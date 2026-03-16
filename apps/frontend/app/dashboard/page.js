@@ -59,6 +59,7 @@ export default function DashboardPage() {
   const [docTypeFilter, setDocTypeFilter] = useState('all');
   const [collectionView, setCollectionView] = useState('all'); // all | recent | images | videos | trash
   const [albumsExpanded, setAlbumsExpanded] = useState(false);
+  const [groupByTimeEnabled, setGroupByTimeEnabled] = useState(false);
   const [groupMode, setGroupMode] = useState('month'); // month | year
   const [expandedGroups, setExpandedGroups] = useState({});
 
@@ -127,6 +128,7 @@ export default function DashboardPage() {
   }, [photoAssets, selectedAlbum]);
 
   const photoGroups = useMemo(() => {
+    if (!groupByTimeEnabled) return [['all', albumFilteredPhotos]];
     const m = new Map();
     for (const p of albumFilteredPhotos) {
       const key = groupMode === 'year' ? yearLabel(p.uploadedAt) : monthLabel(p.uploadedAt);
@@ -134,7 +136,7 @@ export default function DashboardPage() {
       m.get(key).push(p);
     }
     return Array.from(m.entries());
-  }, [albumFilteredPhotos, groupMode]);
+  }, [albumFilteredPhotos, groupMode, groupByTimeEnabled]);
 
   const active = activeIndex >= 0 ? albumFilteredPhotos[activeIndex] : null;
 
@@ -287,10 +289,6 @@ export default function DashboardPage() {
           <span className="ico">🗑</span><span>Thùng rác</span>
         </button>
 
-        <button className="navItem" onClick={() => usageCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}>
-          <span className="ico">📊</span><span>Usage</span>
-        </button>
-
         <div className="storageCard" ref={usageCardRef}>
           <div className="label">Dung lượng</div>
           {usage ? (
@@ -334,9 +332,16 @@ export default function DashboardPage() {
         {tab === 'photos' && (
           <section>
             <div className="groupToggleWrap">
-              <span className="groupLabel">Gom nhóm theo:</span>
-              <button className={`chip ${groupMode === 'month' ? 'active' : ''}`} onClick={() => setGroupMode('month')}>Tháng</button>
-              <button className={`chip ${groupMode === 'year' ? 'active' : ''}`} onClick={() => setGroupMode('year')}>Năm</button>
+              <button className={`chip ${groupByTimeEnabled ? 'active' : ''}`} onClick={() => setGroupByTimeEnabled((v) => !v)}>
+                {groupByTimeEnabled ? 'Tắt gom nhóm theo thời gian' : 'Bật gom nhóm theo thời gian'}
+              </button>
+              {groupByTimeEnabled && (
+                <>
+                  <span className="groupLabel">Theo:</span>
+                  <button className={`chip ${groupMode === 'month' ? 'active' : ''}`} onClick={() => setGroupMode('month')}>Tháng</button>
+                  <button className={`chip ${groupMode === 'year' ? 'active' : ''}`} onClick={() => setGroupMode('year')}>Năm</button>
+                </>
+              )}
             </div>
 
             {collectionView === 'recent' && <div className="hint">Đang hiển thị ảnh/video mới thêm trong 2 tuần gần đây.</div>}
@@ -348,11 +353,13 @@ export default function DashboardPage() {
               const isOpen = expandedGroups[group] ?? true;
               return (
                 <div key={group} className="monthBlock">
-                  <button className="groupHeader" onClick={() => toggleGroup(group)}>
-                    <span>{isOpen ? '▾' : '▸'}</span>
-                    <span>{group}</span>
-                    <span className="groupCount">{items.length}</span>
-                  </button>
+                  {groupByTimeEnabled && (
+                    <button className="groupHeader" onClick={() => toggleGroup(group)}>
+                      <span>{isOpen ? '▾' : '▸'}</span>
+                      <span>{group}</span>
+                      <span className="groupCount">{items.length}</span>
+                    </button>
+                  )}
 
                   {isOpen && (
                     <div className="grid">
