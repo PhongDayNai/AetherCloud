@@ -52,8 +52,11 @@ export default function DashboardPage() {
 
   const [activeIndex, setActiveIndex] = useState(-1);
   const [docTypeFilter, setDocTypeFilter] = useState('all');
+  const [collectionView, setCollectionView] = useState('all'); // all | recent | images | videos | trash
+  const [albumsExpanded, setAlbumsExpanded] = useState(false);
 
   const longPressRef = useRef(null);
+  const usageCardRef = useRef(null);
 
   const filteredAssets = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -61,10 +64,22 @@ export default function DashboardPage() {
     return assets.filter((a) => (a.originalName || '').toLowerCase().includes(q));
   }, [assets, search]);
 
-  const photoAssets = useMemo(
+  const basePhotoAssets = useMemo(
     () => filteredAssets.filter((a) => a.type === 'image' || a.type === 'video'),
     [filteredAssets]
   );
+
+  const recentCutoff = useMemo(() => Date.now() - 14 * 24 * 60 * 60 * 1000, []);
+
+  const photoAssets = useMemo(() => {
+    if (collectionView === 'recent') {
+      return basePhotoAssets.filter((a) => new Date(a.uploadedAt || 0).getTime() >= recentCutoff);
+    }
+    if (collectionView === 'images') return basePhotoAssets.filter((a) => a.type === 'image');
+    if (collectionView === 'videos') return basePhotoAssets.filter((a) => a.type === 'video');
+    if (collectionView === 'trash') return [];
+    return basePhotoAssets;
+  }, [basePhotoAssets, collectionView, recentCutoff]);
 
   const docs = useMemo(
     () => filteredAssets.filter((a) => a.type !== 'image' && a.type !== 'video'),
@@ -88,17 +103,33 @@ export default function DashboardPage() {
     return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [docsFiltered]);
 
-  const photoGroups = useMemo(() => {
+  const [selectedAlbum, setSelectedAlbum] = useState('all');
+
+  const availableAlbums = useMemo(() => {
     const m = new Map();
     for (const p of photoAssets) {
+      const key = monthLabel(p.uploadedAt);
+      m.set(key, (m.get(key) || 0) + 1);
+    }
+    return Array.from(m.entries());
+  }, [photoAssets]);
+
+  const albumFilteredPhotos = useMemo(() => {
+    if (selectedAlbum === 'all') return photoAssets;
+    return photoAssets.filter((p) => monthLabel(p.uploadedAt) === selectedAlbum);
+  }, [photoAssets, selectedAlbum]);
+
+  const photoGroups = useMemo(() => {
+    const m = new Map();
+    for (const p of albumFilteredPhotos) {
       const key = monthLabel(p.uploadedAt);
       if (!m.has(key)) m.set(key, []);
       m.get(key).push(p);
     }
     return Array.from(m.entries());
-  }, [photoAssets]);
+  }, [albumFilteredPhotos]);
 
-  const active = activeIndex >= 0 ? photoAssets[activeIndex] : null;
+  const active = activeIndex >= 0 ? albumFilteredPhotos[activeIndex] : null;
 
   function clearLongPress() {
     if (longPressRef.current) {
@@ -148,12 +179,12 @@ export default function DashboardPage() {
     function onKey(e) {
       if (activeIndex < 0) return;
       if (e.key === 'Escape') setActiveIndex(-1);
-      if (e.key === 'ArrowLeft') setActiveIndex((i) => (i <= 0 ? photoAssets.length - 1 : i - 1));
-      if (e.key === 'ArrowRight') setActiveIndex((i) => (i >= photoAssets.length - 1 ? 0 : i + 1));
+      if (e.key === 'ArrowLeft') setActiveIndex((i) => (i <= 0 ? albumFilteredPhotos.length - 1 : i - 1));
+      if (e.key === 'ArrowRight') setActiveIndex((i) => (i >= albumFilteredPhotos.length - 1 ? 0 : i + 1));
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeIndex, photoAssets.length]);
+  }, [activeIndex, albumFilteredPhotos.length]);
 
   async function onUpload(e) {
     const files = Array.from(e.target.files || []);
@@ -180,7 +211,7 @@ export default function DashboardPage() {
   }
 
   function openPhoto(id) {
-    const idx = photoAssets.findIndex((x) => x.id === id);
+    const idx = albumFilteredPhotos.findIndex((x) => x.id === id);
     if (idx >= 0) setActiveIndex(idx);
   }
 
@@ -202,17 +233,66 @@ export default function DashboardPage() {
     <div className="shell">
       <aside className="sidebar">
         <div className="logo">HC Photos</div>
-        <button className={`navItem ${tab === 'photos' ? 'active' : ''}`} onClick={() => { setTab('photos'); setSelectionMode(false); setSelectedIds([]); }}>📷 Ảnh</button>
-        <button className={`navItem ${tab === 'docs' ? 'active' : ''}`} onClick={() => { setTab('docs'); setSelectionMode(false); setSelectedIds([]); }}>📁 Tài liệu</button>
 
-        <div className="storageCard">
+        <button className={`navItem ${tab === 'docs' ? 'active' : ''}`} onClick={() => { setTab('docs'); setSelectionMode(false); setSelectedIds([]); }}>
+          📁 Tài liệu ({docs.length})
+        </button>
+
+        <div className="sectionTitle">Bộ sưu tập</div>
+
+        <button
+          className={`navItem ${albumsExpanded ? 'active' : ''}`}
+          onClick={() => setAlbumsExpanded((v) => !v)}
+        >
+          {albumsExpanded ? '▾' : '▸'} Album
+        </button>
+
+        {albumsExpanded && (
+          <div className="subList">
+            <button className={`subItem ${selectedAlbum === 'all' ? 'active' : ''}`} onClick={() => { setTab('photos'); setCollectionView('all'); setSelectedAlbum('all'); }}>
+              Tất cả ({photoAssets.length})
+            </button>
+            {availableAlbums.map(([name, count]) => (
+              <button key={name} className={`subItem ${selectedAlbum === name ? 'active' : ''}`} onClick={() => { setTab('photos'); setCollectionView('all'); setSelectedAlbum(name); }}>
+                {name} ({count})
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button className={`navItem ${tab === 'photos' && collectionView === 'recent' ? 'active' : ''}`} onClick={() => { setTab('photos'); setCollectionView('recent'); setSelectedAlbum('all'); }}>
+          🕒 Mới thêm gần đây
+        </button>
+        <button className={`navItem ${tab === 'photos' && collectionView === 'images' ? 'active' : ''}`} onClick={() => { setTab('photos'); setCollectionView('images'); setSelectedAlbum('all'); }}>
+          🖼 Ảnh
+        </button>
+        <button className={`navItem ${tab === 'photos' && collectionView === 'videos' ? 'active' : ''}`} onClick={() => { setTab('photos'); setCollectionView('videos'); setSelectedAlbum('all'); }}>
+          🎬 Video
+        </button>
+        <button className={`navItem ${tab === 'photos' && collectionView === 'trash' ? 'active' : ''}`} onClick={() => { setTab('photos'); setCollectionView('trash'); setSelectedAlbum('all'); }}>
+          🗑 Thùng rác
+        </button>
+
+        <button className="navItem" onClick={() => usageCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}>
+          📊 Usage
+        </button>
+
+        <div className="storageCard" ref={usageCardRef}>
           <div className="label">Dung lượng</div>
           {usage ? (
             <>
-              <div className="row"><span>Đã dùng</span><b>{fmtBytes(usage.usedBytes)}</b></div>
-              <div className="row"><span>Tổng</span><b>{fmtBytes(usage.totalBytes)}</b></div>
-              <div className="bar"><div className="barFill" style={{ width: `${Math.min(100, usage.usedPercent || 0)}%` }} /></div>
-              <small>{usage.usedPercent}%</small>
+              {(() => {
+                const appUsed = (usage.breakdown?.originalsBytes || 0) + (usage.breakdown?.derivedBytes || 0) + (usage.breakdown?.trashBytes || 0);
+                const appPercent = usage.totalBytes > 0 ? Number(((appUsed / usage.totalBytes) * 100).toFixed(4)) : 0;
+                return (
+                  <>
+                    <div className="row"><span>HC Photos dùng</span><b>{fmtBytes(appUsed)}</b></div>
+                    <div className="row"><span>Tổng ổ</span><b>{fmtBytes(usage.totalBytes)}</b></div>
+                    <div className="bar"><div className="barFill" style={{ width: `${Math.min(100, appPercent)}%` }} /></div>
+                    <small>HC Photos: {appPercent}% · Filesystem: {usage.usedPercent}%</small>
+                  </>
+                );
+              })()}
             </>
           ) : <small>Đang tải...</small>}
         </div>
@@ -239,6 +319,11 @@ export default function DashboardPage() {
 
         {tab === 'photos' && (
           <section>
+            {collectionView === 'recent' && <div className="hint">Đang hiển thị ảnh/video mới thêm trong 2 tuần gần đây.</div>}
+            {collectionView === 'trash' && <div className="hint">Thùng rác chưa triển khai backend. Sẽ bổ sung soft-delete ở phase kế tiếp.</div>}
+
+            {photoGroups.length === 0 && <div className="hint">Không có dữ liệu phù hợp.</div>}
+
             {photoGroups.map(([month, items]) => (
               <div key={month} className="monthBlock">
                 <div className="monthTitle">{month} · {items.length}</div>
@@ -298,7 +383,7 @@ export default function DashboardPage() {
 
       {active && (
         <div className="viewer" onClick={() => setActiveIndex(-1)}>
-          <button className="nav left" onClick={(e) => { e.stopPropagation(); setActiveIndex((i) => (i <= 0 ? photoAssets.length - 1 : i - 1)); }}>‹</button>
+          <button className="nav left" onClick={(e) => { e.stopPropagation(); setActiveIndex((i) => (i <= 0 ? albumFilteredPhotos.length - 1 : i - 1)); }}>‹</button>
           <div className="stage" onClick={(e) => e.stopPropagation()}>
             <div className="stageTitle">{active.originalName}</div>
             {active.type === 'image' ? (
@@ -307,7 +392,7 @@ export default function DashboardPage() {
               <video src={`${api}/api/assets/_media/original/${active.id}`} controls autoPlay className="full" />
             )}
           </div>
-          <button className="nav right" onClick={(e) => { e.stopPropagation(); setActiveIndex((i) => (i >= photoAssets.length - 1 ? 0 : i + 1)); }}>›</button>
+          <button className="nav right" onClick={(e) => { e.stopPropagation(); setActiveIndex((i) => (i >= albumFilteredPhotos.length - 1 ? 0 : i + 1)); }}>›</button>
           <button className="close" onClick={(e) => { e.stopPropagation(); setActiveIndex(-1); }}>✕</button>
         </div>
       )}
@@ -319,7 +404,12 @@ export default function DashboardPage() {
         .navItem { width: 100%; text-align: left; border: 0; padding: 11px 12px; border-radius: 12px; margin-bottom: 6px; background: transparent; color: #dcdcdc; cursor: pointer; }
         .navItem:hover { background: #1f1f1f; }
         .navItem.active { background: #2b3548; color: #9fc4ff; }
-        .storageCard { margin-top: 18px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 12px; }
+        .sectionTitle { margin-top: 14px; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.2px; opacity: 0.72; text-transform: uppercase; }
+        .subList { margin: 0 0 6px 8px; border-left: 1px solid #2f2f2f; padding-left: 8px; }
+        .subItem { width: 100%; text-align: left; border: 0; background: transparent; color: #cfcfcf; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+        .subItem:hover { background: #1f1f1f; }
+        .subItem.active { background: #25314a; color: #aecdff; }
+        .storageCard { margin-top: 10px; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 12px; }
         .label { font-size: 12px; opacity: 0.75; margin-bottom: 8px; }
         .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
         .bar { height: 10px; border-radius: 99px; overflow: hidden; background: #2d2d2d; margin: 6px 0; }
@@ -333,6 +423,7 @@ export default function DashboardPage() {
         .ghost { background: transparent; border: 1px solid #4a4a4a; color: #ddd; border-radius: 10px; padding: 10px 12px; cursor: pointer; }
         .info { color: #9dc8ff; margin-bottom: 8px; }
         .error { color: #ff9b9b; margin-bottom: 8px; }
+        .hint { margin: 8px 0 14px; padding: 10px 12px; border: 1px solid #343434; border-radius: 10px; background: #1a1a1a; color: #cfcfcf; font-size: 13px; }
 
         .monthBlock { margin-bottom: 18px; }
         .monthTitle { font-size: 14px; font-weight: 700; margin-bottom: 10px; opacity: 0.92; }
