@@ -203,6 +203,71 @@ function moveToTrash(ids = []) {
   return { updated };
 }
 
+function restoreFromTrash(ids = []) {
+  const idSet = new Set(ids || []);
+  const db = readIndex();
+  let updated = 0;
+
+  for (const it of db.items) {
+    if (!idSet.has(it.id)) continue;
+    const item = normalizeItem(it);
+    if (!item.isDeleted) continue;
+
+    const oldAbs = path.join(LIBRARY_PATH, item.relPath || '');
+    const baseDate = new Date(item.takenAt || item.uploadedAt || Date.now());
+    const yyyy = String(baseDate.getUTCFullYear());
+    const mm = String(baseDate.getUTCMonth() + 1).padStart(2, '0');
+    const ext = path.extname(item.originalName || '') || path.extname(item.relPath || '') || '';
+    const restoreDir = path.join(ORIGINALS_ROOT, yyyy, mm);
+    fs.mkdirSync(restoreDir, { recursive: true });
+    const newAbs = path.join(restoreDir, `${item.id}${ext}`);
+
+    if (fs.existsSync(oldAbs)) {
+      try {
+        fs.renameSync(oldAbs, newAbs);
+      } catch (e) {
+        if (e && e.code === 'EXDEV') {
+          fs.copyFileSync(oldAbs, newAbs);
+          fs.unlinkSync(oldAbs);
+        } else {
+          throw e;
+        }
+      }
+      it.relPath = path.relative(LIBRARY_PATH, newAbs).replaceAll('\\', '/');
+    }
+
+    it.isDeleted = false;
+    it.deletedAt = null;
+    updated += 1;
+  }
+
+  writeIndex(db);
+  return { updated };
+}
+
+function purgeDeleted(ids = []) {
+  const idSet = new Set(ids || []);
+  const db = readIndex();
+  let removed = 0;
+
+  db.items = db.items.filter((it) => {
+    if (!idSet.has(it.id)) return true;
+    const item = normalizeItem(it);
+    if (!item.isDeleted) return true;
+
+    const abs = path.join(LIBRARY_PATH, item.relPath || '');
+    try {
+      if (fs.existsSync(abs)) fs.unlinkSync(abs);
+    } catch {}
+
+    removed += 1;
+    return false;
+  });
+
+  writeIndex(db);
+  return { removed };
+}
+
 module.exports = {
   saveUploadedFile,
   listAssets,
@@ -211,5 +276,7 @@ module.exports = {
   listAlbums,
   assignAlbum,
   moveToTrash,
+  restoreFromTrash,
+  purgeDeleted,
   LIBRARY_PATH,
 };

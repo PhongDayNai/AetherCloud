@@ -248,6 +248,49 @@ export default function DashboardPage() {
     }
   }
 
+  async function restoreSelectedFromTrash() {
+    if (!selectedIds.length) return;
+    try {
+      const r = await fetch(`${api}/api/assets/bulk/restore`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      if (!r.ok) throw new Error('Khôi phục thất bại');
+      const data = await r.json();
+      setMsg(`Đã khôi phục ${data.updated || 0} file`);
+      setSelectedIds([]);
+      setSelectionMode(false);
+      await loadData();
+    } catch (e) {
+      setMsg(`Lỗi khôi phục: ${e.message || 'unknown'}`);
+    }
+  }
+
+  async function purgeSelectedForever() {
+    if (!selectedIds.length) return;
+    const ok = window.confirm('Xóa vĩnh viễn các file đã chọn? Không thể hoàn tác.');
+    if (!ok) return;
+
+    try {
+      const r = await fetch(`${api}/api/assets/bulk/purge`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      if (!r.ok) throw new Error('Xóa vĩnh viễn thất bại');
+      const data = await r.json();
+      setMsg(`Đã xóa vĩnh viễn ${data.removed || 0} file`);
+      setSelectedIds([]);
+      setSelectionMode(false);
+      await loadData();
+    } catch (e) {
+      setMsg(`Lỗi purge: ${e.message || 'unknown'}`);
+    }
+  }
+
   async function addSelectedToAlbum() {
     if (!selectedIds.length) return;
     const name = window.prompt('Tên album cần thêm vào:');
@@ -344,7 +387,7 @@ export default function DashboardPage() {
           <span className="ico">🎬</span><span>Video</span>
         </button>
         <button className={`navItem ${tab === 'photos' && collectionView === 'trash' ? 'active' : ''}`} onClick={() => { setTab('photos'); setCollectionView('trash'); setSelectedAlbum('all'); }}>
-          <span className="ico">🗑</span><span>Thùng rác</span>
+          <span className="ico">🗑</span><span>Thùng rác</span><span className="count">{basePhotoAssets.filter((x) => x.isDeleted).length}</span>
         </button>
 
         <div className="storageCard" ref={usageCardRef}>
@@ -384,8 +427,17 @@ export default function DashboardPage() {
 
             {selectionMode && selectedIds.length > 0 && (
               <>
-                <button className="ghost" onClick={addSelectedToAlbum}>Thêm vào album</button>
-                <button className="danger" onClick={moveSelectedToTrash}>Xóa</button>
+                {collectionView !== 'trash' ? (
+                  <>
+                    <button className="ghost" onClick={addSelectedToAlbum}>Thêm vào album</button>
+                    <button className="danger" onClick={moveSelectedToTrash}>Xóa</button>
+                  </>
+                ) : (
+                  <>
+                    <button className="ghost" onClick={restoreSelectedFromTrash}>Khôi phục</button>
+                    <button className="danger" onClick={purgeSelectedForever}>Xóa vĩnh viễn</button>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -410,7 +462,7 @@ export default function DashboardPage() {
             </div>
 
             {collectionView === 'recent' && <div className="hint">Đang hiển thị ảnh/video mới thêm trong 2 tuần gần đây.</div>}
-            {collectionView === 'trash' && <div className="hint">Thùng rác chưa triển khai backend. Sẽ bổ sung soft-delete ở phase kế tiếp.</div>}
+            {collectionView === 'trash' && <div className="hint">Thùng rác: chọn nhiều để khôi phục hoặc xóa vĩnh viễn.</div>}
 
             {photoGroups.length === 0 && <div className="hint">Không có dữ liệu phù hợp.</div>}
 

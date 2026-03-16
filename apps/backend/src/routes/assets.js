@@ -11,6 +11,8 @@ const {
   listAlbums,
   assignAlbum,
   moveToTrash,
+  restoreFromTrash,
+  purgeDeleted,
 } = require('../lib/assets');
 
 const router = express.Router();
@@ -57,6 +59,22 @@ router.post('/bulk/trash', requireAuth, (req, res) => {
   if (!ids.length) return res.status(400).json({ message: 'ids is required' });
 
   const result = moveToTrash(ids);
+  return res.json({ ok: true, ...result });
+});
+
+router.post('/bulk/restore', requireAuth, (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
+
+  const result = restoreFromTrash(ids);
+  return res.json({ ok: true, ...result });
+});
+
+router.post('/bulk/purge', requireAuth, (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
+
+  const result = purgeDeleted(ids);
   return res.json({ ok: true, ...result });
 });
 
