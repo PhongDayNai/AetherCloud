@@ -29,6 +29,33 @@ function docTypeOf(item) {
   return 'no-extension';
 }
 
+function docCategoryOf(item) {
+  const ext = (item.ext || '').toLowerCase().replace(/^\./, '');
+  const mime = (item.mime || '').toLowerCase();
+
+  if (ext === 'pdf' || mime.includes('pdf')) return 'pdf';
+  if (['doc', 'docx', 'odt', 'rtf'].includes(ext) || mime.includes('word') || mime.includes('officedocument.wordprocessingml')) return 'word';
+  if (['xls', 'xlsx', 'csv', 'ods'].includes(ext) || mime.includes('excel') || mime.includes('spreadsheet')) return 'excel';
+  if (['ppt', 'pptx', 'odp'].includes(ext) || mime.includes('presentation') || mime.includes('powerpoint')) return 'powerpoint';
+  if (['md', 'markdown'].includes(ext) || mime.includes('markdown')) return 'markdown';
+  if (['txt', 'log'].includes(ext) || mime.startsWith('text/')) return 'text';
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext) || mime.includes('zip') || mime.includes('compressed')) return 'archive';
+  if (['json', 'js', 'ts', 'py', 'java', 'kt', 'sql', 'yml', 'yaml', 'xml', 'html', 'css', 'sh'].includes(ext)) return 'code';
+  return 'other';
+}
+
+const DOC_CATEGORY_LABELS = {
+  pdf: 'PDF',
+  word: 'Word',
+  excel: 'Excel/CSV',
+  powerpoint: 'PowerPoint',
+  markdown: 'Markdown',
+  text: 'Text',
+  archive: 'Nén',
+  code: 'Code',
+  other: 'Khác',
+};
+
 function monthLabel(iso) {
   const d = iso ? new Date(iso) : new Date();
   return new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' }).format(d);
@@ -134,7 +161,10 @@ export default function DashboardPage() {
   const [albums, setAlbums] = useState([]);
   const [albumQuery, setAlbumQuery] = useState('');
   const [docTypeFilter, setDocTypeFilter] = useState('all');
+  const [docCategoryFilter, setDocCategoryFilter] = useState('all');
   const [docCollectionView, setDocCollectionView] = useState('all'); // all | trash
+  const [docKindsExpanded, setDocKindsExpanded] = useState(false);
+  const [docsAutoGroup, setDocsAutoGroup] = useState(true);
   const [collectionView, setCollectionView] = useState('all'); // all | recent | images | videos | trash
   const [albumsExpanded, setAlbumsExpanded] = useState(false);
   const [groupByTimeEnabled, setGroupByTimeEnabled] = useState(false);
@@ -187,19 +217,30 @@ export default function DashboardPage() {
   const docTypes = useMemo(() => Array.from(new Set(docsBase.map(docTypeOf))).sort(), [docsBase]);
 
   const docsFiltered = useMemo(() => {
-    if (docTypeFilter === 'all') return docsBase;
-    return docsBase.filter((d) => docTypeOf(d) === docTypeFilter);
-  }, [docsBase, docTypeFilter]);
+    let list = docsBase;
+    if (docCategoryFilter !== 'all') list = list.filter((d) => docCategoryOf(d) === docCategoryFilter);
+    if (docTypeFilter !== 'all') list = list.filter((d) => docTypeOf(d) === docTypeFilter);
+    return list;
+  }, [docsBase, docCategoryFilter, docTypeFilter]);
+
+  const docCategoryCounts = useMemo(() => {
+    const m = new Map();
+    for (const d of docsBase) {
+      const c = docCategoryOf(d);
+      m.set(c, (m.get(c) || 0) + 1);
+    }
+    return m;
+  }, [docsBase]);
 
   const docsGrouped = useMemo(() => {
     const m = new Map();
     for (const d of docsFiltered) {
-      const t = docTypeOf(d);
-      if (!m.has(t)) m.set(t, []);
-      m.get(t).push(d);
+      const key = docsAutoGroup ? (DOC_CATEGORY_LABELS[docCategoryOf(d)] || 'Khác') : docTypeOf(d);
+      if (!m.has(key)) m.set(key, []);
+      m.get(key).push(d);
     }
     return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [docsFiltered]);
+  }, [docsFiltered, docsAutoGroup]);
 
   const [selectedAlbum, setSelectedAlbum] = useState('all');
 
@@ -520,7 +561,7 @@ export default function DashboardPage() {
           <span className="ico">🖼</span><span>Tất cả ảnh/video</span><span className="count">{basePhotoAssets.filter((x) => !x.isDeleted).length}</span>
         </button>
 
-        <button className={`navItem ${tab === 'docs' ? 'active' : ''}`} onClick={() => { setTab('docs'); setDocCollectionView('all'); setSelectionMode(false); setSelectedIds([]); }}>
+        <button className={`navItem ${tab === 'docs' ? 'active' : ''}`} onClick={() => { setTab('docs'); setDocCollectionView('all'); setDocCategoryFilter('all'); setSelectionMode(false); setSelectedIds([]); }}>
           <span className="ico">📁</span><span>Tài liệu</span><span className="count">{docs.length}</span>
         </button>
 
@@ -572,6 +613,39 @@ export default function DashboardPage() {
               </button>
               <button className={`navItem ${tab === 'docs' && docCollectionView === 'trash' ? 'active' : ''}`} onClick={() => { setTab('docs'); setDocCollectionView('trash'); setSelectionMode(false); setSelectedIds([]); }}>
                 <span className="ico">🗑</span><span>Tài liệu trong thùng rác</span><span className="count">{trashedDocs.length}</span>
+              </button>
+
+              <button className={`navItem ${docCategoryFilter === 'all' ? 'active' : ''}`} onClick={() => setDocCategoryFilter('all')}>
+                <span className="ico">🧩</span><span>Tất cả loại</span><span className="count">{docsBase.length}</span>
+              </button>
+
+              {['pdf', 'excel', 'word', 'markdown', 'text'].map((k) => (
+                <button key={k} className={`navItem ${docCategoryFilter === k ? 'active' : ''}`} onClick={() => setDocCategoryFilter(k)}>
+                  <span className="ico">{k === 'pdf' ? '📕' : k === 'excel' ? '📊' : k === 'word' ? '📝' : k === 'markdown' ? '🔤' : '📄'}</span>
+                  <span>{DOC_CATEGORY_LABELS[k]}</span>
+                  <span className="count">{docCategoryCounts.get(k) || 0}</span>
+                </button>
+              ))}
+
+              <button className={`navItem ${docKindsExpanded ? 'active' : ''}`} onClick={() => setDocKindsExpanded((v) => !v)}>
+                <span className="ico">🗂</span><span>Hiện tất cả loại</span><span className="chev">{docKindsExpanded ? '▾' : '▸'}</span>
+              </button>
+
+              {docKindsExpanded && (
+                <div className="subList">
+                  {docTypes.map((t) => (
+                    <button key={t} className={`subItem ${docTypeFilter === t ? 'active' : ''}`} onClick={() => setDocTypeFilter(t)}>
+                      {t}
+                    </button>
+                  ))}
+                  <button className={`subItem ${docTypeFilter === 'all' ? 'active' : ''}`} onClick={() => setDocTypeFilter('all')}>
+                    Bỏ lọc loại cụ thể
+                  </button>
+                </div>
+              )}
+
+              <button className={`navItem ${docsAutoGroup ? 'active' : ''}`} onClick={() => setDocsAutoGroup((v) => !v)}>
+                <span className="ico">🧠</span><span>{docsAutoGroup ? 'Tự gom nhóm: BẬT' : 'Tự gom nhóm: TẮT'}</span>
               </button>
             </div>
           )}
@@ -694,11 +768,15 @@ export default function DashboardPage() {
         {tab === 'docs' && (
           <section className="contentPane">
             <div className="docFilters">
-              <span>Loại file:</span>
+              <span>Loại cụ thể:</span>
               <select value={docTypeFilter} onChange={(e) => setDocTypeFilter(e.target.value)}>
                 <option value="all">Tất cả</option>
                 {docTypes.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
+              <span>Nhóm:</span>
+              <button className={`chip ${docsAutoGroup ? 'active' : ''}`} onClick={() => setDocsAutoGroup((v) => !v)}>
+                {docsAutoGroup ? 'Theo nhóm phổ biến' : 'Theo extension'}
+              </button>
             </div>
 
             {docCollectionView === 'trash' && <div className="hint">Thùng rác tài liệu: chọn nhiều để khôi phục hoặc xóa vĩnh viễn.</div>}
