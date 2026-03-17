@@ -152,7 +152,11 @@ export default function DashboardPage() {
   }
 
   function togglePick(id) {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSelectedIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      if (next.length === 0) setSelectionMode(false);
+      return next;
+    });
   }
 
   function beginLongPress(id) {
@@ -200,9 +204,6 @@ export default function DashboardPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [activeIndex, albumFilteredPhotos.length]);
 
-  useEffect(() => {
-    if (selectionMode && selectedIds.length === 0) setSelectionMode(false);
-  }, [selectionMode, selectedIds.length]);
 
   async function onUpload(e) {
     const files = Array.from(e.target.files || []);
