@@ -68,11 +68,14 @@ function makeVideoPlayable(absPath, id) {
   const transcode = spawnSync('ffmpeg', [
     '-y',
     '-i', absPath,
+    '-map', '0:v:0',
+    '-map', '0:a?',
     '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-crf', '23',
+    '-preset', 'slow',
+    '-crf', '18',
+    '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
-    '-b:a', '128k',
+    '-b:a', '192k',
     '-movflags', '+faststart',
     out,
   ], { stdio: 'ignore' });
