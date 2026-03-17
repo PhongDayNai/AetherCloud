@@ -205,23 +205,71 @@ export default function DashboardPage() {
   }, [activeIndex, albumFilteredPhotos.length]);
 
 
+  async function uploadLargeFileByChunks(file) {
+    const init = await fetch(`${api}/api/assets/upload-chunk/init`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: file.name, mime: file.type || 'application/octet-stream', totalSize: file.size }),
+    });
+    if (!init.ok) throw new Error('Không tạo được phiên upload chunk');
+    const initData = await init.json();
+    const uploadId = initData.uploadId;
+
+    const CHUNK = 8 * 1024 * 1024; // 8MB/chunk
+    const totalChunks = Math.ceil(file.size / CHUNK);
+
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK;
+      const end = Math.min(file.size, start + CHUNK);
+      const blob = file.slice(start, end);
+      const fd = new FormData();
+      fd.append('chunk', blob, `${file.name}.part`);
+      fd.append('index', String(i));
+
+      const r = await fetch(`${api}/api/assets/upload-chunk/${uploadId}`, {
+        method: 'POST',
+        credentials: 'include',
+        body: fd,
+      });
+      if (!r.ok) throw new Error(`Chunk ${i + 1}/${totalChunks} lỗi`);
+
+      setMsg(`Đang upload ${file.name}: ${i + 1}/${totalChunks}`);
+    }
+
+    const done = await fetch(`${api}/api/assets/upload-chunk/${uploadId}/complete`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!done.ok) throw new Error('Hoàn tất upload chunk thất bại');
+    return done.json();
+  }
+
   async function onUpload(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    const form = new FormData();
-    files.forEach((f) => form.append('files', f));
-
-    setMsg(`Đang upload ${files.length} file...`);
     try {
-      const r = await fetch(`${api}/api/assets/upload`, {
-        method: 'POST',
-        credentials: 'include',
-        body: form,
-      });
-      if (!r.ok) throw new Error('Upload thất bại');
-      const data = await r.json();
-      setMsg(`Upload xong ${data.count} file`);
+      setMsg(`Đang upload ${files.length} file...`);
+
+      for (const file of files) {
+        const big = file.size > 90 * 1024 * 1024; // >90MB dùng chunk tránh Cloudflare limit
+        if (big) {
+          await uploadLargeFileByChunks(file);
+        } else {
+          const form = new FormData();
+          form.append('files', file);
+          const r = await fetch(`${api}/api/assets/upload`, {
+            method: 'POST',
+            credentials: 'include',
+            body: form,
+          });
+          if (!r.ok) throw new Error(`Upload thất bại: ${file.name}`);
+          await r.json();
+        }
+      }
+
+      setMsg(`Upload xong ${files.length} file`);
       await loadData();
       e.target.value = '';
     } catch (ex) {

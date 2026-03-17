@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const crypto = require('crypto');
 const { requireAuth } = require('../middleware/requireAuth');
 const {
   saveUploadedFile,
@@ -28,11 +29,79 @@ const upload = multer({
   },
 });
 
+const chunkSessions = new Map();
+
 router.get('/', requireAuth, (req, res) => {
   const limit = Number(req.query.limit || 200);
   const includeTrash = String(req.query.includeTrash || 'false') === 'true';
   const onlyTrash = String(req.query.onlyTrash || 'false') === 'true';
   return res.json({ items: listAssets(limit, { includeTrash, onlyTrash }) });
+});
+
+router.post('/upload-chunk/init', requireAuth, (req, res) => {
+  const { fileName, mime, totalSize } = req.body || {};
+  if (!fileName || !mime) return res.status(400).json({ message: 'fileName and mime are required' });
+
+  const uploadId = crypto.randomUUID();
+  const chunkDir = path.join(tempDir, uploadId);
+  fs.mkdirSync(chunkDir, { recursive: true });
+
+  chunkSessions.set(uploadId, {
+    fileName,
+    mime,
+    totalSize: Number(totalSize || 0),
+    chunkDir,
+    createdAt: Date.now(),
+  });
+
+  return res.json({ ok: true, uploadId });
+});
+
+router.post('/upload-chunk/:uploadId', requireAuth, upload.single('chunk'), (req, res) => {
+  const session = chunkSessions.get(req.params.uploadId);
+  if (!session) return res.status(404).json({ message: 'upload session not found' });
+  if (!req.file) return res.status(400).json({ message: 'chunk is required' });
+
+  const index = Number(req.body?.index);
+  if (!Number.isFinite(index) || index < 0) return res.status(400).json({ message: 'invalid chunk index' });
+
+  const dest = path.join(session.chunkDir, `${String(index).padStart(8, '0')}.part`);
+  fs.renameSync(req.file.path, dest);
+  return res.json({ ok: true, index });
+});
+
+router.post('/upload-chunk/:uploadId/complete', requireAuth, async (req, res) => {
+  const session = chunkSessions.get(req.params.uploadId);
+  if (!session) return res.status(404).json({ message: 'upload session not found' });
+
+  const parts = fs.readdirSync(session.chunkDir).filter((x) => x.endsWith('.part')).sort();
+  if (!parts.length) return res.status(400).json({ message: 'no chunks uploaded' });
+
+  const merged = path.join(tempDir, `${req.params.uploadId}.merged`);
+  const ws = fs.createWriteStream(merged);
+  for (const p of parts) {
+    const buf = fs.readFileSync(path.join(session.chunkDir, p));
+    ws.write(buf);
+  }
+  ws.end();
+
+  await new Promise((resolve) => ws.on('finish', resolve));
+
+  const stat = fs.statSync(merged);
+  const saved = await saveUploadedFile(
+    {
+      path: merged,
+      originalname: session.fileName,
+      mimetype: session.mime,
+      size: stat.size,
+    },
+    req.user
+  );
+
+  try { fs.rmSync(session.chunkDir, { recursive: true, force: true }); } catch {}
+  chunkSessions.delete(req.params.uploadId);
+
+  return res.json({ ok: true, item: saved });
 });
 
 router.post('/upload', requireAuth, upload.array('files', 50), async (req, res) => {
