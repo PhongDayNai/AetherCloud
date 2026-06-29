@@ -74,18 +74,132 @@ function buildHlsDirById(id) {
   return hlsDir;
 }
 
-function makeVideoPlayable(absPath, id) {
+function executeFfmpegAsync(args, strategyName) {
   return new Promise((resolve) => {
-    const out = buildPlayPathById(id);
+    console.log(`[Transcoder] Bắt đầu transcode bằng ${strategyName}...`);
+    const child = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderrData = '';
+    let lastLogTime = 0;
 
-    const child = spawn('ffmpeg', [
+    child.stderr.on('data', (data) => {
+      const str = data.toString();
+      stderrData += str;
+
+      const now = Date.now();
+      if (now - lastLogTime > 4000) {
+        const lines = str.split(/[\r\n]+/);
+        const progressLine = lines.reverse().find(line => line.includes('frame=') && line.includes('time='));
+        if (progressLine) {
+          console.log(`[Transcoder] Tiến độ [${strategyName}]: ${progressLine.trim()}`);
+          lastLogTime = now;
+        }
+      }
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        console.log(`[Transcoder] Transcode bằng ${strategyName} THÀNH CÔNG.`);
+        resolve(true);
+      } else {
+        console.error(`[Transcoder] Transcode bằng ${strategyName} THẤT BẠI (Mã lỗi: ${code}).`);
+        const lines = stderrData.split('\n').filter(Boolean).slice(-10).join('\n');
+        console.error(`[Transcoder] Chi tiết lỗi ffmpeg:\n${lines}`);
+        resolve(false);
+      }
+    });
+
+    child.on('error', (err) => {
+      console.error(`[Transcoder] Không thể khởi chạy ffmpeg cho ${strategyName}:`, err.message);
+      resolve(false);
+    });
+  });
+}
+
+async function transcodeWithFallback(getArgsFn, outPath) {
+  // Strategy 1: Nvidia NVENC (dGPU)
+  const nvencArgs = getArgsFn('nvenc');
+  const nvencOk = await executeFfmpegAsync(nvencArgs, 'Nvidia NVENC');
+  if (nvencOk && fs.existsSync(outPath)) {
+    return true;
+  }
+  console.log(`[Transcoder] NVENC kiểm tra thất bại: nvencOk=${nvencOk}, fileExists=${fs.existsSync(outPath)}`);
+  try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
+
+  // Strategy 2: VA-API (Generic Intel/AMD iGPU/dGPU on Linux)
+  if (fs.existsSync('/dev/dri/renderD128')) {
+    const vaapiArgs = getArgsFn('vaapi');
+    const vaapiOk = await executeFfmpegAsync(vaapiArgs, 'Intel/AMD VA-API');
+    if (vaapiOk && fs.existsSync(outPath)) {
+      return true;
+    }
+    try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
+  } else {
+    console.log('[Transcoder] Bỏ qua VA-API do không tìm thấy thiết bị /dev/dri/renderD128');
+  }
+
+  // Strategy 3: CPU Fallback (libx264)
+  const cpuArgs = getArgsFn('cpu');
+  const cpuOk = await executeFfmpegAsync(cpuArgs, 'CPU (libx264)');
+  if (cpuOk && fs.existsSync(outPath)) {
+    return true;
+  }
+  return false;
+}
+
+function makeVideoPlayable(absPath, id) {
+  const out = buildPlayPathById(id);
+
+  const getArgs = (strategy) => {
+    if (strategy === 'nvenc') {
+      return [
+        '-y',
+        '-i', absPath,
+        '-map', '0:v:0',
+        '-map', '0:a?',
+        '-c:v', 'h264_nvenc',
+        '-preset', 'fast',
+        '-cq', '24',
+        '-pix_fmt', 'yuv420p',
+        '-maxrate', '10M',
+        '-bufsize', '20M',
+        '-g', '48',
+        '-keyint_min', '48',
+        '-c:a', 'aac',
+        '-b:a', '192k',
+        '-movflags', '+faststart',
+        out,
+      ];
+    }
+    if (strategy === 'vaapi') {
+      return [
+        '-y',
+        '-hwaccel', 'vaapi',
+        '-hwaccel_device', '/dev/dri/renderD128',
+        '-hwaccel_output_format', 'vaapi',
+        '-i', absPath,
+        '-map', '0:v:0',
+        '-map', '0:a?',
+        '-c:v', 'h264_vaapi',
+        '-qp', '24',
+        '-maxrate', '10M',
+        '-bufsize', '20M',
+        '-g', '48',
+        '-keyint_min', '48',
+        '-c:a', 'aac',
+        '-b:a', '192k',
+        '-movflags', '+faststart',
+        out,
+      ];
+    }
+    // CPU fallback
+    return [
       '-y',
       '-i', absPath,
       '-map', '0:v:0',
       '-map', '0:a?',
       '-c:v', 'libx264',
       '-preset', 'faster',
-      '-crf', '18',
+      '-crf', '23',
       '-pix_fmt', 'yuv420p',
       '-maxrate', '10M',
       '-bufsize', '20M',
@@ -95,20 +209,10 @@ function makeVideoPlayable(absPath, id) {
       '-b:a', '192k',
       '-movflags', '+faststart',
       out,
-    ], { stdio: 'ignore' });
+    ];
+  };
 
-    child.on('close', (code) => {
-      if (code === 0 && fs.existsSync(out)) {
-        resolve(out);
-      } else {
-        resolve(null);
-      }
-    });
-
-    child.on('error', () => {
-      resolve(null);
-    });
-  });
+  return transcodeWithFallback(getArgs, out).then((ok) => (ok ? out : null));
 }
 
 function probeVideoSize(absPath) {
@@ -131,76 +235,66 @@ function probeVideoSize(absPath) {
   return null;
 }
 
-function makeVideoHlsHigh(absPath, id) {
-  return new Promise((resolve) => {
-    const hlsDir = buildHlsDirById(id);
-    const streamPath = path.join(hlsDir, 'stream.m3u8');
-    const masterPath = path.join(hlsDir, 'master.m3u8');
+function makeVideoHlsFromPlayable(playableMp4Path, id) {
+  const hlsDir = buildHlsDirById(id);
+  const streamPath = path.join(hlsDir, 'stream.m3u8');
+  const masterPath = path.join(hlsDir, 'master.m3u8');
 
-    const child = spawn('ffmpeg', [
-      '-y',
-      '-i', absPath,
-      '-map', '0:v:0',
-      '-map', '0:a?',
-      '-c:v', 'libx264',
-      '-preset', 'faster',
-      '-crf', '18',
-      '-pix_fmt', 'yuv420p',
-      '-maxrate', '10M',
-      '-bufsize', '20M',
-      '-g', '48',
-      '-keyint_min', '48',
-      '-sc_threshold', '0',
-      '-c:a', 'aac',
-      '-b:a', '192k',
-      '-hls_time', '4',
-      '-hls_playlist_type', 'vod',
-      '-hls_flags', 'independent_segments',
-      '-hls_segment_filename', path.join(hlsDir, 'seg_%05d.ts'),
-      streamPath,
-    ], { stdio: 'ignore' });
+  const args = [
+    '-y',
+    '-i', playableMp4Path,
+    '-c', 'copy',
+    '-hls_time', '4',
+    '-hls_playlist_type', 'vod',
+    '-hls_flags', 'independent_segments',
+    '-hls_segment_filename', path.join(hlsDir, 'seg_%05d.ts'),
+    streamPath,
+  ];
 
-    child.on('close', (code) => {
-      if (code !== 0 || !fs.existsSync(streamPath)) {
-        return resolve(null);
-      }
+  return executeFfmpegAsync(args, 'HLS Packaging').then((ok) => {
+    if (!ok) return null;
 
-      const size = probeVideoSize(streamPath) || probeVideoSize(absPath);
-      const res = size ? `${size.w}x${size.h}` : '1920x1080';
+    const size = probeVideoSize(streamPath) || probeVideoSize(playableMp4Path);
+    const res = size ? `${size.w}x${size.h}` : '1920x1080';
 
-      const master = [
-        '#EXTM3U',
-        '#EXT-X-VERSION:3',
-        `#EXT-X-STREAM-INF:BANDWIDTH=12000000,AVERAGE-BANDWIDTH=8000000,RESOLUTION=${res},CODECS="avc1.640028,mp4a.40.2"`,
-        'stream.m3u8',
-        '',
-      ].join('\n');
-      
-      try {
-        fs.writeFileSync(masterPath, master);
-        resolve({
-          hlsDir,
-          masterPath,
-        });
-      } catch {
-        resolve(null);
-      }
-    });
-
-    child.on('error', () => {
-      resolve(null);
-    });
+    const master = [
+      '#EXTM3U',
+      '#EXT-X-VERSION:3',
+      `#EXT-X-STREAM-INF:BANDWIDTH=12000000,AVERAGE-BANDWIDTH=8000000,RESOLUTION=${res},CODECS="avc1.640028,mp4a.40.2"`,
+      'stream.m3u8',
+      '',
+    ].join('\n');
+    
+    try {
+      fs.writeFileSync(masterPath, master);
+      return {
+        hlsDir,
+        masterPath,
+      };
+    } catch (err) {
+      console.error(`[Transcoder] Không thể ghi file master.m3u8:`, err.message);
+      return null;
+    }
   });
 }
 
 async function scheduleVideoDerivatives(id, absPath) {
   try {
+    console.log(`[Transcoder] Bắt đầu scheduleVideoDerivatives cho ${id}...`);
     const playable = await makeVideoPlayable(absPath, id);
-    const hls = await makeVideoHlsHigh(absPath, id);
+    console.log(`[Transcoder] Kết quả makeVideoPlayable:`, playable);
+    let hls = null;
+    if (playable) {
+      hls = await makeVideoHlsFromPlayable(playable, id);
+      console.log(`[Transcoder] Kết quả makeVideoHlsFromPlayable:`, hls);
+    }
 
     const db = readIndex();
     const item = db.items.find((x) => x.id === id);
-    if (!item) return;
+    if (!item) {
+      console.error(`[Transcoder] Không tìm thấy item ${id} trong assets.json.`);
+      return;
+    }
 
     if (playable) item.playRelPath = path.relative(LIBRARY_PATH, playable).replaceAll('\\', '/');
     if (hls?.masterPath) item.hlsRelPath = path.relative(LIBRARY_PATH, hls.masterPath).replaceAll('\\', '/');
@@ -208,7 +302,10 @@ async function scheduleVideoDerivatives(id, absPath) {
     item.processingFinishedAt = new Date().toISOString();
 
     writeIndex(db);
-  } catch {}
+    console.log(`[Transcoder] Đã cập nhật assets.json sang trạng thái ready cho ${id}.`);
+  } catch (err) {
+    console.error(`[Transcoder] Lỗi nghiêm trọng trong scheduleVideoDerivatives:`, err);
+  }
 }
 
 async function saveUploadedFile(file, user) {
