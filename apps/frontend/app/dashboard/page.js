@@ -200,6 +200,7 @@ export default function DashboardPage() {
   const [showAlbumPicker, setShowAlbumPicker] = useState(false);
   const [albums, setAlbums] = useState([]);
   const [albumQuery, setAlbumQuery] = useState('');
+  const [selectedAlbumsForActive, setSelectedAlbumsForActive] = useState([]);
   const [docTypeFilter, setDocTypeFilter] = useState('all');
   const [docCategoryFilter, setDocCategoryFilter] = useState('all');
   const [docCollectionView, setDocCollectionView] = useState('all'); // all | trash
@@ -639,21 +640,41 @@ export default function DashboardPage() {
     setDocProjects(data.items || []);
   }
 
-  async function addActiveToAlbum(name) {
-    if (!active?.id) return;
-    const albumName = (name || '').trim();
-    if (!albumName) return;
+  function toggleAlbumSelection(name) {
+    setSelectedAlbumsForActive((prev) =>
+      prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]
+    );
+  }
 
-    const r = await fetch(`${api}/api/assets/bulk/album`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: [active.id], albumName }),
+  function createNewAlbumInSelection(name) {
+    const trimmed = (name || '').trim();
+    if (!trimmed) return;
+    setSelectedAlbumsForActive((prev) =>
+      prev.includes(trimmed) ? prev : [...prev, trimmed]
+    );
+    setAlbums((prev) => {
+      if (prev.some((a) => a.name.toLowerCase() === trimmed.toLowerCase())) return prev;
+      return [...prev, { name: trimmed, count: 0 }];
     });
-    if (!r.ok) throw new Error('Thêm album thất bại');
-    await loadData();
-    await loadAlbums();
-    setShowAlbumPicker(false);
+  }
+
+  async function saveActiveAlbums() {
+    if (!active?.id) return;
+    try {
+      const r = await fetch(`${api}/api/assets/${active.id}/albums`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumNames: selectedAlbumsForActive }),
+      });
+      if (!r.ok) throw new Error('Cập nhật album thất bại');
+      await loadData();
+      await loadAlbums();
+      setShowAlbumPicker(false);
+      setMsg('Đã cập nhật danh sách album thành công');
+    } catch (e) {
+      setMsg(`Lỗi lưu album: ${e.message}`);
+    }
   }
 
   function openPhoto(id) {
@@ -971,7 +992,19 @@ export default function DashboardPage() {
           </div>
           <button className="nav right" onClick={(e) => { e.stopPropagation(); setActiveIndex((i) => (i >= albumFilteredPhotos.length - 1 ? 0 : i + 1)); }}>›</button>
           <button className="topBtn infoBtn" onClick={(e) => { e.stopPropagation(); setShowInfo((v) => !v); }}>i</button>
-          <button className="topBtn albumBtn" onClick={async (e) => { e.stopPropagation(); try { await loadAlbums(); setShowAlbumPicker((v) => !v); } catch (er) { setMsg('Không tải được album'); } }}>＋</button>
+          <button className="topBtn albumBtn" onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              await loadAlbums();
+              if (!showAlbumPicker && active) {
+                const current = active.albumNames || (active.albumName ? [active.albumName] : []);
+                setSelectedAlbumsForActive(current);
+              }
+              setShowAlbumPicker((v) => !v);
+            } catch (er) {
+              setMsg('Không tải được album');
+            }
+          }}>＋</button>
           <button className="close" onClick={(e) => { e.stopPropagation(); setActiveIndex(-1); setShowInfo(false); setShowAlbumPicker(false); }}>✕</button>
 
           {showInfo && active && (
@@ -988,11 +1021,22 @@ export default function DashboardPage() {
           {showAlbumPicker && (
             <div className="albumPanel" onClick={(e) => e.stopPropagation()}>
               <input className="albumSearch" placeholder="Tìm album..." value={albumQuery} onChange={(e) => setAlbumQuery(e.target.value)} />
-              <button className="albumCreate" onClick={() => addActiveToAlbum(albumQuery || window.prompt('Tên album mới:') || '')}>+ Tạo album mới</button>
+              <button className="albumCreate" onClick={() => createNewAlbumInSelection(albumQuery || window.prompt('Tên album mới:') || '')}>+ Tạo album mới</button>
               <div className="albumList">
-                {albums.filter((a) => a.name.toLowerCase().includes(albumQuery.toLowerCase())).map((a) => (
-                  <button key={a.name} className="albumItem" onClick={() => addActiveToAlbum(a.name)}>{a.name} ({a.count})</button>
-                ))}
+                {albums.filter((a) => a.name.toLowerCase().includes(albumQuery.toLowerCase())).map((a) => {
+                  const isSelected = selectedAlbumsForActive.includes(a.name);
+                  return (
+                    <button key={a.name} className={`albumItem ${isSelected ? 'selected' : ''}`} onClick={() => toggleAlbumSelection(a.name)}>
+                      <span className="chk">{isSelected ? '✓' : ''}</span>
+                      <span>{a.name}</span>
+                      <span className="cnt">({a.count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="albumActions">
+                <button className="albumBtnSave" onClick={saveActiveAlbums}>Lưu</button>
+                <button className="albumBtnCancel" onClick={() => setShowAlbumPicker(false)}>Hủy</button>
               </div>
             </div>
           )}
@@ -1772,6 +1816,9 @@ export default function DashboardPage() {
           gap: 4px;
         }
         .albumItem {
+          display: flex;
+          align-items: center;
+          gap: 8px;
           text-align: left;
           background: rgba(255, 255, 255, 0.02);
           border: 1px solid rgba(255, 255, 255, 0.05);
@@ -1786,6 +1833,71 @@ export default function DashboardPage() {
         .albumItem:hover {
           background: rgba(255, 255, 255, 0.06);
           color: #ffffff;
+        }
+        .albumItem.selected {
+          background: rgba(255, 255, 255, 0.08);
+          border-color: rgba(255, 255, 255, 0.2);
+          color: #ffffff;
+        }
+        .albumItem .chk {
+          width: 14px;
+          height: 14px;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 4px;
+          display: grid;
+          place-items: center;
+          font-size: 10px;
+          color: #09090b;
+          background: transparent;
+          transition: all 0.2s ease;
+        }
+        .albumItem.selected .chk {
+          background: #ffffff;
+          border-color: #ffffff;
+          color: #09090b;
+        }
+        .albumItem .cnt {
+          margin-left: auto;
+          font-size: 11px;
+          color: #71717a;
+        }
+        .albumActions {
+          display: flex;
+          gap: 8px;
+          margin-top: 12px;
+          border-top: 1px solid rgba(255, 255, 255, 0.06);
+          padding-top: 10px;
+        }
+        .albumBtnSave {
+          flex: 1;
+          background: #ffffff;
+          color: #09090b;
+          border: 0;
+          border-radius: 8px;
+          padding: 8px;
+          font-weight: 600;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          font-family: inherit;
+        }
+        .albumBtnSave:hover {
+          background: #f4f4f5;
+        }
+        .albumBtnCancel {
+          background: rgba(255, 255, 255, 0.05);
+          color: #e4e4e7;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 8px;
+          padding: 8px 12px;
+          font-weight: 600;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          font-family: inherit;
+        }
+        .albumBtnCancel:hover {
+          background: rgba(255, 255, 255, 0.1);
         }
         .mediaCache {
           position: fixed;

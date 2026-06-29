@@ -354,6 +354,18 @@ function assignAlbum(ids = [], albumName = '') {
   return { updated };
 }
 
+function setAssetAlbums(id, albumNames = []) {
+  const names = albumNames.map(x => String(x || '').trim()).filter(Boolean);
+  const db = readIndex();
+  const it = db.items.find((x) => x.id === id);
+  if (!it) return { updated: 0 };
+
+  it.albumNames = names;
+  it.albumName = names[0] || null;
+  writeIndex(db);
+  return { updated: 1 };
+}
+
 function listDocProjects() {
   const db = readIndex();
   const m = new Map();
@@ -517,6 +529,7 @@ module.exports = {
   getHlsDirAbsPathFromAsset,
   listAlbums,
   assignAlbum,
+  setAssetAlbums,
   listDocProjects,
   assignDocProject,
   moveToTrash,

@@ -14,6 +14,7 @@ const {
   getHlsDirAbsPathFromAsset,
   listAlbums,
   assignAlbum,
+  setAssetAlbums,
   listDocProjects,
   assignDocProject,
   moveToTrash,
@@ -235,6 +236,13 @@ router.get('/_media/original/:id', requireAuth, (req, res) => {
   res.setHeader('Content-Disposition', `inline; filename="${path.basename(asset.originalName || 'file')}"`);
   res.setHeader('Cache-Control', 'private, max-age=3600');
   return res.sendFile(abs);
+});
+
+router.put('/:id/albums', requireAuth, (req, res) => {
+  const albumNames = Array.isArray(req.body?.albumNames) ? req.body.albumNames : [];
+  const result = setAssetAlbums(req.params.id, albumNames);
+  if (result.updated === 0) return res.status(404).json({ message: 'Asset not found' });
+  return res.json({ ok: true, ...result });
 });
 
 router.get('/:id', requireAuth, (req, res) => {
