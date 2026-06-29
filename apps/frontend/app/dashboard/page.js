@@ -1088,7 +1088,7 @@ export default function DashboardPage() {
       {active && (
         <div className="viewer" onClick={() => { setActiveIndex(-1); setShowInfo(false); setShowAlbumPicker(false); setShowTagPicker(false); }}>
           <button className="nav left" onClick={(e) => { e.stopPropagation(); const list = tab === 'photos' ? albumFilteredPhotos : docsFiltered; if (list.length > 0) setActiveIndex((i) => (i <= 0 ? list.length - 1 : i - 1)); }}>‹</button>
-          <div className="stage" onClick={(e) => e.stopPropagation()}>
+          <div className={`stage ${activeMediaFit === 'contain-tall' ? 'stageTall' : ''}`} onClick={(e) => e.stopPropagation()}>
             <div className="stageTitle">{active.originalName}</div>
             {active.type === 'image' && (
               <img key={active.id} src={`${api}/api/assets/_media/original/${active.id}`} alt={active.originalName} className={`full mediaEnter ${activeMediaFit}`} />
@@ -1800,6 +1800,33 @@ export default function DashboardPage() {
           justify-content: center;
           align-items: center;
           gap: 10px;
+          position: relative;
+          overflow: hidden;
+        }
+        .stageTall::before,
+        .stageTall::after {
+          content: '';
+          position: absolute;
+          top: 40px;
+          bottom: 12px;
+          width: clamp(40px, 10vw, 160px);
+          pointer-events: none;
+          z-index: 1;
+          filter: blur(16px);
+          opacity: 0.35;
+          border-radius: 18px;
+        }
+        .stageTall::before {
+          left: 0;
+          background: linear-gradient(90deg, rgba(255,255,255,.10), rgba(255,255,255,0));
+        }
+        .stageTall::after {
+          right: 0;
+          background: linear-gradient(270deg, rgba(255,255,255,.10), rgba(255,255,255,0));
+        }
+        .stageTitle, .full {
+          position: relative;
+          z-index: 2;
         }
         .mediaEnter {
           animation: mediaFadeIn .3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1933,7 +1960,8 @@ export default function DashboardPage() {
           position: absolute;
           right: 24px;
           top: 76px;
-          width: 300px;
+          width: min(300px, calc(100vw - 48px));
+          box-sizing: border-box;
           max-height: 60vh;
           overflow-y: auto;
           background: rgba(15, 15, 18, 0.85);
@@ -1944,6 +1972,9 @@ export default function DashboardPage() {
           backdrop-filter: blur(12px);
           animation: panelEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           transform-origin: top right;
+        }
+        .albumPanel * {
+          box-sizing: border-box;
         }
         .albumSearch {
           width: 100%;
@@ -1996,6 +2027,13 @@ export default function DashboardPage() {
           font-family: inherit;
           cursor: pointer;
           transition: all 0.2s ease;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .albumItem span:nth-child(2) {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         .albumItem:hover {
           background: rgba(255, 255, 255, 0.06);
