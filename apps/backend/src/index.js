@@ -40,7 +40,7 @@ app.use(express.json({ limit: '25mb' }));
 app.use(cookieParser());
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'hcphotos-be', time: new Date().toISOString() });
+  res.json({ ok: true, service: 'aethercloud-be', time: new Date().toISOString() });
 });
 
 app.use('/api/auth', authRoutes);
@@ -49,12 +49,12 @@ app.use('/api/assets', assetsRoutes);
 
 app.get('/api', (_req, res) => {
   res.json({
-    name: 'PC Photos API',
+    name: 'AetherCloud API',
     version: '0.1.0',
     endpoints: ['/api/health', '/api/auth/*', '/api/storage/usage'],
   });
 });
 
 app.listen(port, () => {
-  console.log(`hcphotos-be listening on :${port}`);
+  console.log(`aethercloud-be listening on :${port}`);
 });

@@ -840,7 +840,7 @@ export default function DashboardPage() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="logo">PC Photos</div>
+        <div className="logo">AetherCloud</div>
 
         <button className={`navItem ${tab === 'photos' && collectionView === 'all' ? 'active' : ''}`} onClick={() => { setTab('photos'); setCollectionView('all'); setSelectedAlbum('all'); setSelectionMode(false); setSelectedIds([]); }}>
           <span className="ico">🖼</span><span>Tất cả ảnh/video</span><span className="count">{basePhotoAssets.filter((x) => !x.isDeleted).length}</span>
@@ -978,10 +978,10 @@ export default function DashboardPage() {
                 const appPercent = usage.totalBytes > 0 ? Number(((appUsed / usage.totalBytes) * 100).toFixed(4)) : 0;
                 return (
                   <>
-                    <div className="row"><span>PC Photos dùng</span><b>{fmtBytes(appUsed)}</b></div>
+                    <div className="row"><span>AetherCloud dùng</span><b>{fmtBytes(appUsed)}</b></div>
                     <div className="row"><span>Tổng ổ</span><b>{fmtBytes(usage.totalBytes)}</b></div>
                     <div className="bar"><div className="barFill" style={{ width: `${Math.min(100, appPercent)}%` }} /></div>
-                    <small>PC Photos: {appPercent}% · Filesystem: {usage.usedPercent}%</small>
+                    <small>AetherCloud: {appPercent}% · Filesystem: {usage.usedPercent}%</small>
                     {Number(usage.processingCount || 0) > 0 && <small>Đang xử lý media: {usage.processingCount} file · tạm giữ nguyên số usage</small>}
                   </>
                 );

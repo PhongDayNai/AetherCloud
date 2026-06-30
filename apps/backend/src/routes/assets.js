@@ -25,7 +25,7 @@ const {
 } = require('../lib/assets');
 
 const router = express.Router();
-const tempDir = '/tmp/hcphotos-upload';
+const tempDir = '/tmp/aethercloud-upload';
 fs.mkdirSync(tempDir, { recursive: true });
 
 const upload = multer({

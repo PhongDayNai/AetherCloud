@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'PC Photos',
-  description: 'Private photo/video hub',
+  title: 'AetherCloud',
+  description: 'Private cloud for photos, videos, documents, and spaces',
 };
 
 export default function RootLayout({ children }) {

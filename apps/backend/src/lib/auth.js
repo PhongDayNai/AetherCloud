@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
-const ACCESS_COOKIE = 'hcphotos_access';
-const REFRESH_COOKIE = 'hcphotos_refresh';
+const ACCESS_COOKIE = 'aethercloud_access';
+const REFRESH_COOKIE = 'aethercloud_refresh';
 
 function signAccess(payload) {
   return jwt.sign(payload, process.env.JWT_ACCESS_SECRET || 'dev_access_secret', {

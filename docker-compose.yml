@@ -1,6 +1,6 @@
 services:
   fe:
-    container_name: hcphotos-fe
+    container_name: aethercloud-fe
     build:
       context: ./apps/frontend
       args:
@@ -17,7 +17,7 @@ services:
     restart: unless-stopped
 
   be:
-    container_name: hcphotos-be
+    container_name: aethercloud-be
     build:
       context: ./apps/backend
     env_file:
@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   worker:
-    container_name: hcphotos-worker
+    container_name: aethercloud-worker
     build:
       context: ./apps/worker
     env_file:
@@ -45,12 +45,12 @@ services:
     restart: unless-stopped
 
   db:
-    container_name: hcphotos-db
+    container_name: aethercloud-db
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-hcphotos}
-      POSTGRES_USER: ${POSTGRES_USER:-hcphotos}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hcphotos_local_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-aethercloud}
+      POSTGRES_USER: ${POSTGRES_USER:-aethercloud}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aethercloud_local_dev}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -58,7 +58,7 @@ services:
     restart: unless-stopped
 
   redis:
-    container_name: hcphotos-redis
+    container_name: aethercloud-redis
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
     volumes:

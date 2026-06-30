@@ -1,7 +1,7 @@
 const { Pool } = require('pg');
 const fs = require('fs');
 
-let connectionString = process.env.DATABASE_URL || 'postgresql://hcphotos:hcphotos_local_dev@localhost:5432/hcphotos';
+let connectionString = process.env.DATABASE_URL || 'postgresql://aethercloud:aethercloud_local_dev@localhost:5432/aethercloud';
 
 // Check if we are running in docker or host to route host 'db' to 'localhost' appropriately
 const isDocker = fs.existsSync('/.dockerenv');

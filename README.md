@@ -1,8 +1,8 @@
-# PC Photos
+# AetherCloud
 
 [Bản Tiếng Việt](./README-vi.md)
 
-A self-hosted, private cloud web application for backing up, organizing, and viewing photos and videos with a smooth interface and experience inspired by Apple Photos.
+A self-hosted, private cloud web application for backing up, organizing, and viewing photos, videos, and documents with a smooth interface and experience.
 
 The system is designed to run optimally on home servers or NAS devices integrated with external hard drives (HDD) and is securely routed via Cloudflare Tunnel.
 
@@ -35,11 +35,11 @@ The system is designed to run optimally on home servers or NAS devices integrate
 
 The application is fully containerized using Docker and comprises the following services:
 
-*   **`hcphotos-fe`**: Next.js frontend (App Router) running on port `45173`.
-*   **`hcphotos-be`**: RESTful API Backend built with Node.js / Express running on port `45174`.
-*   **`hcphotos-worker`**: Worker processing background tasks (EXIF extraction, thumbnail generation via Sharp, video transcoding via FFmpeg).
-*   **`hcphotos-db`**: PostgreSQL database for metadata storage.
-*   **`hcphotos-redis`**: Redis instance managing the background job queues.
+*   **`aethercloud-fe`**: Next.js frontend (App Router) running on port `45173`.
+*   **`aethercloud-be`**: RESTful API Backend built with Node.js / Express running on port `45174`.
+*   **`aethercloud-worker`**: Worker processing background tasks (EXIF extraction, thumbnail generation via Sharp, video transcoding via FFmpeg).
+*   **`aethercloud-db`**: PostgreSQL database for metadata storage.
+*   **`aethercloud-redis`**: Redis instance managing the background job queues.
 *   **`cloudflared`**: Connects and routes your local services directly to the internet securely via Cloudflare Tunnel (no Nginx required).
 
 ---

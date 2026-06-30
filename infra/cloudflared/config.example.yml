@@ -1,5 +1,5 @@
-tunnel: hcphotos-tunnel-id
-credentials-file: /etc/cloudflared/hcphotos.json
+tunnel: aethercloud-tunnel-id
+credentials-file: /etc/cloudflared/aethercloud.json
 
 ingress:
   - hostname: aethercloud.example.com
