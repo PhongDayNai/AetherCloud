@@ -15,6 +15,55 @@ const pool = new Pool({
 });
 
 const schema = `
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  salt VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL DEFAULT 'user', -- 'admin' | 'user'
+  must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_login_at TIMESTAMPTZ,
+  invitation_id UUID
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+CREATE TABLE IF NOT EXISTS user_invitations (
+  id UUID PRIMARY KEY,
+  token VARCHAR(6) UNIQUE NOT NULL,
+  created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  max_uses INT DEFAULT 1,
+  uses_count INT NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_invitations_token ON user_invitations(token);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_users_invitation') THEN
+    ALTER TABLE users ADD CONSTRAINT fk_users_invitation FOREIGN KEY (invitation_id) REFERENCES user_invitations(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='avatar_url') THEN
+    ALTER TABLE users ADD COLUMN avatar_url VARCHAR(1000);
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash VARCHAR(255) UNIQUE NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+
 CREATE TABLE IF NOT EXISTS assets (
   id UUID PRIMARY KEY,
   original_name VARCHAR(500) NOT NULL,

@@ -9,6 +9,7 @@ const fs = require('fs');
 const authRoutes = require('./routes/auth');
 const storageRoutes = require('./routes/storage');
 const assetsRoutes = require('./routes/assets');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const port = Number(process.env.BE_PORT || 45174);
@@ -46,6 +47,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/assets', assetsRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/api', (_req, res) => {
   res.json({
