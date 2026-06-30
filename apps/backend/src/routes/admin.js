@@ -30,7 +30,7 @@ router.use(requireAdmin);
 
 // 1. Sinh mã mời đăng ký mới
 router.post('/invitations', async (req, res) => {
-  const { max_uses, expires_in_hours } = req.body || {};
+  const { max_uses, expires_in_hours, expires_at } = req.body || {};
   
   let maxUses = 1;
   if (max_uses !== undefined) {
@@ -39,7 +39,9 @@ router.post('/invitations', async (req, res) => {
   }
 
   let expiresAt = null;
-  if (expires_in_hours !== undefined) {
+  if (expires_at !== undefined && expires_at !== null) {
+    expiresAt = new Date(expires_at);
+  } else if (expires_in_hours !== undefined) {
     const parsed = parseInt(expires_in_hours, 10);
     if (!Number.isNaN(parsed) && parsed > 0) {
       expiresAt = new Date(Date.now() + parsed * 60 * 60 * 1000);
@@ -84,6 +86,22 @@ router.post('/invitations', async (req, res) => {
     });
   } catch (err) {
     console.error('[Admin API] Create invitation error:', err);
+    return res.status(500).json({ message: 'Lỗi máy chủ nội bộ' });
+  }
+});
+
+// 1.5. Lấy danh sách toàn bộ mã mời
+router.get('/invitations', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT i.*, u.email as creator_email, u.name as creator_name
+      FROM user_invitations i
+      JOIN users u ON i.created_by = u.id
+      ORDER BY i.created_at DESC
+    `);
+    return res.json({ ok: true, invitations: result.rows });
+  } catch (err) {
+    console.error('[Admin API] Get invitations error:', err);
     return res.status(500).json({ message: 'Lỗi máy chủ nội bộ' });
   }
 });

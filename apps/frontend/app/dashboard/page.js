@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import CustomDatePicker from '../../components/CustomDatePicker';
 
 // Icons SVG đồng bộ (Phase 1)
 const Icons = {
@@ -21,6 +22,11 @@ const Icons = {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  ),
+  Key: () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
     </svg>
   ),
   User: () => (
@@ -292,7 +298,7 @@ export default function DashboardPage() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [user, setUser] = useState(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [settingsTab, setSettingsTab] = useState('profile'); // profile | password
+  const [settingsTab, setSettingsTab] = useState('profile'); // profile | password | invites
   const [profileNameInput, setProfileNameInput] = useState('');
   const [updateProfileMsg, setUpdateProfileMsg] = useState('');
 
@@ -318,6 +324,93 @@ export default function DashboardPage() {
       setUpdateProfileMsg(`Lỗi: ${err.message}`);
     }
   }
+
+  // State cho quản lý mã mời (Admin)
+  const [invitations, setInvitations] = useState([]);
+  const [maxUsesInput, setMaxUsesInput] = useState(1);
+  const [expiresType, setExpiresType] = useState('hours'); // 'hours' | 'date'
+  const [expiresInHoursInput, setExpiresInHoursInput] = useState('');
+  const [expiresDateInput, setExpiresDateInput] = useState('');
+  const [createInviteMsg, setCreateInviteMsg] = useState('');
+
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }, []);
+
+  async function loadInvitations() {
+    try {
+      const res = await fetch(`${api}/api/admin/invitations`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setInvitations(data.invitations || []);
+      }
+    } catch (err) {
+      console.error('Không tải được danh sách mã mời:', err);
+    }
+  }
+
+  async function handleCreateInvitation(e) {
+    e.preventDefault();
+    setCreateInviteMsg('');
+    try {
+      const body = {
+        max_uses: maxUsesInput ? parseInt(maxUsesInput, 10) : 1
+      };
+      if (expiresType === 'hours') {
+        if (expiresInHoursInput) {
+          body.expires_in_hours = parseInt(expiresInHoursInput, 10);
+        }
+      } else if (expiresType === 'date') {
+        if (expiresDateInput) {
+          // Tạo Date local cho 23:59:59 của ngày được chọn
+          const dateObj = new Date(`${expiresDateInput}T23:59:59`);
+          body.expires_at = dateObj.toISOString();
+        }
+      }
+      const res = await fetch(`${api}/api/admin/invitations`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        setCreateInviteMsg('Tạo mã mời thành công!');
+        setMaxUsesInput(1);
+        setExpiresInHoursInput('');
+        setExpiresDateInput('');
+        loadInvitations();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setCreateInviteMsg(`Lỗi: ${data.message || 'Không tạo được mã mời'}`);
+      }
+    } catch (err) {
+      setCreateInviteMsg(`Lỗi: ${err.message}`);
+    }
+  }
+
+  async function handleDeactivateInvitation(id) {
+    if (!window.confirm('Bạn có chắc chắn muốn vô hiệu hóa mã mời này không?')) return;
+    try {
+      const res = await fetch(`${api}/api/admin/invitations/${id}/deactivate`, {
+        method: 'PUT',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        loadInvitations();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(`Lỗi: ${data.message}`);
+      }
+    } catch (err) {
+      alert(`Lỗi: ${err.message}`);
+    }
+  }
+
+
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -607,6 +700,12 @@ export default function DashboardPage() {
     window.addEventListener('click', handleGlobalClick);
     return () => window.removeEventListener('click', handleGlobalClick);
   }, [showProfileMenu]);
+
+  useEffect(() => {
+    if (showSettingsModal && settingsTab === 'invites' && user?.role === 'admin') {
+      loadInvitations();
+    }
+  }, [showSettingsModal, settingsTab, user]);
 
   useEffect(() => {
     function onKey(e) {
@@ -998,6 +1097,8 @@ export default function DashboardPage() {
           <span className="ico">📁</span><span>Tài liệu</span><span className="count">{docs.length}</span>
         </button>
 
+
+
         <div className="sectionWrap">
           <div className="sectionTitle">{tab === 'photos' ? 'Bộ sưu tập' : 'Khu vực tài liệu'}</div>
 
@@ -1319,6 +1420,8 @@ export default function DashboardPage() {
             ))}
           </section>
         )}
+
+
       </main>
 
       {active && (
@@ -1539,6 +1642,34 @@ export default function DashboardPage() {
                 <span style={{ display: 'inline-flex', alignItems: 'center', opacity: settingsTab === 'password' ? 1 : 0.7 }}><Icons.Lock /></span>
                 <span>Đổi mật khẩu</span>
               </button>
+
+              {user?.role === 'admin' && (
+                <button 
+                  onClick={() => setSettingsTab('invites')}
+                  style={{
+                    background: settingsTab === 'invites' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: settingsTab === 'invites' ? '#ffffff' : '#a1a1aa',
+                    padding: '11px 12px',
+                    fontSize: '13.5px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    transition: 'all 0.15s ease',
+                    textAlign: 'left',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                  onMouseEnter={(e) => { if (settingsTab !== 'invites') e.currentTarget.style.color = '#ffffff'; }}
+                  onMouseLeave={(e) => { if (settingsTab !== 'invites') e.currentTarget.style.color = '#a1a1aa'; }}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', opacity: settingsTab === 'invites' ? 1 : 0.7 }}><Icons.Key /></span>
+                  <span>Quản lý mã mời</span>
+                </button>
+              )}
             </div>
 
             {/* Khung chứa nội dung tab bên phải (Premium Glassmorphism) */}
@@ -1808,6 +1939,217 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
+
+              {/* 3. QUẢN LÝ MÃ MỜI (ADMIN ONLY) */}
+              {settingsTab === 'invites' && user?.role === 'admin' && (
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'visible' }}>
+                  <h3 style={{ margin: '0 0 16px 0', fontSize: '17px', color: '#ffffff', fontWeight: '600' }}>Quản lý mã mời đăng ký</h3>
+                  
+                  <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch', flex: 1, overflow: 'visible' }}>
+                    {/* Cột trái: Form tạo mã mời (Xếp dọc gọn gàng) */}
+                    <div style={{
+                      width: '180px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      paddingRight: '24px',
+                      borderRight: '1px solid rgba(255, 255, 255, 0.06)',
+                      boxSizing: 'border-box',
+                      justifyContent: 'center'
+                    }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '600', color: '#ffffff' }}>Tạo mã mời mới</h4>
+                      <form onSubmit={handleCreateInvitation} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '10.5px', color: '#71717a', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Số lượt dùng</label>
+                          <input 
+                            type="number" 
+                            min="1" 
+                            value={maxUsesInput} 
+                            onChange={(e) => setMaxUsesInput(e.target.value)} 
+                            required 
+                            style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '7px 10px', color: '#ffffff', fontSize: '13px', outline: 'none', transition: 'all 0.15s ease', boxSizing: 'border-box' }}
+                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '10.5px', color: '#71717a', marginBottom: '6px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Hạn dùng</label>
+                          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                            <button 
+                              type="button" 
+                              onClick={() => { setExpiresType('hours'); setExpiresDateInput(''); }}
+                              style={{
+                                flex: 1,
+                                background: expiresType === 'hours' ? 'rgba(255,255,255,0.08)' : 'transparent',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: '4px',
+                                color: expiresType === 'hours' ? '#ffffff' : '#a1a1aa',
+                                padding: '5px 0',
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              Theo giờ
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={() => { setExpiresType('date'); setExpiresInHoursInput(''); }}
+                              style={{
+                                flex: 1,
+                                background: expiresType === 'date' ? 'rgba(255,255,255,0.08)' : 'transparent',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: '4px',
+                                color: expiresType === 'date' ? '#ffffff' : '#a1a1aa',
+                                padding: '5px 0',
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              Theo ngày
+                            </button>
+                          </div>
+                          
+                          {expiresType === 'hours' ? (
+                            <input 
+                              type="number" 
+                              min="1" 
+                              placeholder="Không hết hạn"
+                              value={expiresInHoursInput} 
+                              onChange={(e) => setExpiresInHoursInput(e.target.value)} 
+                              style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '7px 10px', color: '#ffffff', fontSize: '13px', outline: 'none', transition: 'all 0.15s ease', boxSizing: 'border-box' }}
+                              onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                              onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                            />
+                          ) : (
+                            <div>
+                              <CustomDatePicker 
+                                value={expiresDateInput} 
+                                onChange={setExpiresDateInput} 
+                                minDate={todayStr}
+                              />
+                              <span style={{ display: 'block', fontSize: '9px', color: '#71717a', marginTop: '5px', lineHeight: '1.4' }}>
+                                * Hết hạn vào lúc 23:59:59 của ngày được chọn.
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <button 
+                          type="submit" 
+                          style={{
+                            background: '#ffffff',
+                            color: '#000000',
+                            border: 0,
+                            borderRadius: '6px',
+                            padding: '8px 14px',
+                            fontSize: '12.5px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'opacity 0.15s ease',
+                            marginTop: '4px'
+                          }}
+                          onMouseEnter={(e) => { e.target.style.opacity = '0.9'; }}
+                          onMouseLeave={(e) => { e.target.style.opacity = '1'; }}
+                        >
+                          Tạo mã mời
+                        </button>
+
+                        {createInviteMsg && (
+                          <div style={{
+                            fontSize: '11.5px',
+                            color: createInviteMsg.startsWith('Lỗi') ? '#fca5a5' : '#a7f3d0',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            background: createInviteMsg.startsWith('Lỗi') ? 'rgba(244, 63, 94, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                            border: `1px solid ${createInviteMsg.startsWith('Lỗi') ? 'rgba(244, 63, 94, 0.12)' : 'rgba(16, 185, 129, 0.12)'}`,
+                            wordBreak: 'break-word'
+                          }}>
+                            {createInviteMsg}
+                          </div>
+                        )}
+                      </form>
+                    </div>
+
+                    {/* Cột phải: Danh sách mã mời */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '600', color: '#ffffff' }}>Danh sách mã mời đã tạo</h4>
+                      <div style={{
+                        flex: 1,
+                        border: '1px solid rgba(255, 255, 255, 0.06)',
+                        borderRadius: '8px',
+                        overflowY: 'auto',
+                        background: 'rgba(0, 0, 0, 0.15)'
+                      }}>
+                        {invitations.length === 0 ? (
+                          <div style={{ padding: '24px', textAlign: 'center', color: '#71717a', fontSize: '12.5px' }}>
+                            Chưa có mã mời nào được tạo.
+                          </div>
+                        ) : (
+                          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12.5px', color: '#e4e4e7' }}>
+                            <thead>
+                              <tr style={{ background: 'rgba(255, 255, 255, 0.02)', borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                                <th style={{ padding: '8px 10px', fontWeight: '600', color: '#71717a' }}>Mã</th>
+                                <th style={{ padding: '8px 10px', fontWeight: '600', color: '#71717a' }}>Dùng</th>
+                                <th style={{ padding: '8px 10px', fontWeight: '600', color: '#71717a' }}>Hạn dùng</th>
+                                <th style={{ padding: '8px 10px', fontWeight: '600', color: '#71717a' }}>Trạng thái</th>
+                                <th style={{ padding: '8px 10px', fontWeight: '600', color: '#71717a', textAlign: 'right' }}>Hành động</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {invitations.map((inv) => {
+                                const isExpired = inv.expires_at && new Date(inv.expires_at) < new Date();
+                                const isActive = inv.is_active && !isExpired && (inv.max_uses === null || inv.uses_count < inv.max_uses);
+                                return (
+                                  <tr key={inv.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', transition: 'background 0.2s' }} className="tableRowHover">
+                                    <td style={{ padding: '8px 10px', fontWeight: '700', color: '#3b82f6', fontFamily: 'monospace', fontSize: '13px' }}>{inv.token}</td>
+                                    <td style={{ padding: '8px 10px' }}>{inv.uses_count}/{inv.max_uses || '∞'}</td>
+                                    <td style={{ padding: '8px 10px', color: '#71717a' }}>
+                                      {inv.expires_at ? new Date(inv.expires_at).toLocaleDateString('vi-VN') : 'Vô hạn'}
+                                    </td>
+                                    <td style={{ padding: '8px 10px' }}>
+                                      {isActive ? (
+                                        <span style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.1)', padding: '1px 6px', borderRadius: '99px', fontSize: '10px', fontWeight: '600' }}>Chạy</span>
+                                      ) : (
+                                        <span style={{ color: '#f43f5e', background: 'rgba(244, 63, 94, 0.06)', border: '1px solid rgba(244, 63, 94, 0.1)', padding: '1px 6px', borderRadius: '99px', fontSize: '10px', fontWeight: '600' }}>Khóa</span>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                                      {inv.is_active && (
+                                        <button 
+                                          onClick={() => handleDeactivateInvitation(inv.id)}
+                                          style={{
+                                            background: 'transparent',
+                                            border: '1px solid rgba(244, 63, 94, 0.25)',
+                                            color: '#f43f5e',
+                                            borderRadius: '4px',
+                                            padding: '2px 6px',
+                                            fontSize: '10.5px',
+                                            fontWeight: '600',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                          onMouseEnter={(e) => { e.target.style.background = 'rgba(244, 63, 94, 0.06)'; e.target.style.borderColor = '#f43f5e'; }}
+                                          onMouseLeave={(e) => { e.target.style.background = 'transparent'; e.target.style.borderColor = 'rgba(244, 63, 94, 0.25)'; }}
+                                        >
+                                          Khóa
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>
@@ -1863,6 +2205,16 @@ export default function DashboardPage() {
       )}
 
       <style jsx>{`
+        /* An spin-button (mui ten tang giam) cua input type="number" */
+        :global(input::-webkit-outer-spin-button),
+        :global(input::-webkit-inner-spin-button) {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        :global(input[type="number"]) {
+          -moz-appearance: textfield;
+        }
+
         .shell {
           display: grid;
           grid-template-columns: 260px 1fr;
@@ -2217,6 +2569,9 @@ export default function DashboardPage() {
           line-height: 1.4;
         }
 
+        .tableRowHover:hover {
+          background: rgba(255, 255, 255, 0.015);
+        }
         .main {
           padding: 24px 32px 40px;
           box-sizing: border-box;
