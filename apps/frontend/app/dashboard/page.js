@@ -292,6 +292,7 @@ export default function DashboardPage() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [user, setUser] = useState(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('profile'); // profile | password
   const [profileNameInput, setProfileNameInput] = useState('');
   const [updateProfileMsg, setUpdateProfileMsg] = useState('');
 
@@ -561,6 +562,7 @@ export default function DashboardPage() {
       if (meData?.user?.mustChangePassword) {
         setMustChangePassword(true);
         setShowSettingsModal(true);
+        setSettingsTab('password');
       }
 
       const [u, a, p, t] = await Promise.all([
@@ -1166,7 +1168,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <hr className="popoverDivider" />
-              <button className="popoverItem" onClick={() => { setShowSettingsModal(true); setProfileNameInput(user?.name || ''); setUpdateProfileMsg(''); setShowProfileMenu(false); }}>
+              <button className="popoverItem" onClick={() => { setShowSettingsModal(true); setSettingsTab('profile'); setProfileNameInput(user?.name || ''); setUpdateProfileMsg(''); setShowProfileMenu(false); }}>
                 <span className="popoverIcon"><Icons.Settings /></span>
                 <span>Cài đặt</span>
               </button>
@@ -1462,131 +1464,352 @@ export default function DashboardPage() {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          backgroundColor: 'rgba(5, 5, 5, 0.85)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 9999,
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 9999,
-          backdropFilter: 'blur(4px)',
         }} onClick={() => { if (!mustChangePassword) setShowSettingsModal(false); }}>
           <div style={{
-            backgroundColor: '#18181b',
-            border: '1px solid #27272a',
-            padding: '28px',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '400px',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
-            color: '#f4f4f5',
-            fontFamily: 'sans-serif',
-            maxHeight: '85vh',
-            overflowY: 'auto'
+            display: 'flex',
+            gap: '20px',
+            width: '90%',
+            maxWidth: '820px',
+            height: '430px',
+            alignItems: 'stretch',
           }} onClick={(e) => e.stopPropagation()}>
             
-            {!mustChangePassword && (
+            {/* Cột các tab Option bên trái */}
+            <div style={{
+              width: '180px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              flexShrink: 0
+            }}>
               <button 
-                onClick={() => setShowSettingsModal(false)}
+                onClick={() => setSettingsTab('profile')}
                 style={{
-                  float: 'right',
-                  background: 'transparent',
-                  border: 0,
-                  color: '#71717a',
-                  fontSize: '20px',
+                  background: settingsTab === 'profile' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: settingsTab === 'profile' ? '#ffffff' : '#a1a1aa',
+                  padding: '11px 12px',
+                  fontSize: '13.5px',
+                  fontWeight: '600',
                   cursor: 'pointer',
-                  marginTop: '-10px',
-                  marginRight: '-10px'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  transition: 'all 0.15s ease',
+                  textAlign: 'left',
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}
+                onMouseEnter={(e) => { if (settingsTab !== 'profile') e.currentTarget.style.color = '#ffffff'; }}
+                onMouseLeave={(e) => { if (settingsTab !== 'profile') e.currentTarget.style.color = '#a1a1aa'; }}
               >
-                ✕
+                <span style={{ display: 'inline-flex', alignItems: 'center', opacity: settingsTab === 'profile' ? 1 : 0.7 }}><Icons.User /></span>
+                <span>Hồ sơ cá nhân</span>
               </button>
-            )}
 
-            <h3 style={{ marginTop: 0, marginBottom: 10, fontSize: 18, color: '#fff' }}>
-              Hồ sơ cá nhân
-            </h3>
-            <form onSubmit={handleUpdateProfile} style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 4 }}>Tên hiển thị</label>
-                <input 
-                  type="text" 
-                  value={profileNameInput} 
-                  onChange={(e) => setProfileNameInput(e.target.value)} 
-                  required 
-                  style={{ width: '100%', padding: '10px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid #3f3f46', backgroundColor: '#09090b', color: '#fff' }}
-                />
-              </div>
-              {updateProfileMsg && (
-                <div style={{ padding: '8px 12px', borderRadius: '6px', backgroundColor: updateProfileMsg.startsWith('Lỗi') ? '#450a0a' : 'rgba(16, 185, 129, 0.08)', color: updateProfileMsg.startsWith('Lỗi') ? '#fca5a5' : '#a7f3d0', fontSize: 13, border: `1px solid ${updateProfileMsg.startsWith('Lỗi') ? '#7f1d1d' : 'rgba(16, 185, 129, 0.12)'}` }}>
-                  {updateProfileMsg}
-                </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setSettingsTab('password')}
+                style={{
+                  background: settingsTab === 'password' ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: settingsTab === 'password' ? '#ffffff' : '#a1a1aa',
+                  padding: '11px 12px',
+                  fontSize: '13.5px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  transition: 'all 0.15s ease',
+                  textAlign: 'left',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}
+                onMouseEnter={(e) => { if (settingsTab !== 'password') e.currentTarget.style.color = '#ffffff'; }}
+                onMouseLeave={(e) => { if (settingsTab !== 'password') e.currentTarget.style.color = '#a1a1aa'; }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', opacity: settingsTab === 'password' ? 1 : 0.7 }}><Icons.Lock /></span>
+                <span>Đổi mật khẩu</span>
+              </button>
+            </div>
+
+            {/* Khung chứa nội dung tab bên phải (Premium Glassmorphism) */}
+            <div style={{
+              flex: 1,
+              background: 'rgba(20, 20, 25, 0.75)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '20px',
+              padding: '28px 32px',
+              display: 'flex',
+              flexDirection: 'column',
+              color: '#f4f4f5',
+              boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+              position: 'relative',
+              boxSizing: 'border-box',
+              overflow: 'visible'
+            }}>
+              {/* Nút đóng */}
+              {!mustChangePassword && (
                 <button 
-                  type="submit"
-                  style={{ padding: '8px 16px', borderRadius: '6px', border: 0, backgroundColor: '#ffffff', color: '#000', fontWeight: 'bold', cursor: 'pointer' }}
+                  onClick={() => setShowSettingsModal(false)}
+                  style={{
+                    position: 'absolute',
+                    top: '20px',
+                    right: '24px',
+                    background: 'transparent',
+                    border: 0,
+                    color: '#71717a',
+                    fontSize: '20px',
+                    cursor: 'pointer',
+                    transition: 'color 0.2s',
+                    padding: '4px',
+                    zIndex: 10
+                  }}
+                  onMouseEnter={(e) => { e.target.style.color = '#fff'; }}
+                  onMouseLeave={(e) => { e.target.style.color = '#71717a'; }}
                 >
-                  Lưu thay đổi
+                  ✕
                 </button>
-              </div>
-            </form>
-
-            <hr style={{ border: 0, borderTop: '1px solid #27272a', margin: '20px 0' }} />
-
-            <h3 style={{ marginTop: 0, marginBottom: 10, fontSize: 18, color: '#fff' }}>
-              {mustChangePassword ? 'Bắt buộc đổi mật khẩu lần đầu' : 'Đổi mật khẩu tài khoản'}
-            </h3>
-            {mustChangePassword && (
-              <p style={{ fontSize: 13, color: '#a1a1aa', marginBottom: 20 }}>
-                Bạn đang sử dụng mật khẩu mặc định/tạm thời. Vui lòng đổi mật khẩu để tiếp tục sử dụng hệ thống.
-              </p>
-            )}
-            <form onSubmit={handleChangePassword} style={{ display: 'grid', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 4 }}>Mật khẩu cũ</label>
-                <input 
-                  type="password" 
-                  value={oldPassword} 
-                  onChange={(e) => setOldPassword(e.target.value)} 
-                  required 
-                  style={{ width: '100%', padding: '10px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid #3f3f46', backgroundColor: '#09090b', color: '#fff' }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 4 }}>Mật khẩu mới</label>
-                <input 
-                  type="password" 
-                  value={newPassword} 
-                  onChange={(e) => setNewPassword(e.target.value)} 
-                  required 
-                  style={{ width: '100%', padding: '10px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid #3f3f46', backgroundColor: '#09090b', color: '#fff' }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 4 }}>Xác nhận mật khẩu mới</label>
-                <input 
-                  type="password" 
-                  value={confirmPassword} 
-                  onChange={(e) => setConfirmPassword(e.target.value)} 
-                  required 
-                  style={{ width: '100%', padding: '10px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid #3f3f46', backgroundColor: '#09090b', color: '#fff' }}
-                />
-              </div>
-              
-              {changePasswordMsg && (
-                <div style={{ padding: '8px 12px', borderRadius: '6px', backgroundColor: '#450a0a', color: '#fca5a5', fontSize: 13, border: '1px solid #7f1d1d' }}>
-                  {changePasswordMsg}
-                </div>
               )}
 
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
-                <button 
-                  type="submit"
-                  style={{ padding: '8px 16px', borderRadius: '6px', border: 0, backgroundColor: '#2563eb', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
-                >
-                  Cập nhật
-                </button>
-              </div>
-            </form>
+              {/* TABS CONTENT */}
+
+              {/* 1. HỒ SƠ CÁ NHÂN (PROFILE) */}
+              {settingsTab === 'profile' && (
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <h3 style={{ margin: '0 0 20px 0', fontSize: '17px', color: '#ffffff', fontWeight: '600' }}>Hồ sơ cá nhân</h3>
+                  
+                  <div style={{ display: 'flex', gap: '28px', alignItems: 'stretch', flex: 1 }}>
+                    {/* Cột trái: Profile Card tóm tắt */}
+                    <div style={{
+                      width: '180px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      textAlign: 'center',
+                      paddingRight: '28px',
+                      borderRight: '1px solid rgba(255, 255, 255, 0.06)',
+                      boxSizing: 'border-box',
+                      justifyContent: 'center'
+                    }}>
+                      <div style={{
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: '700',
+                        fontSize: '24px',
+                        boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)',
+                        marginBottom: '16px'
+                      }}>
+                        {user ? user.name.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                      <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: '600', color: '#ffffff' }}>{user?.name}</h4>
+                      <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#71717a', wordBreak: 'break-all' }}>{user?.email}</p>
+                      <span style={{
+                        fontSize: '10px',
+                        fontWeight: '600',
+                        padding: '2px 8px',
+                        borderRadius: '99px',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        color: '#a1a1aa',
+                        border: '1px solid rgba(255, 255, 255, 0.08)'
+                      }}>
+                        {user?.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}
+                      </span>
+                    </div>
+
+                    {/* Cột phải: Form cập nhật */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <form onSubmit={handleUpdateProfile} style={{ display: 'grid', gap: '16px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '10.5px', color: '#71717a', marginBottom: '6px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tên hiển thị</label>
+                          <input 
+                            type="text" 
+                            value={profileNameInput} 
+                            onChange={(e) => setProfileNameInput(e.target.value)} 
+                            required 
+                            style={{ width: '100%', padding: '9px 12px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13.5px', outline: 'none', transition: 'all 0.15s ease' }}
+                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '10.5px', color: '#71717a', marginBottom: '6px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email tài khoản (Bảo mật)</label>
+                          <div style={{
+                            width: '100%',
+                            padding: '9px 12px',
+                            boxSizing: 'border-box',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(255,255,255,0.03)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.01)',
+                            color: '#52525b',
+                            fontSize: '13.5px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            cursor: 'not-allowed'
+                          }}>
+                            <span>{user?.email}</span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#52525b' }}>
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                              </svg>
+                            </span>
+                          </div>
+                        </div>
+
+                        {updateProfileMsg && (
+                          <div style={{
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            backgroundColor: updateProfileMsg.startsWith('Lỗi') ? 'rgba(244, 63, 94, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                            color: updateProfileMsg.startsWith('Lỗi') ? '#fca5a5' : '#a7f3d0',
+                            fontSize: '13px',
+                            border: `1px solid ${updateProfileMsg.startsWith('Lỗi') ? 'rgba(244, 63, 94, 0.12)' : 'rgba(16, 185, 129, 0.12)'}`
+                          }}>
+                            {updateProfileMsg}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '2px' }}>
+                          <button 
+                            type="submit"
+                            style={{
+                              padding: '9px 18px',
+                              borderRadius: '6px',
+                              border: 0,
+                              backgroundColor: '#ffffff',
+                              color: '#000000',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              transition: 'opacity 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => { e.target.style.opacity = '0.9'; }}
+                            onMouseLeave={(e) => { e.target.style.opacity = '1'; }}
+                          >
+                            Lưu thay đổi
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. ĐỔI MẬT KHẨU */}
+              {settingsTab === 'password' && (
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <h3 style={{ margin: '0 0 20px 0', fontSize: '17px', color: '#ffffff', fontWeight: '600' }}>Bảo mật tài khoản</h3>
+                  
+                  <div style={{ display: 'flex', gap: '28px', alignItems: 'stretch', flex: 1 }}>
+                    {/* Cột trái: Hướng dẫn bảo mật */}
+                    <div style={{
+                      width: '180px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      paddingRight: '28px',
+                      borderRight: '1px solid rgba(255, 255, 255, 0.06)',
+                      boxSizing: 'border-box',
+                      justifyContent: 'center'
+                    }}>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '13.5px', fontWeight: '600', color: '#ffffff' }}>Mật khẩu mạnh</h4>
+                      <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#71717a', lineHeight: '1.5' }}>
+                        {mustChangePassword ? 'Yêu cầu đổi mật khẩu mặc định/tạm thời để kích hoạt tài khoản của bạn.' : 'Nên định kỳ cập nhật mật khẩu mới để bảo vệ dữ liệu đám mây luôn an toàn.'}
+                      </p>
+                      <div style={{ fontSize: '11.5px', color: '#52525b', lineHeight: '1.4' }}>
+                        * Tối thiểu 8 ký tự<br />
+                        * Gồm chữ hoa, chữ thường, số và ký tự đặc biệt
+                      </div>
+                    </div>
+
+                    {/* Cột phải: Form đổi mật khẩu */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <form onSubmit={handleChangePassword} style={{ display: 'grid', gap: '12px' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '10.5px', color: '#71717a', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Mật khẩu hiện tại</label>
+                          <input 
+                            type="password" 
+                            value={oldPassword} 
+                            onChange={(e) => setOldPassword(e.target.value)} 
+                            required 
+                            style={{ width: '100%', padding: '9px 12px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13.5px', outline: 'none', transition: 'all 0.15s ease' }}
+                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '10.5px', color: '#71717a', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Mật khẩu mới</label>
+                          <input 
+                            type="password" 
+                            value={newPassword} 
+                            onChange={(e) => setNewPassword(e.target.value)} 
+                            required 
+                            style={{ width: '100%', padding: '9px 12px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13.5px', outline: 'none', transition: 'all 0.15s ease' }}
+                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '10.5px', color: '#71717a', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Xác nhận mật khẩu mới</label>
+                          <input 
+                            type="password" 
+                            value={confirmPassword} 
+                            onChange={(e) => setConfirmPassword(e.target.value)} 
+                            required 
+                            style={{ width: '100%', padding: '9px 12px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13.5px', outline: 'none', transition: 'all 0.15s ease' }}
+                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                          />
+                        </div>
+                        
+                        {changePasswordMsg && (
+                          <div style={{ padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(244, 63, 94, 0.08)', color: '#fca5a5', fontSize: '13px', border: '1px solid rgba(244, 63, 94, 0.12)' }}>
+                            {changePasswordMsg}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '4px' }}>
+                          <button 
+                            type="submit"
+                            style={{
+                              padding: '9px 18px',
+                              borderRadius: '6px',
+                              border: 0,
+                              backgroundColor: '#ffffff',
+                              color: '#000000',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              transition: 'opacity 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => { e.target.style.opacity = '0.9'; }}
+                            onMouseLeave={(e) => { e.target.style.opacity = '1'; }}
+                          >
+                            Cập nhật mật khẩu
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       )}
