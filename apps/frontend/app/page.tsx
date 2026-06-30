@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 
-function getApiOrigin() {
+function getApiOrigin(): string {
   return process.env.NEXT_PUBLIC_API_ORIGIN || 'http://localhost:45174';
 }
 
-export default function Home() {
+export default function Home(): React.JSX.Element {
   useEffect(() => {
     let mounted = true;
     (async () => {

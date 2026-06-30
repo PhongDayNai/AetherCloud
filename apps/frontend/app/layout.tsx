@@ -1,9 +1,16 @@
-export const metadata = {
+import React from 'react';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
   title: 'AetherCloud',
   description: 'Private cloud for photos, videos, documents, and spaces',
 };
 
-export default function RootLayout({ children }) {
+interface RootLayoutProps {
+  children: React.ReactNode;
+}
+
+export default function RootLayout({ children }: RootLayoutProps): React.JSX.Element {
   return (
     <html lang="vi">
       <head>

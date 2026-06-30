@@ -1,35 +1,96 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import CustomDatePicker from '../../components/CustomDatePicker';
+
+// Interfaces & Types
+interface Asset {
+  id: string;
+  originalName: string;
+  mime: string;
+  size: number;
+  owner: string;
+  uploadedAt: string | null;
+  takenAt: string | null;
+  relPath: string;
+  playRelPath: string | null;
+  hlsRelPath: string | null;
+  processingStatus: 'ready' | 'processing' | 'failed' | string;
+  processingStartedAt: string | null;
+  processingFinishedAt: string | null;
+  ext: string;
+  albumName: string | null;
+  albumNames: string[];
+  docProjectName: string | null;
+  docProjectNames: string[];
+  tags: string[];
+  isDeleted: boolean;
+  deletedAt: string | null;
+  type: 'image' | 'video' | 'file' | string;
+}
+
+interface User {
+  sub: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'user' | string;
+  mustChangePassword: boolean;
+  avatarUrl?: string;
+}
+
+interface Invitation {
+  id: string;
+  token: string;
+  created_by: string;
+  max_uses: number | null;
+  uses_count: number;
+  is_active: boolean;
+  expires_at: string | null;
+  created_at: string;
+}
+
+interface Album {
+  name: string;
+  count: number;
+}
+
+interface Tag {
+  name: string;
+  count: number;
+}
+
+interface DocProject {
+  name: string;
+  count: number;
+}
 
 // Icons SVG đồng bộ (Phase 1)
 const Icons = {
-  Lock: () => (
+  Lock: (): React.JSX.Element => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   ),
-  LogOut: () => (
+  LogOut: (): React.JSX.Element => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   ),
-  Settings: () => (
+  Settings: (): React.JSX.Element => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   ),
-  Key: () => (
+  Key: (): React.JSX.Element => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
     </svg>
   ),
-  User: () => (
+  User: (): React.JSX.Element => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
@@ -37,11 +98,11 @@ const Icons = {
   )
 };
 
-function getApiOrigin() {
+function getApiOrigin(): string {
   return process.env.NEXT_PUBLIC_API_ORIGIN || 'http://localhost:45174';
 }
 
-function fmtBytes(bytes) {
+function fmtBytes(bytes: number): string {
   if (!Number.isFinite(bytes)) return '-';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let i = 0;
@@ -53,13 +114,13 @@ function fmtBytes(bytes) {
   return `${n.toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
 }
 
-function docTypeOf(item) {
+function docTypeOf(item: Asset): string {
   if (item.ext?.trim()) return item.ext.toLowerCase();
   if (item.mime?.trim()) return `mime:${item.mime.toLowerCase()}`;
   return 'no-extension';
 }
 
-function docCategoryOf(item) {
+function docCategoryOf(item: Asset): 'pdf' | 'word' | 'excel' | 'powerpoint' | 'markdown' | 'text' | 'archive' | 'code' | 'other' {
   const ext = (item.ext || '').toLowerCase().replace(/^\./, '');
   const mime = (item.mime || '').toLowerCase();
 
@@ -74,7 +135,7 @@ function docCategoryOf(item) {
   return 'other';
 }
 
-const DOC_CATEGORY_LABELS = {
+const DOC_CATEGORY_LABELS: Record<string, string> = {
   pdf: 'PDF',
   word: 'Word',
   excel: 'Excel/CSV',
@@ -86,17 +147,17 @@ const DOC_CATEGORY_LABELS = {
   other: 'Khác',
 };
 
-function monthLabel(iso) {
+function monthLabel(iso: string | null): string {
   const d = iso ? new Date(iso) : new Date();
   return new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' }).format(d);
 }
 
-function yearLabel(iso) {
+function yearLabel(iso: string | null): string {
   const d = iso ? new Date(iso) : new Date();
   return String(d.getFullYear());
 }
 
-function inferUploadKind(file) {
+function inferUploadKind(file: File): string {
   const t = (file?.type || '').toLowerCase();
   const name = (file?.name || '').toLowerCase();
   if (t.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic|avif)$/.test(name)) return 'ảnh';
@@ -104,7 +165,7 @@ function inferUploadKind(file) {
   return 'tài liệu/file khác';
 }
 
-async function readErrorMessage(res) {
+async function readErrorMessage(res: Response): Promise<string> {
   try {
     const data = await res.clone().json();
     if (data?.message) return String(data.message);
@@ -120,15 +181,37 @@ async function readErrorMessage(res) {
 
 const LONG_PRESS_MS = 420;
 
-function SmartVideo({ hlsSrc, mp4Src, className, controls = false, autoPlay = false, muted = false, preload = 'metadata', active = true, onMeta }) {
-  const ref = useRef(null);
-  const [fallbackToMp4, setFallbackToMp4] = useState(false);
+interface SmartVideoProps {
+  hlsSrc: string;
+  mp4Src: string;
+  className?: string;
+  controls?: boolean;
+  autoPlay?: boolean;
+  muted?: boolean;
+  preload?: string;
+  active?: boolean;
+  onMeta?: (meta: { w: number; h: number }) => void;
+}
+
+function SmartVideo({ 
+  hlsSrc, 
+  mp4Src, 
+  className, 
+  controls = false, 
+  autoPlay = false, 
+  muted = false, 
+  preload = 'metadata', 
+  active = true, 
+  onMeta 
+}: SmartVideoProps): React.JSX.Element {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [fallbackToMp4, setFallbackToMp4] = useState<boolean>(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
-    let hls;
+    let hls: any;
     let cancelled = false;
 
     async function setup() {
@@ -163,7 +246,7 @@ function SmartVideo({ hlsSrc, mp4Src, className, controls = false, autoPlay = fa
           backBufferLength: 90,
           enableWorker: true,
           startLevel: -1,
-          xhrSetup: (xhr) => {
+          xhrSetup: (xhr: XMLHttpRequest) => {
             xhr.withCredentials = true;
           }
         });
@@ -172,11 +255,11 @@ function SmartVideo({ hlsSrc, mp4Src, className, controls = false, autoPlay = fa
           console.log('[SmartVideo] Hls: Đã kết nối media element.');
         });
 
-        hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+        hls.on(Hls.Events.MANIFEST_PARSED, (event: any, data: any) => {
           console.log('[SmartVideo] Hls: Manifest đã được parse thành công. Các stream khả dụng:', data.levels);
         });
 
-        hls.on(Hls.Events.ERROR, (_evt, data) => {
+        hls.on(Hls.Events.ERROR, (_evt: any, data: any) => {
           console.error('[SmartVideo] Hls Lỗi:', data);
           if (data?.fatal) {
             console.warn('[SmartVideo] Hls gặp lỗi nghiêm trọng (fatal). Chuyển hướng sang MP4...');
@@ -243,7 +326,7 @@ function SmartVideo({ hlsSrc, mp4Src, className, controls = false, autoPlay = fa
       onWaiting={() => console.log('[SmartVideo] Native Event: waiting')}
       onPlaying={() => console.log('[SmartVideo] Native Event: playing')}
       onCanPlay={() => console.log('[SmartVideo] Native Event: canplay')}
-      onError={(e) => {
+      onError={(e: any) => {
         const err = e.target.error;
         console.error('[SmartVideo] Native Event Lỗi:', err ? { code: err.code, message: err.message } : e);
         if (!fallbackToMp4) {
@@ -255,54 +338,54 @@ function SmartVideo({ hlsSrc, mp4Src, className, controls = false, autoPlay = fa
   );
 }
 
-export default function DashboardPage() {
+export default function DashboardPage(): React.JSX.Element {
   const api = useMemo(() => getApiOrigin(), []);
 
-  const [usage, setUsage] = useState(null);
-  const [assets, setAssets] = useState([]);
-  const [msg, setMsg] = useState('');
-  const [err, setErr] = useState('');
+  const [usage, setUsage] = useState<any>(null);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [msg, setMsg] = useState<string>('');
+  const [err, setErr] = useState<string>('');
 
-  const [tab, setTab] = useState('photos'); // photos | docs
-  const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<'photos' | 'docs'>('photos');
+  const [search, setSearch] = useState<string>('');
 
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectionMode, setSelectionMode] = useState<boolean>(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const [showInfo, setShowInfo] = useState(false);
-  const [showAlbumPicker, setShowAlbumPicker] = useState(false);
-  const [albums, setAlbums] = useState([]);
-  const [albumQuery, setAlbumQuery] = useState('');
-  const [selectedAlbumsForActive, setSelectedAlbumsForActive] = useState([]);
-  const [tags, setTags] = useState([]);
-  const [selectedFilterTags, setSelectedFilterTags] = useState([]);
-  const [selectedTagsForActive, setSelectedTagsForActive] = useState([]);
-  const [showTagPicker, setShowTagPicker] = useState(false);
-  const [tagQuery, setTagQuery] = useState('');
-  const [docTypeFilter, setDocTypeFilter] = useState('all');
-  const [docCategoryFilter, setDocCategoryFilter] = useState('all');
-  const [docCollectionView, setDocCollectionView] = useState('all'); // all | trash
-  const [docKindsExpanded, setDocKindsExpanded] = useState(false);
-  const [collectionView, setCollectionView] = useState('all'); // all | recent | images | videos | trash
-  const [albumsExpanded, setAlbumsExpanded] = useState(false);
-  const [docProjects, setDocProjects] = useState([]);
-  const [docProjectsExpanded, setDocProjectsExpanded] = useState(false);
-  const [selectedDocProject, setSelectedDocProject] = useState('all');
-  const [groupByTimeEnabled, setGroupByTimeEnabled] = useState(false);
-  const [groupMode, setGroupMode] = useState('month'); // month | year
-  const [expandedGroups, setExpandedGroups] = useState({});
-  const [activeMediaFit, setActiveMediaFit] = useState('contain');
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const [showInfo, setShowInfo] = useState<boolean>(false);
+  const [showAlbumPicker, setShowAlbumPicker] = useState<boolean>(false);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [albumQuery, setAlbumQuery] = useState<string>('');
+  const [selectedAlbumsForActive, setSelectedAlbumsForActive] = useState<string[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [selectedFilterTags, setSelectedFilterTags] = useState<string[]>([]);
+  const [selectedTagsForActive, setSelectedTagsForActive] = useState<string[]>([]);
+  const [showTagPicker, setShowTagPicker] = useState<boolean>(false);
+  const [tagQuery, setTagQuery] = useState<string>('');
+  const [docTypeFilter, setDocTypeFilter] = useState<string>('all');
+  const [docCategoryFilter, setDocCategoryFilter] = useState<string>('all');
+  const [docCollectionView, setDocCollectionView] = useState<'all' | 'trash'>('all');
+  const [docKindsExpanded, setDocKindsExpanded] = useState<boolean>(false);
+  const [collectionView, setCollectionView] = useState<'all' | 'recent' | 'images' | 'videos' | 'trash'>('all');
+  const [albumsExpanded, setAlbumsExpanded] = useState<boolean>(false);
+  const [docProjects, setDocProjects] = useState<DocProject[]>([]);
+  const [docProjectsExpanded, setDocProjectsExpanded] = useState<boolean>(false);
+  const [selectedDocProject, setSelectedDocProject] = useState<string>('all');
+  const [groupByTimeEnabled, setGroupByTimeEnabled] = useState<boolean>(false);
+  const [groupMode, setGroupMode] = useState<'month' | 'year'>('month');
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [activeMediaFit, setActiveMediaFit] = useState<string>('contain');
 
   // State và Handler cho đổi mật khẩu & logout phiên khác (Phase 1)
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [user, setUser] = useState(null);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [settingsTab, setSettingsTab] = useState('profile'); // profile | password | invites
-  const [profileNameInput, setProfileNameInput] = useState('');
-  const [updateProfileMsg, setUpdateProfileMsg] = useState('');
+  const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [settingsTab, setSettingsTab] = useState<'profile' | 'password' | 'invites'>('profile');
+  const [profileNameInput, setProfileNameInput] = useState<string>('');
+  const [updateProfileMsg, setUpdateProfileMsg] = useState<string>('');
 
-  async function handleUpdateProfile(e) {
+  async function handleUpdateProfile(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setUpdateProfileMsg('');
     try {
@@ -320,21 +403,21 @@ export default function DashboardPage() {
         const data = await res.json().catch(() => ({}));
         setUpdateProfileMsg(`Lỗi: ${data.message || 'Không cập nhật được hồ sơ'}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       setUpdateProfileMsg(`Lỗi: ${err.message}`);
     }
   }
 
   // State cho quản lý mã mời (Admin)
-  const [invitations, setInvitations] = useState([]);
-  const [maxUsesInput, setMaxUsesInput] = useState(1);
-  const [expiresType, setExpiresType] = useState('hours'); // 'hours' | 'date'
-  const [expiresInHoursInput, setExpiresInHoursInput] = useState('');
-  const [expiresDateInput, setExpiresDateInput] = useState('');
-  const [createInviteMsg, setCreateInviteMsg] = useState('');
-  const [toastMsg, setToastMsg] = useState('');
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [maxUsesInput, setMaxUsesInput] = useState<number | string>(1);
+  const [expiresType, setExpiresType] = useState<'hours' | 'date'>('hours');
+  const [expiresInHoursInput, setExpiresInHoursInput] = useState<number | string>('');
+  const [expiresDateInput, setExpiresDateInput] = useState<string>('');
+  const [createInviteMsg, setCreateInviteMsg] = useState<string>('');
+  const [toastMsg, setToastMsg] = useState<string>('');
 
-  function showToast(msg) {
+  function showToast(msg: string) {
     setToastMsg(msg);
     setTimeout(() => {
       setToastMsg((curr) => curr === msg ? '' : curr);
@@ -361,16 +444,16 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleCreateInvitation(e) {
+  async function handleCreateInvitation(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setCreateInviteMsg('');
     try {
-      const body = {
-        max_uses: maxUsesInput ? parseInt(maxUsesInput, 10) : 1
+      const body: any = {
+        max_uses: maxUsesInput ? parseInt(String(maxUsesInput), 10) : 1
       };
       if (expiresType === 'hours') {
         if (expiresInHoursInput) {
-          body.expires_in_hours = parseInt(expiresInHoursInput, 10);
+          body.expires_in_hours = parseInt(String(expiresInHoursInput), 10);
         }
       } else if (expiresType === 'date') {
         if (expiresDateInput) {
@@ -395,12 +478,12 @@ export default function DashboardPage() {
         const data = await res.json().catch(() => ({}));
         setCreateInviteMsg(`Lỗi: ${data.message || 'Không tạo được mã mời'}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       setCreateInviteMsg(`Lỗi: ${err.message}`);
     }
   }
 
-  async function handleDeactivateInvitation(id) {
+  async function handleDeactivateInvitation(id: string) {
     if (!window.confirm('Bạn có chắc chắn muốn vô hiệu hóa mã mời này không?')) return;
     try {
       const res = await fetch(`${api}/api/admin/invitations/${id}/deactivate`, {
@@ -413,18 +496,17 @@ export default function DashboardPage() {
         const data = await res.json().catch(() => ({}));
         alert(`Lỗi: ${data.message}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       alert(`Lỗi: ${err.message}`);
     }
   }
 
-
-  const [mustChangePassword, setMustChangePassword] = useState(false);
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [changePasswordMsg, setChangePasswordMsg] = useState('');
-  const [showLogoutOthersConfirm, setShowLogoutOthersConfirm] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState<boolean>(false);
+  const [oldPassword, setOldPassword] = useState<string>('');
+  const [newPassword, setNewPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [changePasswordMsg, setChangePasswordMsg] = useState<string>('');
+  const [showLogoutOthersConfirm, setShowLogoutOthersConfirm] = useState<boolean>(false);
 
   async function handleLogout() {
     try {
@@ -435,7 +517,7 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleChangePassword(e) {
+  async function handleChangePassword(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setChangePasswordMsg('');
     if (newPassword !== confirmPassword) {
@@ -468,12 +550,12 @@ export default function DashboardPage() {
         const data = await res.json().catch(() => ({}));
         setChangePasswordMsg(`Lỗi: ${data.message || 'Không đổi được mật khẩu'}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       setChangePasswordMsg(`Lỗi: ${err.message || 'Lỗi kết nối'}`);
     }
   }
 
-  async function handleLogoutOthers(confirm) {
+  async function handleLogoutOthers(confirm: boolean) {
     if (confirm) {
       try {
         const res = await fetch(`${api}/api/auth/logout-others`, {
@@ -486,16 +568,16 @@ export default function DashboardPage() {
           const data = await res.json().catch(() => ({}));
           setErr(`Lỗi đăng xuất thiết bị khác: ${data.message}`);
         }
-      } catch (err) {
+      } catch (err: any) {
         setErr(`Lỗi kết nối: ${err.message}`);
       }
     }
     setShowLogoutOthersConfirm(false);
   }
 
-  const longPressRef = useRef(null);
-  const suppressClickRef = useRef(null);
-  const usageCardRef = useRef(null);
+  const longPressRef = useRef<NodeJS.Timeout | null>(null);
+  const suppressClickRef = useRef<string | null>(null);
+  const usageCardRef = useRef<HTMLDivElement>(null);
 
   const filteredAssets = useMemo(() => {
     let list = assets;
@@ -554,7 +636,7 @@ export default function DashboardPage() {
   }, [docsBase, selectedDocProject, docCategoryFilter, docTypeFilter]);
 
   const docCategoryCounts = useMemo(() => {
-    const m = new Map();
+    const m = new Map<string, number>();
     for (const d of docsBase) {
       const c = docCategoryOf(d);
       m.set(c, (m.get(c) || 0) + 1);
@@ -563,19 +645,19 @@ export default function DashboardPage() {
   }, [docsBase]);
 
   const docsGrouped = useMemo(() => {
-    const m = new Map();
+    const m = new Map<string, Asset[]>();
     for (const d of docsFiltered) {
       const key = DOC_CATEGORY_LABELS[docCategoryOf(d)] || 'Khác';
       if (!m.has(key)) m.set(key, []);
-      m.get(key).push(d);
+      m.get(key)!.push(d);
     }
     return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [docsFiltered]);
 
-  const [selectedAlbum, setSelectedAlbum] = useState('all');
+  const [selectedAlbum, setSelectedAlbum] = useState<string>('all');
 
   const availableAlbums = useMemo(() => {
-    const m = new Map();
+    const m = new Map<string, number>();
     for (const p of photoAssets) {
       if (!p.albumName) continue;
       m.set(p.albumName, (m.get(p.albumName) || 0) + 1);
@@ -588,18 +670,19 @@ export default function DashboardPage() {
     return photoAssets.filter((p) => p.albumName === selectedAlbum);
   }, [photoAssets, selectedAlbum]);
 
-  const photoGroups = useMemo(() => {
+  const photoGroups = useMemo<[string, Asset[]][]>(() => {
     if (!groupByTimeEnabled) return [['all', albumFilteredPhotos]];
-    const m = new Map();
+    const m = new Map<string, Asset[]>();
     for (const p of albumFilteredPhotos) {
       const key = groupMode === 'year' ? yearLabel(p.takenAt || p.uploadedAt) : monthLabel(p.takenAt || p.uploadedAt);
       if (!m.has(key)) m.set(key, []);
-      m.get(key).push(p);
+      m.get(key)!.push(p);
     }
     return Array.from(m.entries());
   }, [albumFilteredPhotos, groupMode, groupByTimeEnabled]);
 
-  const active = activeIndex >= 0
+  const activeIndexInScope = activeIndex >= 0;
+  const active = activeIndexInScope
     ? (tab === 'photos' ? albumFilteredPhotos[activeIndex] : docsFiltered[activeIndex])
     : null;
 
@@ -619,8 +702,6 @@ export default function DashboardPage() {
     }
   }, [active?.id, active?.type, api]);
 
-
-
   function clearLongPress() {
     if (longPressRef.current) {
       clearTimeout(longPressRef.current);
@@ -628,7 +709,7 @@ export default function DashboardPage() {
     }
   }
 
-  function togglePick(id) {
+  function togglePick(id: string) {
     setSelectedIds((prev) => {
       const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
       if (next.length === 0) setSelectionMode(false);
@@ -636,7 +717,7 @@ export default function DashboardPage() {
     });
   }
 
-  function beginLongPress(id) {
+  function beginLongPress(id: string) {
     clearLongPress();
     longPressRef.current = setTimeout(() => {
       suppressClickRef.current = id;
@@ -681,7 +762,7 @@ export default function DashboardPage() {
       setAssets(assetsData.items || []);
       setDocProjects(projectsData.items || []);
       setTags(tagsData.items || []);
-    } catch (e) {
+    } catch (e: any) {
       setErr(e.message || 'Không tải được dữ liệu');
     }
   }
@@ -716,7 +797,7 @@ export default function DashboardPage() {
   }, [showSettingsModal, settingsTab, user]);
 
   useEffect(() => {
-    function onKey(e) {
+    function onKey(e: KeyboardEvent) {
       if (activeIndex < 0) return;
       if (e.key === 'Escape') {
         setActiveIndex(-1);
@@ -733,8 +814,7 @@ export default function DashboardPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [activeIndex, albumFilteredPhotos.length, docsFiltered.length, tab]);
 
-
-  async function uploadLargeFileByChunks(file) {
+  async function uploadLargeFileByChunks(file: File) {
     const init = await fetch(`${api}/api/assets/upload-chunk/init`, {
       method: 'POST',
       credentials: 'include',
@@ -781,7 +861,7 @@ export default function DashboardPage() {
     return done.json();
   }
 
-  async function onUpload(e) {
+  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
@@ -817,7 +897,7 @@ export default function DashboardPage() {
 
         done += 1;
         setMsg(`✅ ${file.name} (${kind}) upload thành công · ${done}/${files.length}`);
-      } catch (ex) {
+      } catch (ex: any) {
         const reason = ex?.message || 'unknown';
         failed.push({ index: idx + 1, name: file.name, kind, sizeMb, mode: big ? 'chunk' : 'thường', reason });
         setMsg(`❌ Lỗi file ${idx + 1}/${files.length}: ${file.name} (${kind}) · ${reason}`);
@@ -852,7 +932,7 @@ export default function DashboardPage() {
       setSelectedIds([]);
       setSelectionMode(false);
       await loadData();
-    } catch (e) {
+    } catch (e: any) {
       setMsg(`Lỗi xóa: ${e.message || 'unknown'}`);
     }
   }
@@ -872,7 +952,7 @@ export default function DashboardPage() {
       setSelectedIds([]);
       setSelectionMode(false);
       await loadData();
-    } catch (e) {
+    } catch (e: any) {
       setMsg(`Lỗi khôi phục: ${e.message || 'unknown'}`);
     }
   }
@@ -895,7 +975,7 @@ export default function DashboardPage() {
       setSelectedIds([]);
       setSelectionMode(false);
       await loadData();
-    } catch (e) {
+    } catch (e: any) {
       setMsg(`Lỗi purge: ${e.message || 'unknown'}`);
     }
   }
@@ -916,7 +996,7 @@ export default function DashboardPage() {
       const data = await r.json();
       setMsg(`Đã thêm ${data.updated || 0} file vào album "${name.trim()}"`);
       await loadData();
-    } catch (e) {
+    } catch (e: any) {
       setMsg(`Lỗi album: ${e.message || 'unknown'}`);
     }
   }
@@ -938,32 +1018,40 @@ export default function DashboardPage() {
       setMsg(`Đã thêm ${data.updated || 0} tài liệu vào project "${name.trim()}"`);
       await loadData();
       await loadDocProjects();
-    } catch (e) {
+    } catch (e: any) {
       setMsg(`Lỗi project tài liệu: ${e.message || 'unknown'}`);
     }
   }
 
   async function loadAlbums() {
-    const r = await fetch(`${api}/api/assets/albums`, { credentials: 'include' });
-    if (!r.ok) throw new Error('Không tải được album');
-    const data = await r.json();
-    setAlbums(data.items || []);
+    try {
+      const r = await fetch(`${api}/api/assets/albums`, { credentials: 'include' });
+      if (!r.ok) throw new Error('Không tải được album');
+      const data = await r.json();
+      setAlbums(data.items || []);
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   async function loadDocProjects() {
-    const r = await fetch(`${api}/api/assets/doc-projects`, { credentials: 'include' });
-    if (!r.ok) throw new Error('Không tải được nhóm dự án tài liệu');
-    const data = await r.json();
-    setDocProjects(data.items || []);
+    try {
+      const r = await fetch(`${api}/api/assets/doc-projects`, { credentials: 'include' });
+      if (!r.ok) throw new Error('Không tải được nhóm dự án tài liệu');
+      const data = await r.json();
+      setDocProjects(data.items || []);
+    } catch (err) {
+      console.error(err);
+    }
   }
 
-  function toggleAlbumSelection(name) {
+  function toggleAlbumSelection(name: string) {
     setSelectedAlbumsForActive((prev) =>
       prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]
     );
   }
 
-  function createNewAlbumInSelection(name) {
+  function createNewAlbumInSelection(name: string) {
     const trimmed = (name || '').trim();
     if (!trimmed) return;
     setSelectedAlbumsForActive((prev) =>
@@ -989,7 +1077,7 @@ export default function DashboardPage() {
       await loadAlbums();
       setShowAlbumPicker(false);
       setMsg('Đã cập nhật danh sách album thành công');
-    } catch (e) {
+    } catch (e: any) {
       setMsg(`Lỗi lưu album: ${e.message}`);
     }
   }
@@ -1005,13 +1093,13 @@ export default function DashboardPage() {
     }
   }
 
-  function toggleTagSelection(name) {
+  function toggleTagSelection(name: string) {
     setSelectedTagsForActive((prev) =>
       prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]
     );
   }
 
-  function createNewTagInSelection(name) {
+  function createNewTagInSelection(name: string) {
     const trimmed = (name || '').trim().toLowerCase();
     if (!trimmed) return;
     setSelectedTagsForActive((prev) =>
@@ -1037,19 +1125,19 @@ export default function DashboardPage() {
       await loadTags();
       setShowTagPicker(false);
       setMsg('Đã cập nhật danh sách nhãn thành công');
-    } catch (e) {
+    } catch (e: any) {
       setMsg(`Lỗi lưu nhãn: ${e.message}`);
     }
   }
 
-  function toggleFilterTag(name) {
+  function toggleFilterTag(name: string) {
     setSelectedFilterTags((prev) =>
       prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]
     );
   }
 
-  function docIconOf(item) {
-    const ext = (item.originalName || '').split('.').pop().toLowerCase();
+  function docIconOf(item: Asset): string {
+    const ext = (item.originalName || '').split('.').pop()?.toLowerCase() || '';
     if (['pdf'].includes(ext)) return '📕';
     if (['xls', 'xlsx', 'csv'].includes(ext)) return '📊';
     if (['doc', 'docx'].includes(ext)) return '📘';
@@ -1059,17 +1147,17 @@ export default function DashboardPage() {
     return '📄';
   }
 
-  function openPhoto(id) {
+  function openPhoto(id: string) {
     const idx = albumFilteredPhotos.findIndex((x) => x.id === id);
     if (idx >= 0) setActiveIndex(idx);
   }
 
-  function openDoc(id) {
+  function openDoc(id: string) {
     const idx = docsFiltered.findIndex((x) => x.id === id);
     if (idx >= 0) setActiveIndex(idx);
   }
 
-  function cardHandlers(item, onNormalClick) {
+  function cardHandlers(item: Asset, onNormalClick?: () => void) {
     return {
       onMouseDown: () => beginLongPress(item.id),
       onMouseUp: endLongPress,
@@ -1087,7 +1175,7 @@ export default function DashboardPage() {
     };
   }
 
-  function toggleGroup(key) {
+  function toggleGroup(key: string) {
     setExpandedGroups((prev) => ({ ...prev, [key]: !(prev[key] ?? true) }));
   }
 
@@ -1104,8 +1192,6 @@ export default function DashboardPage() {
         <button className={`navItem ${tab === 'docs' ? 'active' : ''}`} onClick={() => { setTab('docs'); setDocCollectionView('all'); setDocCategoryFilter('all'); setSelectedDocProject('all'); setSelectionMode(false); setSelectedIds([]); }}>
           <span className="ico">📁</span><span>Tài liệu</span><span className="count">{docs.length}</span>
         </button>
-
-
 
         <div className="sectionWrap">
           <div className="sectionTitle">{tab === 'photos' ? 'Bộ sưu tập' : 'Khu vực tài liệu'}</div>
@@ -1184,7 +1270,7 @@ export default function DashboardPage() {
                 </button>
               ))}
 
-              <button className={`navItem ${docKindsExpanded ? 'active' : ''}`} onClick={() => setDocKindsExpanded((v) => !v)}>
+              <button className={`navItem ${docTypeFilter === 'all' && docKindsExpanded ? 'active' : ''}`} onClick={() => setDocKindsExpanded((v) => !v)}>
                 <span className="ico">🗂</span><span>Hiện tất cả loại</span><span className="chev">{docKindsExpanded ? '▾' : '▸'}</span>
               </button>
 
@@ -1380,7 +1466,6 @@ export default function DashboardPage() {
                                 )
                               )}
                               <div className="caption">{a.originalName}</div>
-                              {a.type === 'video' && a.processingStatus === 'processing' && <div className="processingBadge">Đang xử lý…</div>}
                               {picked && <div className="badge">✓</div>}
                             </div>
                           );
@@ -1413,7 +1498,6 @@ export default function DashboardPage() {
                 <div className="monthTitle">{group} · {items.length}</div>
                 <div className="docGrid">
                   {items.map((d, idx) => {
-                    const src = `${api}/api/assets/_media/original/${d.id}`;
                     const picked = selectedIds.includes(d.id);
                     return (
                       <div key={d.id} className={`docCard ${picked ? 'picked' : ''}`} {...cardHandlers(d, () => openDoc(d.id))} style={{ animationDelay: `${(idx % 24) * 0.02}s` }}>
@@ -1428,8 +1512,6 @@ export default function DashboardPage() {
             ))}
           </section>
         )}
-
-
       </main>
 
       {active && (
@@ -1618,8 +1700,8 @@ export default function DashboardPage() {
                   width: '100%',
                   boxSizing: 'border-box'
                 }}
-                onMouseEnter={(e) => { if (settingsTab !== 'profile') e.currentTarget.style.color = '#ffffff'; }}
-                onMouseLeave={(e) => { if (settingsTab !== 'profile') e.currentTarget.style.color = '#a1a1aa'; }}
+                onMouseEnter={(e: any) => { if (settingsTab !== 'profile') e.currentTarget.style.color = '#ffffff'; }}
+                onMouseLeave={(e: any) => { if (settingsTab !== 'profile') e.currentTarget.style.color = '#a1a1aa'; }}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', opacity: settingsTab === 'profile' ? 1 : 0.7 }}><Icons.User /></span>
                 <span>Hồ sơ cá nhân</span>
@@ -1644,8 +1726,8 @@ export default function DashboardPage() {
                   width: '100%',
                   boxSizing: 'border-box'
                 }}
-                onMouseEnter={(e) => { if (settingsTab !== 'password') e.currentTarget.style.color = '#ffffff'; }}
-                onMouseLeave={(e) => { if (settingsTab !== 'password') e.currentTarget.style.color = '#a1a1aa'; }}
+                onMouseEnter={(e: any) => { if (settingsTab !== 'password') e.currentTarget.style.color = '#ffffff'; }}
+                onMouseLeave={(e: any) => { if (settingsTab !== 'password') e.currentTarget.style.color = '#a1a1aa'; }}
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', opacity: settingsTab === 'password' ? 1 : 0.7 }}><Icons.Lock /></span>
                 <span>Đổi mật khẩu</span>
@@ -1671,8 +1753,8 @@ export default function DashboardPage() {
                     width: '100%',
                     boxSizing: 'border-box'
                   }}
-                  onMouseEnter={(e) => { if (settingsTab !== 'invites') e.currentTarget.style.color = '#ffffff'; }}
-                  onMouseLeave={(e) => { if (settingsTab !== 'invites') e.currentTarget.style.color = '#a1a1aa'; }}
+                  onMouseEnter={(e: any) => { if (settingsTab !== 'invites') e.currentTarget.style.color = '#ffffff'; }}
+                  onMouseLeave={(e: any) => { if (settingsTab !== 'invites') e.currentTarget.style.color = '#a1a1aa'; }}
                 >
                   <span style={{ display: 'inline-flex', alignItems: 'center', opacity: settingsTab === 'invites' ? 1 : 0.7 }}><Icons.Key /></span>
                   <span>Quản lý mã mời</span>
@@ -1712,8 +1794,8 @@ export default function DashboardPage() {
                     padding: '4px',
                     zIndex: 10
                   }}
-                  onMouseEnter={(e) => { e.target.style.color = '#fff'; }}
-                  onMouseLeave={(e) => { e.target.style.color = '#71717a'; }}
+                  onMouseEnter={(e: any) => { e.target.style.color = '#fff'; }}
+                  onMouseLeave={(e: any) => { e.target.style.color = '#71717a'; }}
                 >
                   ✕
                 </button>
@@ -1781,8 +1863,8 @@ export default function DashboardPage() {
                             onChange={(e) => setProfileNameInput(e.target.value)} 
                             required 
                             style={{ width: '100%', padding: '9px 12px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13.5px', outline: 'none', transition: 'all 0.15s ease' }}
-                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
-                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                            onFocus={(e: any) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                            onBlur={(e: any) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
                           />
                         </div>
                         <div>
@@ -1838,8 +1920,8 @@ export default function DashboardPage() {
                               fontSize: '13px',
                               transition: 'opacity 0.15s ease',
                             }}
-                            onMouseEnter={(e) => { e.target.style.opacity = '0.9'; }}
-                            onMouseLeave={(e) => { e.target.style.opacity = '1'; }}
+                            onMouseEnter={(e: any) => { e.target.style.opacity = '0.9'; }}
+                            onMouseLeave={(e: any) => { e.target.style.opacity = '1'; }}
                           >
                             Lưu thay đổi
                           </button>
@@ -1887,8 +1969,8 @@ export default function DashboardPage() {
                             onChange={(e) => setOldPassword(e.target.value)} 
                             required 
                             style={{ width: '100%', padding: '9px 12px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13.5px', outline: 'none', transition: 'all 0.15s ease' }}
-                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
-                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                            onFocus={(e: any) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                            onBlur={(e: any) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
                           />
                         </div>
                         <div>
@@ -1899,8 +1981,8 @@ export default function DashboardPage() {
                             onChange={(e) => setNewPassword(e.target.value)} 
                             required 
                             style={{ width: '100%', padding: '9px 12px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13.5px', outline: 'none', transition: 'all 0.15s ease' }}
-                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
-                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                            onFocus={(e: any) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                            onBlur={(e: any) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
                           />
                         </div>
                         <div>
@@ -1911,8 +1993,8 @@ export default function DashboardPage() {
                             onChange={(e) => setConfirmPassword(e.target.value)} 
                             required 
                             style={{ width: '100%', padding: '9px 12px', boxSizing: 'border-box', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'rgba(0,0,0,0.2)', color: '#ffffff', fontSize: '13.5px', outline: 'none', transition: 'all 0.15s ease' }}
-                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
-                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                            onFocus={(e: any) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                            onBlur={(e: any) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
                           />
                         </div>
                         
@@ -1936,8 +2018,8 @@ export default function DashboardPage() {
                               fontSize: '13px',
                               transition: 'opacity 0.15s ease',
                             }}
-                            onMouseEnter={(e) => { e.target.style.opacity = '0.9'; }}
-                            onMouseLeave={(e) => { e.target.style.opacity = '1'; }}
+                            onMouseEnter={(e: any) => { e.target.style.opacity = '0.9'; }}
+                            onMouseLeave={(e: any) => { e.target.style.opacity = '1'; }}
                           >
                             Cập nhật mật khẩu
                           </button>
@@ -1975,8 +2057,8 @@ export default function DashboardPage() {
                             onChange={(e) => setMaxUsesInput(e.target.value)} 
                             required 
                             style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '7px 10px', color: '#ffffff', fontSize: '13px', outline: 'none', transition: 'all 0.15s ease', boxSizing: 'border-box' }}
-                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
-                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                            onFocus={(e: any) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                            onBlur={(e: any) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
                           />
                         </div>
 
@@ -2029,8 +2111,8 @@ export default function DashboardPage() {
                               value={expiresInHoursInput} 
                               onChange={(e) => setExpiresInHoursInput(e.target.value)} 
                               style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', padding: '7px 10px', color: '#ffffff', fontSize: '13px', outline: 'none', transition: 'all 0.15s ease', boxSizing: 'border-box' }}
-                              onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
-                              onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
+                              onFocus={(e: any) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
+                              onBlur={(e: any) => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
                             />
                           ) : (
                             <div>
@@ -2060,8 +2142,8 @@ export default function DashboardPage() {
                             transition: 'opacity 0.15s ease',
                             marginTop: '4px'
                           }}
-                          onMouseEnter={(e) => { e.target.style.opacity = '0.9'; }}
-                          onMouseLeave={(e) => { e.target.style.opacity = '1'; }}
+                          onMouseEnter={(e: any) => { e.target.style.opacity = '0.9'; }}
+                          onMouseLeave={(e: any) => { e.target.style.opacity = '1'; }}
                         >
                           Tạo mã mời
                         </button>
@@ -2133,8 +2215,8 @@ export default function DashboardPage() {
                                         transition: 'all 0.15s ease',
                                         textDecoration: isActive ? 'none' : 'line-through'
                                       }}
-                                      onMouseEnter={(e) => { if (isActive) e.currentTarget.style.color = '#60a5fa'; }}
-                                      onMouseLeave={(e) => { if (isActive) e.currentTarget.style.color = '#3b82f6'; }}
+                                      onMouseEnter={(e: any) => { if (isActive) e.currentTarget.style.color = '#60a5fa'; }}
+                                      onMouseLeave={(e: any) => { if (isActive) e.currentTarget.style.color = '#3b82f6'; }}
                                     >
                                       {inv.token}
                                     </td>
@@ -2164,8 +2246,8 @@ export default function DashboardPage() {
                                             cursor: 'pointer',
                                             transition: 'all 0.15s ease'
                                           }}
-                                          onMouseEnter={(e) => { e.target.style.background = 'rgba(244, 63, 94, 0.06)'; e.target.style.borderColor = '#f43f5e'; }}
-                                          onMouseLeave={(e) => { e.target.style.background = 'transparent'; e.target.style.borderColor = 'rgba(244, 63, 94, 0.25)'; }}
+                                          onMouseEnter={(e: any) => { e.target.style.background = 'rgba(244, 63, 94, 0.06)'; e.target.style.borderColor = '#f43f5e'; }}
+                                          onMouseLeave={(e: any) => { e.target.style.background = 'transparent'; e.target.style.borderColor = 'rgba(244, 63, 94, 0.25)'; }}
                                         >
                                           Khóa
                                         </button>
@@ -2241,7 +2323,7 @@ export default function DashboardPage() {
           position: 'fixed',
           bottom: '32px',
           left: '50%',
-          transform: 'translateX(-50%)',
+          transform: 'translateX(-55%)',
           backgroundColor: '#18181b',
           color: '#ffffff',
           padding: '8px 16px',

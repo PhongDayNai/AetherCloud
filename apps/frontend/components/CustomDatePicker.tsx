@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 // Icon Calendar SVG
-const CalendarIcon = ({ size = 16, className = "" }) => (
+interface IconProps {
+  size?: number;
+  className?: string;
+}
+
+const CalendarIcon: React.FC<IconProps> = ({ size = 16, className = "" }) => (
   <svg 
     width={size} 
     height={size} 
@@ -22,7 +27,7 @@ const CalendarIcon = ({ size = 16, className = "" }) => (
   </svg>
 );
 
-const ChevronLeft = ({ size = 16 }) => (
+const ChevronLeft: React.FC<IconProps> = ({ size = 16 }) => (
   <svg 
     width={size} 
     height={size} 
@@ -37,7 +42,7 @@ const ChevronLeft = ({ size = 16 }) => (
   </svg>
 );
 
-const ChevronRight = ({ size = 16 }) => (
+const ChevronRight: React.FC<IconProps> = ({ size = 16 }) => (
   <svg 
     width={size} 
     height={size} 
@@ -52,11 +57,27 @@ const ChevronRight = ({ size = 16 }) => (
   </svg>
 );
 
-export default function CustomDatePicker({ value, onChange, lang = "vi", onlyMonth = false, minDate, maxDate }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef(null);
+interface CustomDatePickerProps {
+  value: string;
+  onChange: (value: string) => void;
+  lang?: "vi" | "en";
+  onlyMonth?: boolean;
+  minDate?: string;
+  maxDate?: string;
+}
 
-  const isDateDisabled = (y, m, d) => {
+export default function CustomDatePicker({ 
+  value, 
+  onChange, 
+  lang = "vi", 
+  onlyMonth = false, 
+  minDate, 
+  maxDate 
+}: CustomDatePickerProps): React.JSX.Element {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const isDateDisabled = (y: number, m: number, d: number): boolean => {
     const currentDate = new Date(y, m, d);
     
     if (minDate) {
@@ -79,7 +100,7 @@ export default function CustomDatePicker({ value, onChange, lang = "vi", onlyMon
   };
 
   // Parse value (YYYY-MM-DD or YYYY-MM)
-  const parseDate = (dateStr) => {
+  const parseDate = (dateStr: string): Date => {
     if (!dateStr) return new Date();
     const parts = dateStr.split("-");
     if (parts.length === 2) {
@@ -95,8 +116,8 @@ export default function CustomDatePicker({ value, onChange, lang = "vi", onlyMon
   };
 
   const selectedDate = parseDate(value);
-  const [viewDate, setViewDate] = useState(selectedDate);
-  const [viewMode, setViewMode] = useState(onlyMonth ? "months" : "days");
+  const [viewDate, setViewDate] = useState<Date>(selectedDate);
+  const [viewMode, setViewMode] = useState<"days" | "months" | "years">(onlyMonth ? "months" : "days");
 
   useEffect(() => {
     setViewDate(parseDate(value));
@@ -106,8 +127,8 @@ export default function CustomDatePicker({ value, onChange, lang = "vi", onlyMon
   }, [value, onlyMonth]);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setViewMode(onlyMonth ? "months" : "days");
       }
@@ -131,8 +152,8 @@ export default function CustomDatePicker({ value, onChange, lang = "vi", onlyMon
   const daysEn = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
   const daysHeader = lang === "vi" ? daysVi : daysEn;
 
-  const getDaysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
-  const getFirstDayOfMonth = (y, m) => {
+  const getDaysInMonth = (y: number, m: number): number => new Date(y, m + 1, 0).getDate();
+  const getFirstDayOfMonth = (y: number, m: number): number => {
     const day = new Date(y, m, 1).getDay();
     return day === 0 ? 6 : day - 1;
   };
@@ -148,7 +169,7 @@ export default function CustomDatePicker({ value, onChange, lang = "vi", onlyMon
     setViewDate(new Date(year, month + 1, 1));
   };
 
-  const handleSelectDay = (day) => {
+  const handleSelectDay = (day: number) => {
     const formattedMonth = String(month + 1).padStart(2, "0");
     const formattedDay = String(day).padStart(2, "0");
     const formattedDate = `${year}-${formattedMonth}-${formattedDay}`;
@@ -156,7 +177,7 @@ export default function CustomDatePicker({ value, onChange, lang = "vi", onlyMon
     setIsOpen(false);
   };
 
-  const handleSelectMonth = (mIdx) => {
+  const handleSelectMonth = (mIdx: number) => {
     if (onlyMonth) {
       const formattedMonth = String(mIdx + 1).padStart(2, "0");
       const formattedDate = `${year}-${formattedMonth}-01`;
@@ -168,7 +189,7 @@ export default function CustomDatePicker({ value, onChange, lang = "vi", onlyMon
     }
   };
 
-  const handleSelectYear = (selectedYear) => {
+  const handleSelectYear = (selectedYear: number) => {
     setViewDate(new Date(selectedYear, month, 1));
     setViewMode("months");
   };

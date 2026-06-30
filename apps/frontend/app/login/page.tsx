@@ -1,46 +1,46 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-function getApiOrigin() {
+function getApiOrigin(): string {
   return process.env.NEXT_PUBLIC_API_ORIGIN || 'http://localhost:45174';
 }
 
 // Bộ icon SVG đồng bộ phong cách tối giản (Outline Theme, strokeWidth=2)
 const Icons = {
-  User: () => (
+  User: (): React.JSX.Element => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </svg>
   ),
-  Mail: () => (
+  Mail: (): React.JSX.Element => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
       <polyline points="22,6 12,13 2,6" />
     </svg>
   ),
-  Lock: () => (
+  Lock: (): React.JSX.Element => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   ),
-  Key: () => (
+  Key: (): React.JSX.Element => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
     </svg>
   )
 };
 
-export default function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
-  const [msg, setMsg] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+export default function LoginPage(): React.JSX.Element {
+  const [isLogin, setIsLogin] = useState<boolean>(true);
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [name, setName] = useState<string>('');
+  const [inviteCode, setInviteCode] = useState<string>('');
+  const [msg, setMsg] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     let mounted = true;
@@ -55,7 +55,7 @@ export default function LoginPage() {
     return () => { mounted = false; };
   }, []);
 
-  async function onSubmit(e) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setMsg('');
     setIsLoading(true);
@@ -91,7 +91,7 @@ export default function LoginPage() {
 
       const data = await res.json().catch(() => ({}));
       setMsg(`Lỗi: ${data.message || (isLogin ? 'Không đăng nhập được' : 'Không đăng ký được')}`);
-    } catch (err) {
+    } catch (err: any) {
       setIsLoading(false);
       if (err?.name === 'AbortError') {
         setMsg('Lỗi: Hết thời gian chờ kết nối API (15 giây).');
