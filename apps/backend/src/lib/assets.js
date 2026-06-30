@@ -411,16 +411,26 @@ async function saveUploadedFile(file, user) {
 }
 
 async function listAssets(limit = 200, opts = {}) {
-  const { includeTrash = false, onlyTrash = false } = opts;
+  const { includeTrash = false, onlyTrash = false, owner } = opts;
   let queryText = 'SELECT * FROM assets';
   const params = [];
-  
-  if (onlyTrash) {
-    queryText += ' WHERE is_deleted = true';
-  } else if (!includeTrash) {
-    queryText += ' WHERE is_deleted = false';
+  const clauses = [];
+
+  if (owner) {
+    params.push(owner);
+    clauses.push(`owner = $${params.length}`);
   }
-  
+
+  if (onlyTrash) {
+    clauses.push('is_deleted = true');
+  } else if (!includeTrash) {
+    clauses.push('is_deleted = false');
+  }
+
+  if (clauses.length > 0) {
+    queryText += ' WHERE ' + clauses.join(' AND ');
+  }
+
   queryText += ' ORDER BY taken_at DESC LIMIT $' + (params.length + 1);
   params.push(Math.max(1, Math.min(limit, 5000)));
 
@@ -454,31 +464,31 @@ function getHlsDirAbsPathFromAsset(asset) {
   return path.dirname(hls);
 }
 
-async function listAlbums() {
+async function listAlbums(owner) {
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
       SELECT unnest(album_names) AS name 
       FROM assets 
-      WHERE is_deleted = false
+      WHERE is_deleted = false AND owner = $1
     ) sub 
     GROUP BY name 
     ORDER BY name
-  `);
+  `, [owner]);
   return res.rows;
 }
 
-async function listTags() {
+async function listTags(owner) {
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
       SELECT unnest(tags) AS name 
       FROM assets 
-      WHERE is_deleted = false
+      WHERE is_deleted = false AND owner = $1
     ) sub 
     GROUP BY name 
     ORDER BY name
-  `);
+  `, [owner]);
   return res.rows;
 }
 
@@ -538,17 +548,17 @@ async function setAssetAlbums(id, albumNames = []) {
   return { updated: res.rowCount };
 }
 
-async function listDocProjects() {
+async function listDocProjects(owner) {
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
       SELECT unnest(doc_project_names) AS name 
       FROM assets 
-      WHERE is_deleted = false AND type != 'image' AND type != 'video'
+      WHERE is_deleted = false AND type != 'image' AND type != 'video' AND owner = $1
     ) sub 
     GROUP BY name 
     ORDER BY name
-  `);
+  `, [owner]);
   return res.rows;
 }
 

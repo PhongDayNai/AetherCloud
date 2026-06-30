@@ -4,6 +4,7 @@ const path = require('path');
 const multer = require('multer');
 const crypto = require('crypto');
 const { requireAuth } = require('../middleware/requireAuth');
+const db = require('../lib/db');
 const {
   saveUploadedFile,
   listAssets,
@@ -38,12 +39,46 @@ const upload = multer({
 
 const chunkSessions = new Map();
 
+// Middleware kiểm tra quyền sở hữu đối với 1 asset
+async function checkAssetOwnership(req, res, next) {
+  const { id } = req.params;
+  try {
+    const asset = await getAsset(id);
+    if (!asset) return res.status(404).json({ message: 'Không tìm thấy tệp tin' });
+    if (asset.owner !== req.user.sub) {
+      return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin này' });
+    }
+    req.asset = asset; // Truyền asset đã query sang handler kế tiếp để tái sử dụng
+    next();
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+}
+
+// Middleware kiểm tra quyền sở hữu đối với danh sách bulk assets
+async function checkBulkOwnership(req, res, next) {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  if (!ids.length) return res.status(400).json({ message: 'Danh sách ids là bắt buộc' });
+  try {
+    const checkRes = await db.query(
+      'SELECT COUNT(*)::int AS count FROM assets WHERE id = ANY($1) AND owner = $2',
+      [ids, req.user.sub]
+    );
+    if (checkRes.rows[0].count !== ids.length) {
+      return res.status(403).json({ message: 'Bạn không có quyền thao tác trên một số tệp tin' });
+    }
+    next();
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+}
+
 router.get('/', requireAuth, async (req, res) => {
   const limit = Number(req.query.limit || 200);
   const includeTrash = String(req.query.includeTrash || 'false') === 'true';
   const onlyTrash = String(req.query.onlyTrash || 'false') === 'true';
   try {
-    const items = await listAssets(limit, { includeTrash, onlyTrash });
+    const items = await listAssets(limit, { includeTrash, onlyTrash, owner: req.user.sub });
     return res.json({ items });
   } catch (e) {
     return res.status(500).json({ message: e.message });
@@ -134,28 +169,27 @@ router.post('/upload', requireAuth, upload.array('files', 50), async (req, res) 
   }
 });
 
-router.get('/albums', requireAuth, async (_req, res) => {
+router.get('/albums', requireAuth, async (req, res) => {
   try {
-    const items = await listAlbums();
+    const items = await listAlbums(req.user.sub);
     return res.json({ items });
   } catch (e) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.get('/doc-projects', requireAuth, async (_req, res) => {
+router.get('/doc-projects', requireAuth, async (req, res) => {
   try {
-    const items = await listDocProjects();
+    const items = await listDocProjects(req.user.sub);
     return res.json({ items });
   } catch (e) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.post('/bulk/album', requireAuth, async (req, res) => {
+router.post('/bulk/album', requireAuth, checkBulkOwnership, async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
   const albumName = String(req.body?.albumName || '').trim();
-  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
   if (!albumName) return res.status(400).json({ message: 'albumName is required' });
 
   try {
@@ -166,10 +200,9 @@ router.post('/bulk/album', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/bulk/doc-project', requireAuth, async (req, res) => {
+router.post('/bulk/doc-project', requireAuth, checkBulkOwnership, async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
   const projectName = String(req.body?.projectName || '').trim();
-  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
   if (!projectName) return res.status(400).json({ message: 'projectName is required' });
 
   try {
@@ -180,10 +213,8 @@ router.post('/bulk/doc-project', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/bulk/trash', requireAuth, async (req, res) => {
+router.post('/bulk/trash', requireAuth, checkBulkOwnership, async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
-  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
-
   try {
     const result = await moveToTrash(ids);
     return res.json({ ok: true, ...result });
@@ -192,10 +223,8 @@ router.post('/bulk/trash', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/bulk/restore', requireAuth, async (req, res) => {
+router.post('/bulk/restore', requireAuth, checkBulkOwnership, async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
-  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
-
   try {
     const result = await restoreFromTrash(ids);
     return res.json({ ok: true, ...result });
@@ -204,10 +233,8 @@ router.post('/bulk/restore', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/bulk/purge', requireAuth, async (req, res) => {
+router.post('/bulk/purge', requireAuth, checkBulkOwnership, async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
-  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
-
   try {
     const result = await purgeDeleted(ids);
     return res.json({ ok: true, ...result });
@@ -216,11 +243,9 @@ router.post('/bulk/purge', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/_media/hls/:id/master.m3u8', requireAuth, async (req, res) => {
+router.get('/_media/hls/:id/master.m3u8', requireAuth, checkAssetOwnership, async (req, res) => {
   try {
-    const asset = await getAsset(req.params.id);
-    if (!asset) return res.status(404).json({ message: 'Not found' });
-
+    const asset = req.asset;
     const hlsMasterAbs = getHlsAbsPathFromAsset(asset);
     if (!hlsMasterAbs || !fs.existsSync(hlsMasterAbs)) {
       return res.status(404).json({ message: 'HLS not ready' });
@@ -234,11 +259,9 @@ router.get('/_media/hls/:id/master.m3u8', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/_media/hls/:id/:segment', requireAuth, async (req, res) => {
+router.get('/_media/hls/:id/:segment', requireAuth, checkAssetOwnership, async (req, res) => {
   try {
-    const asset = await getAsset(req.params.id);
-    if (!asset) return res.status(404).json({ message: 'Not found' });
-
+    const asset = req.asset;
     const hlsDir = getHlsDirAbsPathFromAsset(asset);
     if (!hlsDir || !fs.existsSync(hlsDir)) return res.status(404).json({ message: 'HLS not ready' });
 
@@ -264,11 +287,9 @@ router.get('/_media/hls/:id/:segment', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/_media/play/:id', requireAuth, async (req, res) => {
+router.get('/_media/play/:id', requireAuth, checkAssetOwnership, async (req, res) => {
   try {
-    const asset = await getAsset(req.params.id);
-    if (!asset) return res.status(404).json({ message: 'Not found' });
-
+    const asset = req.asset;
     const playAbs = getPlayableAbsPathFromAsset(asset);
     if (!playAbs || !fs.existsSync(playAbs)) {
       return res.redirect(`/api/assets/_media/original/${asset.id}`);
@@ -283,11 +304,9 @@ router.get('/_media/play/:id', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/_media/original/:id', requireAuth, async (req, res) => {
+router.get('/_media/original/:id', requireAuth, checkAssetOwnership, async (req, res) => {
   try {
-    const asset = await getAsset(req.params.id);
-    if (!asset) return res.status(404).json({ message: 'Not found' });
-
+    const asset = req.asset;
     const abs = getAbsPathFromAsset(asset);
     if (!fs.existsSync(abs)) return res.status(404).json({ message: 'File missing' });
 
@@ -300,7 +319,7 @@ router.get('/_media/original/:id', requireAuth, async (req, res) => {
   }
 });
 
-router.put('/:id/albums', requireAuth, async (req, res) => {
+router.put('/:id/albums', requireAuth, checkAssetOwnership, async (req, res) => {
   const albumNames = Array.isArray(req.body?.albumNames) ? req.body.albumNames : [];
   try {
     const result = await setAssetAlbums(req.params.id, albumNames);
@@ -313,14 +332,14 @@ router.put('/:id/albums', requireAuth, async (req, res) => {
 
 router.get('/tags', requireAuth, async (req, res) => {
   try {
-    const items = await listTags();
+    const items = await listTags(req.user.sub);
     return res.json({ ok: true, items });
   } catch (e) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.put('/:id/tags', requireAuth, async (req, res) => {
+router.put('/:id/tags', requireAuth, checkAssetOwnership, async (req, res) => {
   const tags = Array.isArray(req.body?.tags) ? req.body.tags : [];
   try {
     const result = await setAssetTags(req.params.id, tags);
@@ -331,14 +350,8 @@ router.put('/:id/tags', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/:id', requireAuth, async (req, res) => {
-  try {
-    const asset = await getAsset(req.params.id);
-    if (!asset) return res.status(404).json({ message: 'Not found' });
-    return res.json(asset);
-  } catch (e) {
-    return res.status(500).json({ message: e.message });
-  }
+router.get('/:id', requireAuth, checkAssetOwnership, async (req, res) => {
+  return res.json(req.asset);
 });
 
 module.exports = router;
