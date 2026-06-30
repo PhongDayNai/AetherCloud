@@ -1,5 +1,14 @@
-const { Pool } = require('pg');
-const fs = require('fs');
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Nạp file .env trước khi khởi tạo connectionString để tránh lỗi nạp chậm trong cơ chế ESM / TS import hoisting
+dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+import { Pool } from 'pg';
+import fs from 'fs';
+import crypto from 'crypto';
+import { hashPassword, generateSalt } from './auth';
 
 let connectionString = process.env.DATABASE_URL || 'postgresql://aethercloud:aethercloud_local_dev@localhost:5432/aethercloud';
 
@@ -10,7 +19,7 @@ if (!isDocker && (connectionString.includes('@db:') || connectionString.includes
   connectionString = connectionString.replace('@db:', '@localhost:').replace('@db/', '@localhost/');
 }
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString,
 });
 
@@ -94,6 +103,47 @@ CREATE INDEX IF NOT EXISTS idx_assets_is_deleted ON assets (is_deleted);
 CREATE INDEX IF NOT EXISTS idx_assets_type ON assets (type);
 `;
 
+async function seedAdmin() {
+  try {
+    const email = (process.env.AUTH_ADMIN_EMAIL || 'admin').trim().toLowerCase();
+    const password = process.env.AUTH_ADMIN_PASSWORD || 'change_me_now';
+    const name = 'System Admin';
+    const role = 'admin';
+
+    // 1. Kiểm tra xem tài khoản Admin có trùng email đã tồn tại trong DB chưa
+    const adminCheckRes = await query('SELECT id FROM users WHERE email = $1', [email]);
+    
+    if (adminCheckRes.rows.length > 0) {
+      console.log('[Database/Seed] Tài khoản Admin đã tồn tại. Đang đồng bộ cập nhật mật khẩu mới từ tệp .env...');
+      const salt = generateSalt();
+      const passwordHash = hashPassword(password, salt);
+      
+      await query(`
+        UPDATE users 
+        SET password_hash = $1, salt = $2, name = $3, role = $4, is_active = true
+        WHERE email = $5
+      `, [passwordHash, salt, name, role, email]);
+      
+      console.log('[Database/Seed] Cập nhật và đồng bộ mật khẩu Admin từ .env THÀNH CÔNG.');
+      return;
+    }
+
+    // 2. Nếu chưa tồn tại, tạo mới
+    const salt = generateSalt();
+    const passwordHash = hashPassword(password, salt);
+    const id = crypto.randomUUID();
+
+    await query(`
+      INSERT INTO users (id, email, password_hash, salt, name, role, must_change_password, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `, [id, email, passwordHash, salt, name, role, false, true]);
+
+    console.log(`[Database/Seed] Đã tạo mới tài khoản Admin tự động thành công: ${email}`);
+  } catch (err: any) {
+    console.error('[Database/Seed] Lỗi khi tự động seed tài khoản Admin:', err.message);
+  }
+}
+
 async function initDb() {
   try {
     const client = await pool.connect();
@@ -101,7 +151,10 @@ async function initDb() {
     await client.query(schema);
     console.log('[Database] Table schemas initialized.');
     client.release();
-  } catch (err) {
+    
+    // Tự động seed tài khoản Admin nếu chưa tồn tại hoặc cần đồng bộ mật khẩu
+    await seedAdmin();
+  } catch (err: any) {
     console.error('[Database] Failed to connect or initialize schema:', err.message);
   }
 }
@@ -109,7 +162,6 @@ async function initDb() {
 // Auto-run schema check
 initDb();
 
-module.exports = {
-  query: (text, params) => pool.query(text, params),
-  pool,
-};
+export function query(text: string, params?: any[]) {
+  return pool.query(text, params);
+}

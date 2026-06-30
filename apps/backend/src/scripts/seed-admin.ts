@@ -1,7 +1,9 @@
-require('dotenv').config();
-const crypto = require('crypto');
-const db = require('../lib/db');
-const { hashPassword, generateSalt } = require('../lib/auth');
+import dotenv from 'dotenv';
+dotenv.config();
+
+import crypto from 'crypto';
+import * as db from '../lib/db';
+import { hashPassword, generateSalt } from '../lib/auth';
 
 async function seedAdmin() {
   const client = await db.pool.connect();
@@ -45,7 +47,7 @@ async function seedAdmin() {
     console.log(`- Username/Email: ${email}`);
     console.log(`- Role: ${role}`);
     console.log(`- Mật khẩu: (Lấy từ cấu hình AUTH_ADMIN_PASSWORD trong file .env)`);
-  } catch (err) {
+  } catch (err: any) {
     console.error('[Seed] Lỗi khi seed tài khoản Admin:', err.message);
   } finally {
     client.release();

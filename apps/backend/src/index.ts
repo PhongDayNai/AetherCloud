@@ -1,15 +1,19 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const cookieParser = require('cookie-parser');
-const fs = require('fs');
+import dotenv from 'dotenv';
+dotenv.config();
 
-const authRoutes = require('./routes/auth');
-const storageRoutes = require('./routes/storage');
-const assetsRoutes = require('./routes/assets');
-const adminRoutes = require('./routes/admin');
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import fs from 'fs';
+
+import authRoutes from './routes/auth';
+import storageRoutes from './routes/storage';
+import assetsRoutes from './routes/assets';
+import adminRoutes from './routes/admin';
+
+import { resolveStoragePath } from './lib/assets';
 
 const app = express();
 const port = Number(process.env.BE_PORT || 45174);
@@ -24,7 +28,7 @@ const allowedOrigins = new Set([
   process.env.MEDIA_LIBRARY_PATH || '/data/library',
   process.env.MEDIA_DERIVED_PATH || '/data/library/derived',
   process.env.MEDIA_TRASH_PATH || '/data/library/trash',
-].forEach((p) => fs.mkdirSync(p, { recursive: true }));
+].forEach((p) => fs.mkdirSync(resolveStoragePath(p), { recursive: true }));
 
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(
@@ -40,7 +44,7 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '25mb' }));
 app.use(cookieParser());
 
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ ok: true, service: 'aethercloud-be', time: new Date().toISOString() });
 });
 
@@ -49,7 +53,7 @@ app.use('/api/storage', storageRoutes);
 app.use('/api/assets', assetsRoutes);
 app.use('/api/admin', adminRoutes);
 
-app.get('/api', (_req, res) => {
+app.get('/api', (_req: Request, res: Response) => {
   res.json({
     name: 'AetherCloud API',
     version: '0.1.0',

@@ -1,9 +1,10 @@
-const fs = require('fs');
-const path = require('path');
-require('dotenv').config();
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
+dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-const { pool } = require('../lib/db');
+import { pool } from '../lib/db';
 
 const LIBRARY_PATH = path.resolve(process.env.MEDIA_LIBRARY_PATH || '/data/library');
 const INDEX_FILE = path.resolve(LIBRARY_PATH, 'index', 'assets.json');
@@ -19,7 +20,7 @@ async function migrate() {
   let data;
   try {
     data = JSON.parse(fs.readFileSync(INDEX_FILE, 'utf8'));
-  } catch (err) {
+  } catch (err: any) {
     console.error('[Migration] Failed to parse assets.json:', err.message);
     process.exit(1);
   }
@@ -75,13 +76,13 @@ async function migrate() {
       ];
 
       const res = await client.query(queryText, values);
-      if (res.rowCount > 0) {
+      if (res.rowCount && res.rowCount > 0) {
         migratedCount++;
       }
     }
     await client.query('COMMIT');
     console.log(`[Migration] Migrated ${migratedCount} new records into PostgreSQL.`);
-  } catch (err) {
+  } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('[Migration] Migration failed, database rolled back:', err.message);
   } finally {

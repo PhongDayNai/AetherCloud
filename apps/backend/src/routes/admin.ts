@@ -1,13 +1,13 @@
-const express = require('express');
-const crypto = require('crypto');
-const db = require('../lib/db');
-const { requireAuth } = require('../middleware/requireAuth');
-const { generateSalt, hashPassword } = require('../lib/auth');
+import express, { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
+import * as db from '../lib/db';
+import { requireAuth } from '../middleware/requireAuth';
+import { generateSalt, hashPassword } from '../lib/auth';
 
 const router = express.Router();
 
 // Middleware kiểm tra vai trò admin
-function requireAdmin(req, res, next) {
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.user?.role !== 'admin') {
     return res.status(403).json({ message: 'Quyền truy cập bị từ chối: Yêu cầu vai trò Admin' });
   }
@@ -15,7 +15,7 @@ function requireAdmin(req, res, next) {
 }
 
 // Hàm sinh mã mời 6 ký tự ngẫu nhiên (chữ in hoa và số)
-function generateInviteCode() {
+function generateInviteCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
   for (let i = 0; i < 6; i++) {
@@ -29,7 +29,8 @@ router.use(requireAuth);
 router.use(requireAdmin);
 
 // 1. Sinh mã mời đăng ký mới
-router.post('/invitations', async (req, res) => {
+router.post('/invitations', async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   const { max_uses, expires_in_hours, expires_at } = req.body || {};
   
   let maxUses = 1;
@@ -38,7 +39,7 @@ router.post('/invitations', async (req, res) => {
     maxUses = Number.isNaN(parsed) ? 1 : parsed;
   }
 
-  let expiresAt = null;
+  let expiresAt: Date | null = null;
   if (expires_at !== undefined && expires_at !== null) {
     expiresAt = new Date(expires_at);
   } else if (expires_in_hours !== undefined) {
@@ -91,7 +92,7 @@ router.post('/invitations', async (req, res) => {
 });
 
 // 1.5. Lấy danh sách toàn bộ mã mời
-router.get('/invitations', async (req, res) => {
+router.get('/invitations', async (req: Request, res: Response) => {
   try {
     const result = await db.query(`
       SELECT i.*, u.email as creator_email, u.name as creator_name
@@ -107,7 +108,7 @@ router.get('/invitations', async (req, res) => {
 });
 
 // 2. Vô hiệu hóa mã mời chủ động
-router.put('/invitations/:id/deactivate', async (req, res) => {
+router.put('/invitations/:id/deactivate', async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
     const result = await db.query(
@@ -127,7 +128,7 @@ router.put('/invitations/:id/deactivate', async (req, res) => {
 });
 
 // 3. Reset mật khẩu người dùng khác (cấp mật khẩu tạm thời)
-router.post('/users/:id/reset-password', async (req, res) => {
+router.post('/users/:id/reset-password', async (req: Request, res: Response) => {
   const { id } = req.params;
   const { temp_password } = req.body || {};
 
@@ -172,4 +173,4 @@ router.post('/users/:id/reset-password', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

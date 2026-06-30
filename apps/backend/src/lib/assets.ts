@@ -1,13 +1,48 @@
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const exifr = require('exifr');
-const { spawnSync, spawn } = require('child_process');
-const db = require('./db');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import exifr from 'exifr';
+import { spawnSync, spawn } from 'child_process';
+import * as db from './db';
 
-const LIBRARY_PATH = path.resolve(process.env.MEDIA_LIBRARY_PATH || '/data/library');
+export interface Asset {
+  id: string;
+  originalName: string;
+  mime: string;
+  size: number;
+  owner: string;
+  uploadedAt: string | null;
+  takenAt: string | null;
+  relPath: string;
+  playRelPath: string | null;
+  hlsRelPath: string | null;
+  processingStatus: string;
+  processingStartedAt: string | null;
+  processingFinishedAt: string | null;
+  ext: string;
+  albumName: string | null;
+  albumNames: string[];
+  docProjectName: string | null;
+  docProjectNames: string[];
+  tags: string[];
+  isDeleted: boolean;
+  deletedAt: string | null;
+  type: string;
+}
+
+const isDocker = fs.existsSync('/.dockerenv');
+
+export function resolveStoragePath(p: string): string {
+  if (!isDocker && p.startsWith('/data')) {
+    const localRoot = path.resolve(__dirname, '../../../storage');
+    return p.replace('/data', localRoot);
+  }
+  return path.resolve(p);
+}
+
+export const LIBRARY_PATH = resolveStoragePath(process.env.MEDIA_LIBRARY_PATH || '/data/library');
 const ORIGINALS_ROOT = path.resolve(LIBRARY_PATH, 'originals');
-const TRASH_ROOT = path.resolve(process.env.MEDIA_TRASH_PATH || path.join(LIBRARY_PATH, 'trash'));
+const TRASH_ROOT = resolveStoragePath(process.env.MEDIA_TRASH_PATH || path.join(LIBRARY_PATH, 'trash'));
 const INDEX_DIR = path.resolve(LIBRARY_PATH, 'index');
 
 function ensureDirs() {
@@ -17,7 +52,7 @@ function ensureDirs() {
 }
 
 // Map PostgreSQL snake_case row columns to JavaScript camelCase object
-function fromDB(row) {
+export function fromDB(row: any): Asset | null {
   if (!row) return null;
   return {
     id: row.id,
@@ -45,7 +80,7 @@ function fromDB(row) {
   };
 }
 
-async function detectTakenAt(absPath, mime) {
+async function detectTakenAt(absPath: string, mime?: string): Promise<string | null> {
   try {
     if (!mime?.startsWith('image/')) return null;
 
@@ -67,33 +102,33 @@ async function detectTakenAt(absPath, mime) {
   }
 }
 
-function buildPlayPathById(id) {
+function buildPlayPathById(id: string): string {
   const playDir = path.join(LIBRARY_PATH, 'derived', 'play');
   fs.mkdirSync(playDir, { recursive: true });
   return path.join(playDir, `${id}.mp4`);
 }
 
-function buildHlsDirById(id) {
+function buildHlsDirById(id: string): string {
   const hlsDir = path.join(LIBRARY_PATH, 'derived', 'hls', id);
   fs.mkdirSync(hlsDir, { recursive: true });
   return hlsDir;
 }
 
-function executeFfmpegAsync(args, strategyName) {
+function executeFfmpegAsync(args: string[], strategyName: string): Promise<boolean> {
   return new Promise((resolve) => {
     console.log(`[Transcoder] Bắt đầu transcode bằng ${strategyName}...`);
     const child = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
     let stderrData = '';
     let lastLogTime = 0;
 
-    child.stderr.on('data', (data) => {
+    child.stderr.on('data', (data: any) => {
       const str = data.toString();
       stderrData += str;
 
       const now = Date.now();
       if (now - lastLogTime > 4000) {
         const lines = str.split(/[\r\n]+/);
-        const progressLine = lines.reverse().find(line => line.includes('frame=') && line.includes('time='));
+        const progressLine = lines.reverse().find((line: string) => line.includes('frame=') && line.includes('time='));
         if (progressLine) {
           console.log(`[Transcoder] Tiến độ [${strategyName}]: ${progressLine.trim()}`);
           lastLogTime = now;
@@ -101,7 +136,7 @@ function executeFfmpegAsync(args, strategyName) {
       }
     });
 
-    child.on('close', (code) => {
+    child.on('close', (code: number | null) => {
       if (code === 0) {
         console.log(`[Transcoder] Transcode bằng ${strategyName} THÀNH CÔNG.`);
         resolve(true);
@@ -113,14 +148,14 @@ function executeFfmpegAsync(args, strategyName) {
       }
     });
 
-    child.on('error', (err) => {
+    child.on('error', (err: any) => {
       console.error(`[Transcoder] Không thể khởi chạy ffmpeg cho ${strategyName}:`, err.message);
       resolve(false);
     });
   });
 }
 
-async function transcodeWithFallback(getArgsFn, outPath) {
+async function transcodeWithFallback(getArgsFn: (strategy: string) => string[], outPath: string): Promise<boolean> {
   // Strategy 1: Nvidia NVENC (dGPU)
   const nvencArgs = getArgsFn('nvenc');
   const nvencOk = await executeFfmpegAsync(nvencArgs, 'Nvidia NVENC');
@@ -151,10 +186,10 @@ async function transcodeWithFallback(getArgsFn, outPath) {
   return false;
 }
 
-function makeVideoPlayable(absPath, id) {
+function makeVideoPlayable(absPath: string, id: string): Promise<string | null> {
   const out = buildPlayPathById(id);
 
-  const getArgs = (strategy) => {
+  const getArgs = (strategy: string) => {
     if (strategy === 'nvenc') {
       return [
         '-y',
@@ -226,7 +261,7 @@ function makeVideoPlayable(absPath, id) {
   return transcodeWithFallback(getArgs, out).then((ok) => (ok ? out : null));
 }
 
-function probeVideoSize(absPath) {
+function probeVideoSize(absPath: string): { w: number; h: number } | null {
   try {
     const p = spawnSync('ffprobe', [
       '-v', 'error',
@@ -246,7 +281,7 @@ function probeVideoSize(absPath) {
   return null;
 }
 
-function makeVideoHlsFromPlayable(playableMp4Path, id) {
+function makeVideoHlsFromPlayable(playableMp4Path: string, id: string): Promise<{ hlsDir: string; masterPath: string } | null> {
   const hlsDir = buildHlsDirById(id);
   const streamPath = path.join(hlsDir, 'stream.m3u8');
   const masterPath = path.join(hlsDir, 'master.m3u8');
@@ -282,14 +317,14 @@ function makeVideoHlsFromPlayable(playableMp4Path, id) {
         hlsDir,
         masterPath,
       };
-    } catch (err) {
+    } catch (err: any) {
       console.error(`[Transcoder] Không thể ghi file master.m3u8:`, err.message);
       return null;
     }
   });
 }
 
-async function scheduleVideoDerivatives(id, absPath) {
+async function scheduleVideoDerivatives(id: string, absPath: string): Promise<void> {
   try {
     console.log(`[Transcoder] Bắt đầu scheduleVideoDerivatives cho ${id}...`);
     const playable = await makeVideoPlayable(absPath, id);
@@ -326,7 +361,7 @@ async function scheduleVideoDerivatives(id, absPath) {
   }
 }
 
-async function saveUploadedFile(file, user) {
+export async function saveUploadedFile(file: any, user?: any): Promise<Asset> {
   ensureDirs();
   const now = new Date();
   const yyyy = String(now.getUTCFullYear());
@@ -340,7 +375,7 @@ async function saveUploadedFile(file, user) {
   const absPath = path.join(destDir, fileName);
   try {
     fs.renameSync(file.path, absPath);
-  } catch (e) {
+  } catch (e: any) {
     if (e && e.code === 'EXDEV') {
       fs.copyFileSync(file.path, absPath);
       fs.unlinkSync(file.path);
@@ -365,7 +400,7 @@ async function saveUploadedFile(file, user) {
   const relPath = path.relative(LIBRARY_PATH, absPath).replaceAll('\\', '/');
   const isVideo = file.mimetype?.startsWith('video/');
 
-  const item = {
+  const item: Asset = {
     id,
     originalName: file.originalname,
     mime: file.mimetype,
@@ -410,11 +445,11 @@ async function saveUploadedFile(file, user) {
   return item;
 }
 
-async function listAssets(limit = 200, opts = {}) {
+export async function listAssets(limit = 200, opts: any = {}): Promise<Asset[]> {
   const { includeTrash = false, onlyTrash = false, owner } = opts;
   let queryText = 'SELECT * FROM assets';
-  const params = [];
-  const clauses = [];
+  const params: any[] = [];
+  const clauses: string[] = [];
 
   if (owner) {
     params.push(owner);
@@ -435,36 +470,36 @@ async function listAssets(limit = 200, opts = {}) {
   params.push(Math.max(1, Math.min(limit, 5000)));
 
   const res = await db.query(queryText, params);
-  return res.rows.map(fromDB);
+  return res.rows.map((row: any) => fromDB(row)).filter((x: Asset | null): x is Asset => x !== null);
 }
 
-async function getAsset(id) {
+export async function getAsset(id: string): Promise<Asset | null> {
   const res = await db.query('SELECT * FROM assets WHERE id = $1', [id]);
   if (res.rows.length === 0) return null;
   return fromDB(res.rows[0]);
 }
 
-function getAbsPathFromAsset(asset) {
+export function getAbsPathFromAsset(asset: Asset): string {
   return path.join(LIBRARY_PATH, asset.relPath);
 }
 
-function getPlayableAbsPathFromAsset(asset) {
+export function getPlayableAbsPathFromAsset(asset: Asset): string | null {
   if (!asset.playRelPath) return null;
   return path.join(LIBRARY_PATH, asset.playRelPath);
 }
 
-function getHlsAbsPathFromAsset(asset) {
+export function getHlsAbsPathFromAsset(asset: Asset): string | null {
   if (!asset.hlsRelPath) return null;
   return path.join(LIBRARY_PATH, asset.hlsRelPath);
 }
 
-function getHlsDirAbsPathFromAsset(asset) {
+export function getHlsDirAbsPathFromAsset(asset: Asset): string | null {
   const hls = getHlsAbsPathFromAsset(asset);
   if (!hls) return null;
   return path.dirname(hls);
 }
 
-async function listAlbums(owner) {
+export async function listAlbums(owner: string): Promise<any[]> {
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
@@ -478,7 +513,7 @@ async function listAlbums(owner) {
   return res.rows;
 }
 
-async function listTags(owner) {
+export async function listTags(owner: string): Promise<any[]> {
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
@@ -492,7 +527,7 @@ async function listTags(owner) {
   return res.rows;
 }
 
-async function setAssetTags(id, tags = []) {
+export async function setAssetTags(id: string, tags: string[] = []): Promise<{ updated: number }> {
   const cleanTags = tags.map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
   const uniqueTags = [...new Set(cleanTags)];
 
@@ -500,10 +535,10 @@ async function setAssetTags(id, tags = []) {
     'UPDATE assets SET tags = $1 WHERE id = $2',
     [uniqueTags, id]
   );
-  return { updated: res.rowCount };
+  return { updated: res.rowCount || 0 };
 }
 
-async function assignAlbum(ids = [], albumName = '') {
+export async function assignAlbum(ids: string[] = [], albumName = ''): Promise<{ updated: number }> {
   const name = String(albumName || '').trim();
   if (!name || ids.length === 0) return { updated: 0 };
 
@@ -526,7 +561,7 @@ async function assignAlbum(ids = [], albumName = '') {
     `, [name, ids]);
     
     await client.query('COMMIT');
-    updated = res1.rowCount;
+    updated = res1.rowCount || 0;
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -537,7 +572,7 @@ async function assignAlbum(ids = [], albumName = '') {
   return { updated };
 }
 
-async function setAssetAlbums(id, albumNames = []) {
+export async function setAssetAlbums(id: string, albumNames: string[] = []): Promise<{ updated: number }> {
   const names = albumNames.map(x => String(x || '').trim()).filter(Boolean);
   const primaryAlbum = names[0] || null;
 
@@ -545,10 +580,10 @@ async function setAssetAlbums(id, albumNames = []) {
     'UPDATE assets SET album_names = $1, album_name = $2 WHERE id = $3',
     [names, primaryAlbum, id]
   );
-  return { updated: res.rowCount };
+  return { updated: res.rowCount || 0 };
 }
 
-async function listDocProjects(owner) {
+export async function listDocProjects(owner: string): Promise<any[]> {
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
@@ -562,7 +597,7 @@ async function listDocProjects(owner) {
   return res.rows;
 }
 
-async function assignDocProject(ids = [], projectName = '') {
+export async function assignDocProject(ids: string[] = [], projectName = ''): Promise<{ updated: number }> {
   const name = String(projectName || '').trim();
   if (!name || ids.length === 0) return { updated: 0 };
 
@@ -585,7 +620,7 @@ async function assignDocProject(ids = [], projectName = '') {
     `, [name, ids]);
     
     await client.query('COMMIT');
-    updated = res1.rowCount;
+    updated = res1.rowCount || 0;
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -596,7 +631,7 @@ async function assignDocProject(ids = [], projectName = '') {
   return { updated };
 }
 
-async function moveToTrash(ids = []) {
+export async function moveToTrash(ids: string[] = []): Promise<{ updated: number }> {
   if (ids.length === 0) return { updated: 0 };
 
   const client = await db.pool.connect();
@@ -605,7 +640,7 @@ async function moveToTrash(ids = []) {
     await client.query('BEGIN');
     
     const selectRes = await client.query('SELECT * FROM assets WHERE id = ANY($1) AND is_deleted = false', [ids]);
-    const assetsToMove = selectRes.rows.map(fromDB);
+    const assetsToMove = selectRes.rows.map((row: any) => fromDB(row)).filter((x: Asset | null): x is Asset => x !== null);
     
     for (const item of assetsToMove) {
       const oldAbs = path.join(LIBRARY_PATH, item.relPath || '');
@@ -617,7 +652,7 @@ async function moveToTrash(ids = []) {
       if (fs.existsSync(oldAbs)) {
         try {
           fs.renameSync(oldAbs, newAbs);
-        } catch (e) {
+        } catch (e: any) {
           if (e && e.code === 'EXDEV') {
             fs.copyFileSync(oldAbs, newAbs);
             fs.unlinkSync(oldAbs);
@@ -644,7 +679,7 @@ async function moveToTrash(ids = []) {
   return { updated };
 }
 
-async function restoreFromTrash(ids = []) {
+export async function restoreFromTrash(ids: string[] = []): Promise<{ updated: number }> {
   if (ids.length === 0) return { updated: 0 };
 
   const client = await db.pool.connect();
@@ -653,7 +688,7 @@ async function restoreFromTrash(ids = []) {
     await client.query('BEGIN');
     
     const selectRes = await client.query('SELECT * FROM assets WHERE id = ANY($1) AND is_deleted = true', [ids]);
-    const assetsToRestore = selectRes.rows.map(fromDB);
+    const assetsToRestore = selectRes.rows.map((row: any) => fromDB(row)).filter((x: Asset | null): x is Asset => x !== null);
     
     for (const item of assetsToRestore) {
       const oldAbs = path.join(LIBRARY_PATH, item.relPath || '');
@@ -668,7 +703,7 @@ async function restoreFromTrash(ids = []) {
       if (fs.existsSync(oldAbs)) {
         try {
           fs.renameSync(oldAbs, newAbs);
-        } catch (e) {
+        } catch (e: any) {
           if (e && e.code === 'EXDEV') {
             fs.copyFileSync(oldAbs, newAbs);
             fs.unlinkSync(oldAbs);
@@ -695,7 +730,7 @@ async function restoreFromTrash(ids = []) {
   return { updated };
 }
 
-async function purgeDeleted(ids = []) {
+export async function purgeDeleted(ids: string[] = []): Promise<{ removed: number }> {
   if (ids.length === 0) return { removed: 0 };
 
   const client = await db.pool.connect();
@@ -704,7 +739,7 @@ async function purgeDeleted(ids = []) {
     await client.query('BEGIN');
     
     const selectRes = await client.query('SELECT * FROM assets WHERE id = ANY($1) AND is_deleted = true', [ids]);
-    const assetsToPurge = selectRes.rows.map(fromDB);
+    const assetsToPurge = selectRes.rows.map((row: any) => fromDB(row)).filter((x: Asset | null): x is Asset => x !== null);
     
     for (const item of assetsToPurge) {
       const abs = path.join(LIBRARY_PATH, item.relPath || '');
@@ -739,24 +774,3 @@ async function purgeDeleted(ids = []) {
 }
 
 ensureDirs();
-
-module.exports = {
-  saveUploadedFile,
-  listAssets,
-  getAsset,
-  getAbsPathFromAsset,
-  getPlayableAbsPathFromAsset,
-  getHlsAbsPathFromAsset,
-  getHlsDirAbsPathFromAsset,
-  listAlbums,
-  assignAlbum,
-  setAssetAlbums,
-  listTags,
-  setAssetTags,
-  listDocProjects,
-  assignDocProject,
-  moveToTrash,
-  restoreFromTrash,
-  purgeDeleted,
-  LIBRARY_PATH,
-};

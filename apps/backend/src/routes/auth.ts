@@ -1,24 +1,23 @@
-const express = require('express');
-const crypto = require('crypto');
-const db = require('../lib/db');
-const {
+import express, { Request, Response } from 'express';
+import crypto from 'crypto';
+import * as db from '../lib/db';
+import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
   signAccess,
   signRefresh,
-  verifyAccess,
   verifyRefresh,
   cookieOpts,
   hashPassword,
   generateSalt,
   hashToken,
-} = require('../lib/auth');
-const { requireAuth } = require('../middleware/requireAuth');
+} from '../lib/auth';
+import { requireAuth } from '../middleware/requireAuth';
 
 const router = express.Router();
 
 // 1. Đăng nhập
-router.post('/login', async (req, res) => {
+router.post('/login', async (req: Request, res: Response) => {
   const { email, password } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ message: 'Thiếu email hoặc mật khẩu' });
@@ -90,7 +89,7 @@ router.post('/login', async (req, res) => {
 });
 
 // 2. Đăng ký
-router.post('/register', async (req, res) => {
+router.post('/register', async (req: Request, res: Response) => {
   const { email, password, name, invite_code } = req.body || {};
   if (!email || !password || !name) {
     return res.status(400).json({ message: 'Thiếu thông tin đăng ký bắt buộc' });
@@ -101,7 +100,7 @@ router.post('/register', async (req, res) => {
     await client.query('BEGIN');
 
     const allowPublicSignup = String(process.env.ALLOW_PUBLIC_SIGNUP || 'false') === 'true';
-    let invitationId = null;
+    let invitationId: string | null = null;
 
     // A. Kiểm tra mã mời nếu không mở đăng ký công khai
     if (!allowPublicSignup) {
@@ -201,7 +200,7 @@ router.post('/register', async (req, res) => {
 });
 
 // 3. Làm mới Token (Refresh)
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', async (req: Request, res: Response) => {
   const token = req.cookies?.[REFRESH_COOKIE];
   if (!token) return res.status(401).json({ message: 'Thiếu token' });
 
@@ -229,7 +228,7 @@ router.post('/refresh', async (req, res) => {
 
     const user = userRes.rows[0];
 
-    // Cấp access token mới
+    // Cập nhật lại Access Token mới
     const newAccess = signAccess({
       sub: user.id,
       email: user.email,
@@ -253,7 +252,7 @@ router.post('/refresh', async (req, res) => {
 });
 
 // 4. Đăng xuất
-router.post('/logout', async (req, res) => {
+router.post('/logout', async (req: Request, res: Response) => {
   const token = req.cookies?.[REFRESH_COOKIE];
   if (token) {
     try {
@@ -269,8 +268,8 @@ router.post('/logout', async (req, res) => {
 });
 
 // 5. Lấy thông tin user hiện tại
-router.get('/me', requireAuth, async (req, res) => {
-  // Lấy dữ liệu mới nhất từ DB để đảm bảo cờ must_change_password cập nhật đúng
+router.get('/me', requireAuth, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   try {
     const userRes = await db.query('SELECT id, email, name, role, must_change_password, avatar_url FROM users WHERE id = $1', [req.user.sub]);
     if (userRes.rows.length === 0) {
@@ -293,7 +292,8 @@ router.get('/me', requireAuth, async (req, res) => {
 });
 
 // 6. Đổi mật khẩu
-router.post('/change-password', requireAuth, async (req, res) => {
+router.post('/change-password', requireAuth, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   const { old_password, new_password } = req.body || {};
   if (!old_password || !new_password) {
     return res.status(400).json({ message: 'Thiếu mật khẩu cũ hoặc mật khẩu mới' });
@@ -331,7 +331,8 @@ router.post('/change-password', requireAuth, async (req, res) => {
 });
 
 // 7. Đăng xuất các thiết bị khác (Logout Others)
-router.post('/logout-others', requireAuth, async (req, res) => {
+router.post('/logout-others', requireAuth, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   const token = req.cookies?.[REFRESH_COOKIE];
   if (!token) return res.status(401).json({ message: 'Thiếu token phiên hiện tại' });
 
@@ -352,7 +353,8 @@ router.post('/logout-others', requireAuth, async (req, res) => {
 });
 
 // 8. Cập nhật hồ sơ (Đổi tên)
-router.post('/update-profile', requireAuth, async (req, res) => {
+router.post('/update-profile', requireAuth, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   const { name } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ message: 'Tên hiển thị không được bỏ trống' });
@@ -393,4 +395,4 @@ router.post('/update-profile', requireAuth, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

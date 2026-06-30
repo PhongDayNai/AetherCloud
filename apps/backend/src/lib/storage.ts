@@ -1,14 +1,20 @@
-const fs = require('fs');
-const path = require('path');
-const { listAssets } = require('./assets');
+import fs from 'fs';
+import path from 'path';
+import { listAssets, resolveStoragePath } from './assets';
 
-const cache = {
+interface StorageCache {
+  at: number;
+  ttlMs: number;
+  value: any;
+}
+
+const cache: StorageCache = {
   at: 0,
   ttlMs: (Number(process.env.STORAGE_USAGE_CACHE_SECONDS || 60) || 60) * 1000,
   value: null,
 };
 
-function safeStatfs(targetPath) {
+function safeStatfs(targetPath: string): fs.StatsFs | null {
   try {
     return fs.statfsSync(targetPath);
   } catch {
@@ -16,14 +22,15 @@ function safeStatfs(targetPath) {
   }
 }
 
-function dirSizeBytes(dirPath) {
+function dirSizeBytes(dirPath: string): number {
   if (!fs.existsSync(dirPath)) return 0;
   let total = 0;
   const stack = [dirPath];
 
   while (stack.length) {
     const current = stack.pop();
-    let entries = [];
+    if (!current) continue;
+    let entries: fs.Dirent[] = [];
     try {
       entries = fs.readdirSync(current, { withFileTypes: true });
     } catch {
@@ -44,14 +51,14 @@ function dirSizeBytes(dirPath) {
   return total;
 }
 
-async function getStorageUsage() {
+export async function getStorageUsage(): Promise<any> {
   const now = Date.now();
   if (cache.value && now - cache.at < cache.ttlMs) return cache.value;
 
-  const mountPoint = process.env.MEDIA_MOUNT_POINT || '/data';
-  const library = process.env.MEDIA_LIBRARY_PATH || '/data/library';
-  const derived = process.env.MEDIA_DERIVED_PATH || '/data/library/derived';
-  const trash = process.env.MEDIA_TRASH_PATH || '/data/library/trash';
+  const mountPoint = resolveStoragePath(process.env.MEDIA_MOUNT_POINT || '/data');
+  const library = resolveStoragePath(process.env.MEDIA_LIBRARY_PATH || '/data/library');
+  const derived = resolveStoragePath(process.env.MEDIA_DERIVED_PATH || '/data/library/derived');
+  const trash = resolveStoragePath(process.env.MEDIA_TRASH_PATH || '/data/library/trash');
   const originals = path.join(library, 'originals');
 
   const s = safeStatfs(mountPoint);
@@ -96,5 +103,3 @@ async function getStorageUsage() {
   cache.value = usage;
   return usage;
 }
-
-module.exports = { getStorageUsage };

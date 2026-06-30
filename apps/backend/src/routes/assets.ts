@@ -1,11 +1,11 @@
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const multer = require('multer');
-const crypto = require('crypto');
-const { requireAuth } = require('../middleware/requireAuth');
-const db = require('../lib/db');
-const {
+import express, { Request, Response, NextFunction } from 'express';
+import fs from 'fs';
+import path from 'path';
+import multer from 'multer';
+import crypto from 'crypto';
+import { requireAuth } from '../middleware/requireAuth';
+import * as db from '../lib/db';
+import {
   saveUploadedFile,
   listAssets,
   getAsset,
@@ -23,7 +23,8 @@ const {
   moveToTrash,
   restoreFromTrash,
   purgeDeleted,
-} = require('../lib/assets');
+  Asset,
+} from '../lib/assets';
 
 const router = express.Router();
 const tempDir = '/tmp/aethercloud-upload';
@@ -37,28 +38,38 @@ const upload = multer({
   },
 });
 
-const chunkSessions = new Map();
+interface ChunkSession {
+  fileName: string;
+  mime: string;
+  totalSize: number;
+  chunkDir: string;
+  createdAt: number;
+  lastModified: number | null;
+}
+
+const chunkSessions = new Map<string, ChunkSession>();
 
 // Middleware kiểm tra quyền sở hữu đối với 1 asset
-async function checkAssetOwnership(req, res, next) {
+async function checkAssetOwnership(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params;
   try {
     const asset = await getAsset(id);
     if (!asset) return res.status(404).json({ message: 'Không tìm thấy tệp tin' });
-    if (asset.owner !== req.user.sub) {
+    if (!req.user || asset.owner !== req.user.sub) {
       return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin này' });
     }
     req.asset = asset; // Truyền asset đã query sang handler kế tiếp để tái sử dụng
     next();
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 }
 
 // Middleware kiểm tra quyền sở hữu đối với danh sách bulk assets
-async function checkBulkOwnership(req, res, next) {
+async function checkBulkOwnership(req: Request, res: Response, next: NextFunction) {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
   if (!ids.length) return res.status(400).json({ message: 'Danh sách ids là bắt buộc' });
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   try {
     const checkRes = await db.query(
       'SELECT COUNT(*)::int AS count FROM assets WHERE id = ANY($1) AND owner = $2',
@@ -68,24 +79,27 @@ async function checkBulkOwnership(req, res, next) {
       return res.status(403).json({ message: 'Bạn không có quyền thao tác trên một số tệp tin' });
     }
     next();
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 }
 
-router.get('/', requireAuth, async (req, res) => {
+// 1. GET danh sách assets
+router.get('/', requireAuth, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   const limit = Number(req.query.limit || 200);
   const includeTrash = String(req.query.includeTrash || 'false') === 'true';
   const onlyTrash = String(req.query.onlyTrash || 'false') === 'true';
   try {
     const items = await listAssets(limit, { includeTrash, onlyTrash, owner: req.user.sub });
     return res.json({ items });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.post('/upload-chunk/init', requireAuth, (req, res) => {
+// 2. POST khởi tạo session upload chunk
+router.post('/upload-chunk/init', requireAuth, (req: Request, res: Response) => {
   const { fileName, mime, totalSize, lastModified } = req.body || {};
   if (!fileName || !mime) return res.status(400).json({ message: 'fileName and mime are required' });
 
@@ -105,7 +119,8 @@ router.post('/upload-chunk/init', requireAuth, (req, res) => {
   return res.json({ ok: true, uploadId });
 });
 
-router.post('/upload-chunk/:uploadId', requireAuth, upload.single('chunk'), (req, res) => {
+// 3. POST tải lên từng chunk
+router.post('/upload-chunk/:uploadId', requireAuth, upload.single('chunk'), (req: Request, res: Response) => {
   const session = chunkSessions.get(req.params.uploadId);
   if (!session) return res.status(404).json({ message: 'upload session not found' });
   if (!req.file) return res.status(400).json({ message: 'chunk is required' });
@@ -118,7 +133,8 @@ router.post('/upload-chunk/:uploadId', requireAuth, upload.single('chunk'), (req
   return res.json({ ok: true, index });
 });
 
-router.post('/upload-chunk/:uploadId/complete', requireAuth, async (req, res) => {
+// 4. POST xác nhận hoàn tất ghép chunk
+router.post('/upload-chunk/:uploadId/complete', requireAuth, async (req: Request, res: Response) => {
   const session = chunkSessions.get(req.params.uploadId);
   if (!session) return res.status(404).json({ message: 'upload session not found' });
 
@@ -152,42 +168,48 @@ router.post('/upload-chunk/:uploadId/complete', requireAuth, async (req, res) =>
     chunkSessions.delete(req.params.uploadId);
 
     return res.json({ ok: true, item: saved });
-  } catch (e) {
+  } catch (e: any) {
     try { if (fs.existsSync(merged)) fs.unlinkSync(merged); } catch {}
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.post('/upload', requireAuth, upload.array('files', 50), async (req, res) => {
-  const files = req.files || [];
+// 5. POST upload thông thường (cho các file nhỏ)
+router.post('/upload', requireAuth, upload.array('files', 50), async (req: Request, res: Response) => {
+  const files = (req.files as Express.Multer.File[]) || [];
   const lastModified = req.body.lastModified ? Number(req.body.lastModified) : null;
   try {
     const saved = await Promise.all(files.map((f) => saveUploadedFile({ ...f, lastModified }, req.user)));
     return res.json({ ok: true, count: saved.length, items: saved });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.get('/albums', requireAuth, async (req, res) => {
+// 6. GET danh sách albums
+router.get('/albums', requireAuth, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   try {
     const items = await listAlbums(req.user.sub);
     return res.json({ items });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.get('/doc-projects', requireAuth, async (req, res) => {
+// 7. GET danh sách project tài liệu
+router.get('/doc-projects', requireAuth, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   try {
     const items = await listDocProjects(req.user.sub);
     return res.json({ items });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.post('/bulk/album', requireAuth, checkBulkOwnership, async (req, res) => {
+// 8. POST gán album hàng loạt (Bulk)
+router.post('/bulk/album', requireAuth, checkBulkOwnership, async (req: Request, res: Response) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
   const albumName = String(req.body?.albumName || '').trim();
   if (!albumName) return res.status(400).json({ message: 'albumName is required' });
@@ -195,12 +217,13 @@ router.post('/bulk/album', requireAuth, checkBulkOwnership, async (req, res) => 
   try {
     const result = await assignAlbum(ids, albumName);
     return res.json({ ok: true, ...result });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.post('/bulk/doc-project', requireAuth, checkBulkOwnership, async (req, res) => {
+// 9. POST gán project tài liệu hàng loạt (Bulk)
+router.post('/bulk/doc-project', requireAuth, checkBulkOwnership, async (req: Request, res: Response) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
   const projectName = String(req.body?.projectName || '').trim();
   if (!projectName) return res.status(400).json({ message: 'projectName is required' });
@@ -208,44 +231,48 @@ router.post('/bulk/doc-project', requireAuth, checkBulkOwnership, async (req, re
   try {
     const result = await assignDocProject(ids, projectName);
     return res.json({ ok: true, ...result });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.post('/bulk/trash', requireAuth, checkBulkOwnership, async (req, res) => {
+// 10. POST bỏ vào thùng rác hàng loạt (Bulk)
+router.post('/bulk/trash', requireAuth, checkBulkOwnership, async (req: Request, res: Response) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
   try {
     const result = await moveToTrash(ids);
     return res.json({ ok: true, ...result });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.post('/bulk/restore', requireAuth, checkBulkOwnership, async (req, res) => {
+// 11. POST khôi phục hàng loạt từ thùng rác (Bulk)
+router.post('/bulk/restore', requireAuth, checkBulkOwnership, async (req: Request, res: Response) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
   try {
     const result = await restoreFromTrash(ids);
     return res.json({ ok: true, ...result });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.post('/bulk/purge', requireAuth, checkBulkOwnership, async (req, res) => {
+// 12. POST xóa vĩnh viễn hàng loạt (Bulk)
+router.post('/bulk/purge', requireAuth, checkBulkOwnership, async (req: Request, res: Response) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
   try {
     const result = await purgeDeleted(ids);
     return res.json({ ok: true, ...result });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.get('/_media/hls/:id/master.m3u8', requireAuth, checkAssetOwnership, async (req, res) => {
+// 13. GET playlist master HLS (.m3u8)
+router.get('/_media/hls/:id/master.m3u8', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
   try {
-    const asset = req.asset;
+    const asset = req.asset as Asset;
     const hlsMasterAbs = getHlsAbsPathFromAsset(asset);
     if (!hlsMasterAbs || !fs.existsSync(hlsMasterAbs)) {
       return res.status(404).json({ message: 'HLS not ready' });
@@ -254,14 +281,15 @@ router.get('/_media/hls/:id/master.m3u8', requireAuth, checkAssetOwnership, asyn
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
     res.setHeader('Cache-Control', 'no-store');
     return res.sendFile(hlsMasterAbs);
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.get('/_media/hls/:id/:segment', requireAuth, checkAssetOwnership, async (req, res) => {
+// 14. GET phân đoạn HLS segment (.ts hoặc .m3u8 phụ)
+router.get('/_media/hls/:id/:segment', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
   try {
-    const asset = req.asset;
+    const asset = req.asset as Asset;
     const hlsDir = getHlsDirAbsPathFromAsset(asset);
     if (!hlsDir || !fs.existsSync(hlsDir)) return res.status(404).json({ message: 'HLS not ready' });
 
@@ -282,14 +310,15 @@ router.get('/_media/hls/:id/:segment', requireAuth, checkAssetOwnership, async (
     }
 
     return res.sendFile(abs);
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.get('/_media/play/:id', requireAuth, checkAssetOwnership, async (req, res) => {
+// 15. GET file xem trực tiếp (Playable MP4)
+router.get('/_media/play/:id', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
   try {
-    const asset = req.asset;
+    const asset = req.asset as Asset;
     const playAbs = getPlayableAbsPathFromAsset(asset);
     if (!playAbs || !fs.existsSync(playAbs)) {
       return res.redirect(`/api/assets/_media/original/${asset.id}`);
@@ -299,14 +328,15 @@ router.get('/_media/play/:id', requireAuth, checkAssetOwnership, async (req, res
     res.setHeader('Content-Disposition', `inline; filename="${path.basename(asset.originalName || 'video')}.mp4"`);
     res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
     return res.sendFile(playAbs);
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.get('/_media/original/:id', requireAuth, checkAssetOwnership, async (req, res) => {
+// 16. GET tải/xem file gốc (Original file)
+router.get('/_media/original/:id', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
   try {
-    const asset = req.asset;
+    const asset = req.asset as Asset;
     const abs = getAbsPathFromAsset(asset);
     if (!fs.existsSync(abs)) return res.status(404).json({ message: 'File missing' });
 
@@ -314,44 +344,49 @@ router.get('/_media/original/:id', requireAuth, checkAssetOwnership, async (req,
     res.setHeader('Content-Disposition', `inline; filename="${path.basename(asset.originalName || 'file')}"`);
     res.setHeader('Cache-Control', 'private, max-age=3600');
     return res.sendFile(abs);
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.put('/:id/albums', requireAuth, checkAssetOwnership, async (req, res) => {
+// 17. PUT cập nhật album của 1 asset
+router.put('/:id/albums', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
   const albumNames = Array.isArray(req.body?.albumNames) ? req.body.albumNames : [];
   try {
     const result = await setAssetAlbums(req.params.id, albumNames);
     if (result.updated === 0) return res.status(404).json({ message: 'Asset not found' });
     return res.json({ ok: true, ...result });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.get('/tags', requireAuth, async (req, res) => {
+// 18. GET danh sách nhãn (Tags)
+router.get('/tags', requireAuth, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   try {
     const items = await listTags(req.user.sub);
     return res.json({ ok: true, items });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.put('/:id/tags', requireAuth, checkAssetOwnership, async (req, res) => {
+// 19. PUT cập nhật nhãn của 1 asset
+router.put('/:id/tags', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
   const tags = Array.isArray(req.body?.tags) ? req.body.tags : [];
   try {
     const result = await setAssetTags(req.params.id, tags);
     if (result.updated === 0) return res.status(404).json({ message: 'Asset not found' });
     return res.json({ ok: true, ...result });
-  } catch (e) {
+  } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.get('/:id', requireAuth, checkAssetOwnership, async (req, res) => {
+// 20. GET thông tin chi tiết của 1 asset
+router.get('/:id', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
   return res.json(req.asset);
 });
 
-module.exports = router;
+export default router;

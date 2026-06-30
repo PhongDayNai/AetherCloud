@@ -1,6 +1,7 @@
-const { ACCESS_COOKIE, verifyAccess } = require('../lib/auth');
+import { Request, Response, NextFunction } from 'express';
+import { ACCESS_COOKIE, verifyAccess } from '../lib/auth';
 
-function requireAuth(req, res, next) {
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const token = req.cookies?.[ACCESS_COOKIE];
   if (!token) return res.status(401).json({ message: 'Unauthorized' });
 
@@ -12,5 +13,3 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 }
-
-module.exports = { requireAuth };

@@ -1,8 +1,10 @@
-require('dotenv').config();
-const crypto = require('crypto');
-const db = require('../lib/db');
+import dotenv from 'dotenv';
+dotenv.config();
 
-function generateInviteCode() {
+import crypto from 'crypto';
+import * as db from '../lib/db';
+
+function generateInviteCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
   for (let i = 0; i < 6; i++) {
@@ -22,7 +24,7 @@ async function createInvite() {
     maxUses = Number.isNaN(parsed) ? 1 : parsed;
   }
 
-  let expiresAt = null;
+  let expiresAt: Date | null = null;
   if (hoursToExpireInput !== undefined) {
     const parsed = parseInt(hoursToExpireInput, 10);
     if (!Number.isNaN(parsed) && parsed > 0) {
@@ -73,7 +75,7 @@ async function createInvite() {
     console.log(`Hạn sử dụng: ${expiresAt ? expiresAt.toLocaleString() : 'Vô thời hạn'}`);
     console.log(`====================================\n`);
 
-  } catch (err) {
+  } catch (err: any) {
     console.error('[Error] Lỗi khi tạo mã mời:', err.message);
   } finally {
     client.release();
