@@ -3,12 +3,7 @@
 import { useEffect, useState } from 'react';
 
 function getApiOrigin() {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host === 'hc.example.com') return 'https://api.example.com';
-    if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:45174';
-  }
-  return process.env.NEXT_PUBLIC_API_ORIGIN || process.env.API_ORIGIN || 'http://localhost:45174';
+  return process.env.NEXT_PUBLIC_API_ORIGIN || 'http://localhost:45174';
 }
 
 export default function LoginPage() {
