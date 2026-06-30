@@ -3,41 +3,46 @@ const path = require('path');
 const crypto = require('crypto');
 const exifr = require('exifr');
 const { spawnSync, spawn } = require('child_process');
+const db = require('./db');
 
 const LIBRARY_PATH = path.resolve(process.env.MEDIA_LIBRARY_PATH || '/data/library');
 const ORIGINALS_ROOT = path.resolve(LIBRARY_PATH, 'originals');
 const TRASH_ROOT = path.resolve(process.env.MEDIA_TRASH_PATH || path.join(LIBRARY_PATH, 'trash'));
 const INDEX_DIR = path.resolve(LIBRARY_PATH, 'index');
-const INDEX_FILE = path.resolve(INDEX_DIR, 'assets.json');
-let lastGoodIndex = { items: [] };
 
-function ensureIndex() {
+function ensureDirs() {
   fs.mkdirSync(ORIGINALS_ROOT, { recursive: true });
   fs.mkdirSync(TRASH_ROOT, { recursive: true });
   fs.mkdirSync(INDEX_DIR, { recursive: true });
-  if (!fs.existsSync(INDEX_FILE)) fs.writeFileSync(INDEX_FILE, JSON.stringify({ items: [] }, null, 2));
 }
 
-function readIndex() {
-  ensureIndex();
-  try {
-    const parsed = JSON.parse(fs.readFileSync(INDEX_FILE, 'utf8'));
-    if (parsed && Array.isArray(parsed.items)) {
-      lastGoodIndex = parsed;
-      return parsed;
-    }
-    return lastGoodIndex;
-  } catch {
-    return lastGoodIndex;
-  }
-}
-
-function writeIndex(data) {
-  ensureIndex();
-  const tmp = path.join(INDEX_DIR, `assets.json.tmp-${process.pid}-${Date.now()}`);
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
-  fs.renameSync(tmp, INDEX_FILE);
-  lastGoodIndex = data;
+// Map PostgreSQL snake_case row columns to JavaScript camelCase object
+function fromDB(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    originalName: row.original_name,
+    mime: row.mime,
+    size: Number(row.size),
+    owner: row.owner,
+    uploadedAt: row.uploaded_at ? new Date(row.uploaded_at).toISOString() : null,
+    takenAt: row.taken_at ? new Date(row.taken_at).toISOString() : null,
+    relPath: row.rel_path,
+    playRelPath: row.play_rel_path,
+    hlsRelPath: row.hls_rel_path,
+    processingStatus: row.processing_status,
+    processingStartedAt: row.processing_started_at ? new Date(row.processing_started_at).toISOString() : null,
+    processingFinishedAt: row.processing_finished_at ? new Date(row.processing_finished_at).toISOString() : null,
+    ext: row.ext,
+    albumName: row.album_name,
+    albumNames: row.album_names || [],
+    docProjectName: row.doc_project_name,
+    docProjectNames: row.doc_project_names || [],
+    tags: row.tags || [],
+    isDeleted: Boolean(row.is_deleted),
+    deletedAt: row.deleted_at ? new Date(row.deleted_at).toISOString() : null,
+    type: row.type,
+  };
 }
 
 async function detectTakenAt(absPath, mime) {
@@ -162,7 +167,7 @@ function makeVideoPlayable(absPath, id) {
         '-pix_fmt', 'yuv420p',
         '-preset', 'fast',
         '-cq', '24',
-        '-bf', '0', // No B-frames to prevent PIPELINE_ERROR_DECODE in Chrome
+        '-bf', '0',
         '-maxrate', '10M',
         '-bufsize', '20M',
         '-g', '48',
@@ -295,27 +300,34 @@ async function scheduleVideoDerivatives(id, absPath) {
       console.log(`[Transcoder] Kết quả makeVideoHlsFromPlayable:`, hls);
     }
 
-    const db = readIndex();
-    const item = db.items.find((x) => x.id === id);
+    const item = await getAsset(id);
     if (!item) {
-      console.error(`[Transcoder] Không tìm thấy item ${id} trong assets.json.`);
+      console.error(`[Transcoder] Không tìm thấy item ${id} trong database.`);
       return;
     }
 
-    if (playable) item.playRelPath = path.relative(LIBRARY_PATH, playable).replaceAll('\\', '/');
-    if (hls?.masterPath) item.hlsRelPath = path.relative(LIBRARY_PATH, hls.masterPath).replaceAll('\\', '/');
-    item.processingStatus = 'ready';
-    item.processingFinishedAt = new Date().toISOString();
+    const playRelPath = playable ? path.relative(LIBRARY_PATH, playable).replaceAll('\\', '/') : null;
+    const hlsRelPath = hls?.masterPath ? path.relative(LIBRARY_PATH, hls.masterPath).replaceAll('\\', '/') : null;
+    const processingStatus = 'ready';
+    const processingFinishedAt = new Date().toISOString();
 
-    writeIndex(db);
-    console.log(`[Transcoder] Đã cập nhật assets.json sang trạng thái ready cho ${id}.`);
+    await db.query(`
+      UPDATE assets 
+      SET play_rel_path = COALESCE($1, play_rel_path), 
+          hls_rel_path = COALESCE($2, hls_rel_path), 
+          processing_status = $3, 
+          processing_finished_at = $4 
+      WHERE id = $5
+    `, [playRelPath, hlsRelPath, processingStatus, processingFinishedAt, id]);
+
+    console.log(`[Transcoder] Đã cập nhật database sang trạng thái ready cho ${id}.`);
   } catch (err) {
     console.error(`[Transcoder] Lỗi nghiêm trọng trong scheduleVideoDerivatives:`, err);
   }
 }
 
 async function saveUploadedFile(file, user) {
-  ensureIndex();
+  ensureDirs();
   const now = new Date();
   const yyyy = String(now.getUTCFullYear());
   const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
@@ -370,63 +382,56 @@ async function saveUploadedFile(file, user) {
     ext,
     albumName: null,
     albumNames: [],
+    docProjectName: null,
+    docProjectNames: [],
     tags: [],
     isDeleted: false,
     deletedAt: null,
     type: file.mimetype?.startsWith('image/') ? 'image' : file.mimetype?.startsWith('video/') ? 'video' : 'file',
   };
 
-  const db = readIndex();
-  db.items.unshift(item);
-  writeIndex(db);
+  await db.query(`
+    INSERT INTO assets (
+      id, original_name, mime, size, owner, uploaded_at, taken_at, rel_path,
+      play_rel_path, hls_rel_path, processing_status, processing_started_at,
+      processing_finished_at, ext, album_name, album_names, doc_project_name,
+      doc_project_names, tags, is_deleted, deleted_at, type
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+  `, [
+    item.id, item.originalName, item.mime, Number(item.size), item.owner,
+    item.uploadedAt, item.takenAt, item.relPath, item.playRelPath, item.hlsRelPath,
+    item.processingStatus, item.processingStartedAt, item.processingFinishedAt,
+    item.ext, item.albumName, item.albumNames, item.docProjectName, item.docProjectNames,
+    item.tags, item.isDeleted, item.deletedAt, item.type
+  ]);
 
   if (isVideo) scheduleVideoDerivatives(id, absPath);
 
   return item;
 }
 
-function normalizeItem(x) {
-  return {
-    ...x,
-    takenAt: x.takenAt || x.uploadedAt,
-    albumName: x.albumName || null,
-    albumNames: Array.isArray(x.albumNames) ? x.albumNames : (x.albumName ? [x.albumName] : []),
-    docProjectName: x.docProjectName || null,
-    docProjectNames: Array.isArray(x.docProjectNames) ? x.docProjectNames : (x.docProjectName ? [x.docProjectName] : []),
-    tags: Array.isArray(x.tags) ? x.tags : [],
-    playRelPath: x.playRelPath || null,
-    hlsRelPath: x.hlsRelPath || null,
-    processingStatus: x.processingStatus || 'ready',
-    processingStartedAt: x.processingStartedAt || null,
-    processingFinishedAt: x.processingFinishedAt || null,
-    isDeleted: Boolean(x.isDeleted),
-    deletedAt: x.deletedAt || null,
-  };
-}
-
-function listAssets(limit = 200, opts = {}) {
+async function listAssets(limit = 200, opts = {}) {
   const { includeTrash = false, onlyTrash = false } = opts;
-  const db = readIndex();
-  let items = db.items.map(normalizeItem);
+  let queryText = 'SELECT * FROM assets';
+  const params = [];
+  
+  if (onlyTrash) {
+    queryText += ' WHERE is_deleted = true';
+  } else if (!includeTrash) {
+    queryText += ' WHERE is_deleted = false';
+  }
+  
+  queryText += ' ORDER BY taken_at DESC LIMIT $' + (params.length + 1);
+  params.push(Math.max(1, Math.min(limit, 5000)));
 
-  if (onlyTrash) items = items.filter((x) => x.isDeleted);
-  else if (!includeTrash) items = items.filter((x) => !x.isDeleted);
-
-  // Sắp xếp theo ngày chụp (takenAt) giảm dần (mới nhất lên đầu)
-  items.sort((a, b) => {
-    const timeA = new Date(a.takenAt || a.uploadedAt || 0).getTime();
-    const timeB = new Date(b.takenAt || b.uploadedAt || 0).getTime();
-    return timeB - timeA;
-  });
-
-  return items.slice(0, Math.max(1, Math.min(limit, 5000)));
+  const res = await db.query(queryText, params);
+  return res.rows.map(fromDB);
 }
 
-function getAsset(id) {
-  const db = readIndex();
-  const item = db.items.find((x) => x.id === id) || null;
-  if (!item) return null;
-  return normalizeItem(item);
+async function getAsset(id) {
+  const res = await db.query('SELECT * FROM assets WHERE id = $1', [id]);
+  if (res.rows.length === 0) return null;
+  return fromDB(res.rows[0]);
 }
 
 function getAbsPathFromAsset(asset) {
@@ -449,226 +454,281 @@ function getHlsDirAbsPathFromAsset(asset) {
   return path.dirname(hls);
 }
 
-function listAlbums() {
-  const db = readIndex();
-  const m = new Map();
-  for (const it of db.items.map(normalizeItem)) {
-    if (it.isDeleted) continue;
-    const names = Array.isArray(it.albumNames) ? it.albumNames : (it.albumName ? [it.albumName] : []);
-    for (const n of names) m.set(n, (m.get(n) || 0) + 1);
-  }
-  return Array.from(m.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+async function listAlbums() {
+  const res = await db.query(`
+    SELECT name, COUNT(*)::int AS count 
+    FROM (
+      SELECT unnest(album_names) AS name 
+      FROM assets 
+      WHERE is_deleted = false
+    ) sub 
+    GROUP BY name 
+    ORDER BY name
+  `);
+  return res.rows;
 }
 
-function listTags() {
-  const db = readIndex();
-  const m = new Map();
-  for (const it of db.items.map(normalizeItem)) {
-    if (it.isDeleted) continue;
-    const names = Array.isArray(it.tags) ? it.tags : [];
-    for (const n of names) m.set(n, (m.get(n) || 0) + 1);
-  }
-  return Array.from(m.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+async function listTags() {
+  const res = await db.query(`
+    SELECT name, COUNT(*)::int AS count 
+    FROM (
+      SELECT unnest(tags) AS name 
+      FROM assets 
+      WHERE is_deleted = false
+    ) sub 
+    GROUP BY name 
+    ORDER BY name
+  `);
+  return res.rows;
 }
 
-function setAssetTags(id, tags = []) {
+async function setAssetTags(id, tags = []) {
   const cleanTags = tags.map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
   const uniqueTags = [...new Set(cleanTags)];
-  const db = readIndex();
-  const it = db.items.find((x) => x.id === id);
-  if (!it) return { updated: 0 };
 
-  it.tags = uniqueTags;
-  writeIndex(db);
-  return { updated: 1 };
+  const res = await db.query(
+    'UPDATE assets SET tags = $1 WHERE id = $2',
+    [uniqueTags, id]
+  );
+  return { updated: res.rowCount };
 }
 
-function assignAlbum(ids = [], albumName = '') {
+async function assignAlbum(ids = [], albumName = '') {
   const name = String(albumName || '').trim();
-  if (!name) return { updated: 0 };
+  if (!name || ids.length === 0) return { updated: 0 };
 
-  const idSet = new Set(ids || []);
-  const db = readIndex();
+  const client = await db.pool.connect();
   let updated = 0;
-
-  for (const it of db.items) {
-    if (!idSet.has(it.id)) continue;
-    if (it.isDeleted) continue;
-    const names = Array.isArray(it.albumNames) ? it.albumNames : (it.albumName ? [it.albumName] : []);
-    if (!names.includes(name)) names.push(name);
-    it.albumNames = names;
-    it.albumName = names[0] || null;
-    updated += 1;
+  try {
+    await client.query('BEGIN');
+    
+    const res1 = await client.query(`
+      UPDATE assets 
+      SET album_names = array_append(album_names, $1), 
+          album_name = COALESCE(album_name, $1)
+      WHERE id = ANY($2) AND NOT ($1 = ANY(album_names)) AND is_deleted = false
+    `, [name, ids]);
+    
+    await client.query(`
+      UPDATE assets 
+      SET album_name = COALESCE(album_name, $1)
+      WHERE id = ANY($2) AND is_deleted = false
+    `, [name, ids]);
+    
+    await client.query('COMMIT');
+    updated = res1.rowCount;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 
-  writeIndex(db);
   return { updated };
 }
 
-function setAssetAlbums(id, albumNames = []) {
+async function setAssetAlbums(id, albumNames = []) {
   const names = albumNames.map(x => String(x || '').trim()).filter(Boolean);
-  const db = readIndex();
-  const it = db.items.find((x) => x.id === id);
-  if (!it) return { updated: 0 };
+  const primaryAlbum = names[0] || null;
 
-  it.albumNames = names;
-  it.albumName = names[0] || null;
-  writeIndex(db);
-  return { updated: 1 };
+  const res = await db.query(
+    'UPDATE assets SET album_names = $1, album_name = $2 WHERE id = $3',
+    [names, primaryAlbum, id]
+  );
+  return { updated: res.rowCount };
 }
 
-function listDocProjects() {
-  const db = readIndex();
-  const m = new Map();
-  for (const it of db.items.map(normalizeItem)) {
-    if (it.isDeleted) continue;
-    if (it.type === 'image' || it.type === 'video') continue;
-    const names = Array.isArray(it.docProjectNames) ? it.docProjectNames : (it.docProjectName ? [it.docProjectName] : []);
-    for (const n of names) m.set(n, (m.get(n) || 0) + 1);
-  }
-  return Array.from(m.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+async function listDocProjects() {
+  const res = await db.query(`
+    SELECT name, COUNT(*)::int AS count 
+    FROM (
+      SELECT unnest(doc_project_names) AS name 
+      FROM assets 
+      WHERE is_deleted = false AND type != 'image' AND type != 'video'
+    ) sub 
+    GROUP BY name 
+    ORDER BY name
+  `);
+  return res.rows;
 }
 
-function assignDocProject(ids = [], projectName = '') {
+async function assignDocProject(ids = [], projectName = '') {
   const name = String(projectName || '').trim();
-  if (!name) return { updated: 0 };
+  if (!name || ids.length === 0) return { updated: 0 };
 
-  const idSet = new Set(ids || []);
-  const db = readIndex();
+  const client = await db.pool.connect();
   let updated = 0;
-
-  for (const it of db.items) {
-    if (!idSet.has(it.id)) continue;
-    if (it.isDeleted) continue;
-    if (it.type === 'image' || it.type === 'video') continue;
-
-    const names = Array.isArray(it.docProjectNames) ? it.docProjectNames : (it.docProjectName ? [it.docProjectName] : []);
-    if (!names.includes(name)) names.push(name);
-    it.docProjectNames = names;
-    it.docProjectName = names[0] || null;
-    updated += 1;
+  try {
+    await client.query('BEGIN');
+    
+    const res1 = await client.query(`
+      UPDATE assets 
+      SET doc_project_names = array_append(doc_project_names, $1), 
+          doc_project_name = COALESCE(doc_project_name, $1)
+      WHERE id = ANY($2) AND NOT ($1 = ANY(doc_project_names)) AND is_deleted = false AND type != 'image' AND type != 'video'
+    `, [name, ids]);
+    
+    await client.query(`
+      UPDATE assets 
+      SET doc_project_name = COALESCE(doc_project_name, $1)
+      WHERE id = ANY($2) AND is_deleted = false AND type != 'image' AND type != 'video'
+    `, [name, ids]);
+    
+    await client.query('COMMIT');
+    updated = res1.rowCount;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 
-  writeIndex(db);
   return { updated };
 }
 
-function moveToTrash(ids = []) {
-  const idSet = new Set(ids || []);
-  const db = readIndex();
+async function moveToTrash(ids = []) {
+  if (ids.length === 0) return { updated: 0 };
+
+  const client = await db.pool.connect();
   let updated = 0;
-
-  for (const it of db.items) {
-    if (!idSet.has(it.id)) continue;
-    const item = normalizeItem(it);
-    if (item.isDeleted) continue;
-
-    const oldAbs = path.join(LIBRARY_PATH, item.relPath || '');
-    const ext = path.extname(item.originalName || '') || path.extname(item.relPath || '') || '';
-    const trashDir = path.join(TRASH_ROOT, new Date().toISOString().slice(0, 10));
-    fs.mkdirSync(trashDir, { recursive: true });
-    const newAbs = path.join(trashDir, `${item.id}${ext}`);
-
-    if (fs.existsSync(oldAbs)) {
-      try {
-        fs.renameSync(oldAbs, newAbs);
-      } catch (e) {
-        if (e && e.code === 'EXDEV') {
-          fs.copyFileSync(oldAbs, newAbs);
-          fs.unlinkSync(oldAbs);
-        } else {
-          throw e;
+  try {
+    await client.query('BEGIN');
+    
+    const selectRes = await client.query('SELECT * FROM assets WHERE id = ANY($1) AND is_deleted = false', [ids]);
+    const assetsToMove = selectRes.rows.map(fromDB);
+    
+    for (const item of assetsToMove) {
+      const oldAbs = path.join(LIBRARY_PATH, item.relPath || '');
+      const ext = path.extname(item.originalName || '') || path.extname(item.relPath || '') || '';
+      const trashDir = path.join(TRASH_ROOT, new Date().toISOString().slice(0, 10));
+      fs.mkdirSync(trashDir, { recursive: true });
+      const newAbs = path.join(trashDir, `${item.id}${ext}`);
+      
+      if (fs.existsSync(oldAbs)) {
+        try {
+          fs.renameSync(oldAbs, newAbs);
+        } catch (e) {
+          if (e && e.code === 'EXDEV') {
+            fs.copyFileSync(oldAbs, newAbs);
+            fs.unlinkSync(oldAbs);
+          } else {
+            throw e;
+          }
         }
+        const newRelPath = path.relative(LIBRARY_PATH, newAbs).replaceAll('\\', '/');
+        
+        await client.query(
+          'UPDATE assets SET rel_path = $1, is_deleted = true, deleted_at = $2 WHERE id = $3',
+          [newRelPath, new Date().toISOString(), item.id]
+        );
+        updated++;
       }
-      it.relPath = path.relative(LIBRARY_PATH, newAbs).replaceAll('\\', '/');
     }
-
-    it.isDeleted = true;
-    it.deletedAt = new Date().toISOString();
-    updated += 1;
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
-
-  writeIndex(db);
   return { updated };
 }
 
-function restoreFromTrash(ids = []) {
-  const idSet = new Set(ids || []);
-  const db = readIndex();
+async function restoreFromTrash(ids = []) {
+  if (ids.length === 0) return { updated: 0 };
+
+  const client = await db.pool.connect();
   let updated = 0;
-
-  for (const it of db.items) {
-    if (!idSet.has(it.id)) continue;
-    const item = normalizeItem(it);
-    if (!item.isDeleted) continue;
-
-    const oldAbs = path.join(LIBRARY_PATH, item.relPath || '');
-    const baseDate = new Date(item.takenAt || item.uploadedAt || Date.now());
-    const yyyy = String(baseDate.getUTCFullYear());
-    const mm = String(baseDate.getUTCMonth() + 1).padStart(2, '0');
-    const ext = path.extname(item.originalName || '') || path.extname(item.relPath || '') || '';
-    const restoreDir = path.join(ORIGINALS_ROOT, yyyy, mm);
-    fs.mkdirSync(restoreDir, { recursive: true });
-    const newAbs = path.join(restoreDir, `${item.id}${ext}`);
-
-    if (fs.existsSync(oldAbs)) {
-      try {
-        fs.renameSync(oldAbs, newAbs);
-      } catch (e) {
-        if (e && e.code === 'EXDEV') {
-          fs.copyFileSync(oldAbs, newAbs);
-          fs.unlinkSync(oldAbs);
-        } else {
-          throw e;
+  try {
+    await client.query('BEGIN');
+    
+    const selectRes = await client.query('SELECT * FROM assets WHERE id = ANY($1) AND is_deleted = true', [ids]);
+    const assetsToRestore = selectRes.rows.map(fromDB);
+    
+    for (const item of assetsToRestore) {
+      const oldAbs = path.join(LIBRARY_PATH, item.relPath || '');
+      const baseDate = new Date(item.takenAt || item.uploadedAt || Date.now());
+      const yyyy = String(baseDate.getUTCFullYear());
+      const mm = String(baseDate.getUTCMonth() + 1).padStart(2, '0');
+      const ext = path.extname(item.originalName || '') || path.extname(item.relPath || '') || '';
+      const restoreDir = path.join(ORIGINALS_ROOT, yyyy, mm);
+      fs.mkdirSync(restoreDir, { recursive: true });
+      const newAbs = path.join(restoreDir, `${item.id}${ext}`);
+      
+      if (fs.existsSync(oldAbs)) {
+        try {
+          fs.renameSync(oldAbs, newAbs);
+        } catch (e) {
+          if (e && e.code === 'EXDEV') {
+            fs.copyFileSync(oldAbs, newAbs);
+            fs.unlinkSync(oldAbs);
+          } else {
+            throw e;
+          }
         }
+        const newRelPath = path.relative(LIBRARY_PATH, newAbs).replaceAll('\\', '/');
+        
+        await client.query(
+          'UPDATE assets SET rel_path = $1, is_deleted = false, deleted_at = null WHERE id = $2',
+          [newRelPath, item.id]
+        );
+        updated++;
       }
-      it.relPath = path.relative(LIBRARY_PATH, newAbs).replaceAll('\\', '/');
     }
-
-    it.isDeleted = false;
-    it.deletedAt = null;
-    updated += 1;
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
-
-  writeIndex(db);
   return { updated };
 }
 
-function purgeDeleted(ids = []) {
-  const idSet = new Set(ids || []);
-  const db = readIndex();
+async function purgeDeleted(ids = []) {
+  if (ids.length === 0) return { removed: 0 };
+
+  const client = await db.pool.connect();
   let removed = 0;
-
-  db.items = db.items.filter((it) => {
-    if (!idSet.has(it.id)) return true;
-    const item = normalizeItem(it);
-    if (!item.isDeleted) return true;
-
-    const abs = path.join(LIBRARY_PATH, item.relPath || '');
-    try {
-      if (fs.existsSync(abs)) fs.unlinkSync(abs);
-    } catch {}
-
-    if (item.playRelPath) {
-      const playAbs = path.join(LIBRARY_PATH, item.playRelPath);
-      try { if (fs.existsSync(playAbs)) fs.unlinkSync(playAbs); } catch {}
-    }
-
-    if (item.hlsRelPath) {
-      const hlsAbs = path.join(LIBRARY_PATH, item.hlsRelPath);
+  try {
+    await client.query('BEGIN');
+    
+    const selectRes = await client.query('SELECT * FROM assets WHERE id = ANY($1) AND is_deleted = true', [ids]);
+    const assetsToPurge = selectRes.rows.map(fromDB);
+    
+    for (const item of assetsToPurge) {
+      const abs = path.join(LIBRARY_PATH, item.relPath || '');
       try {
-        const hlsDir = path.dirname(hlsAbs);
-        if (fs.existsSync(hlsDir)) fs.rmSync(hlsDir, { recursive: true, force: true });
+        if (fs.existsSync(abs)) fs.unlinkSync(abs);
       } catch {}
+      
+      if (item.playRelPath) {
+        const playAbs = path.join(LIBRARY_PATH, item.playRelPath);
+        try { if (fs.existsSync(playAbs)) fs.unlinkSync(playAbs); } catch {}
+      }
+      
+      if (item.hlsRelPath) {
+        const hlsAbs = path.join(LIBRARY_PATH, item.hlsRelPath);
+        try {
+          const hlsDir = path.dirname(hlsAbs);
+          if (fs.existsSync(hlsDir)) fs.rmSync(hlsDir, { recursive: true, force: true });
+        } catch {}
+      }
+      
+      await client.query('DELETE FROM assets WHERE id = $1', [item.id]);
+      removed++;
     }
-
-    removed += 1;
-    return false;
-  });
-
-  writeIndex(db);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
   return { removed };
 }
+
+ensureDirs();
 
 module.exports = {
   saveUploadedFile,

@@ -38,11 +38,16 @@ const upload = multer({
 
 const chunkSessions = new Map();
 
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   const limit = Number(req.query.limit || 200);
   const includeTrash = String(req.query.includeTrash || 'false') === 'true';
   const onlyTrash = String(req.query.onlyTrash || 'false') === 'true';
-  return res.json({ items: listAssets(limit, { includeTrash, onlyTrash }) });
+  try {
+    const items = await listAssets(limit, { includeTrash, onlyTrash });
+    return res.json({ items });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
 });
 
 router.post('/upload-chunk/init', requireAuth, (req, res) => {
@@ -95,178 +100,245 @@ router.post('/upload-chunk/:uploadId/complete', requireAuth, async (req, res) =>
 
   await new Promise((resolve) => ws.on('finish', resolve));
 
-  const stat = fs.statSync(merged);
-  const saved = await saveUploadedFile(
-    {
-      path: merged,
-      originalname: session.fileName,
-      mimetype: session.mime,
-      size: stat.size,
-      lastModified: session.lastModified,
-    },
-    req.user
-  );
+  try {
+    const stat = fs.statSync(merged);
+    const saved = await saveUploadedFile(
+      {
+        path: merged,
+        originalname: session.fileName,
+        mimetype: session.mime,
+        size: stat.size,
+        lastModified: session.lastModified,
+      },
+      req.user
+    );
 
-  try { fs.rmSync(session.chunkDir, { recursive: true, force: true }); } catch {}
-  chunkSessions.delete(req.params.uploadId);
+    try { fs.rmSync(session.chunkDir, { recursive: true, force: true }); } catch {}
+    chunkSessions.delete(req.params.uploadId);
 
-  return res.json({ ok: true, item: saved });
+    return res.json({ ok: true, item: saved });
+  } catch (e) {
+    try { if (fs.existsSync(merged)) fs.unlinkSync(merged); } catch {}
+    return res.status(500).json({ message: e.message });
+  }
 });
 
 router.post('/upload', requireAuth, upload.array('files', 50), async (req, res) => {
   const files = req.files || [];
   const lastModified = req.body.lastModified ? Number(req.body.lastModified) : null;
-  const saved = await Promise.all(files.map((f) => saveUploadedFile({ ...f, lastModified }, req.user)));
-  return res.json({ ok: true, count: saved.length, items: saved });
+  try {
+    const saved = await Promise.all(files.map((f) => saveUploadedFile({ ...f, lastModified }, req.user)));
+    return res.json({ ok: true, count: saved.length, items: saved });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
 });
 
-router.get('/albums', requireAuth, (_req, res) => {
-  return res.json({ items: listAlbums() });
+router.get('/albums', requireAuth, async (_req, res) => {
+  try {
+    const items = await listAlbums();
+    return res.json({ items });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
 });
 
-router.get('/doc-projects', requireAuth, (_req, res) => {
-  return res.json({ items: listDocProjects() });
+router.get('/doc-projects', requireAuth, async (_req, res) => {
+  try {
+    const items = await listDocProjects();
+    return res.json({ items });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
 });
 
-router.post('/bulk/album', requireAuth, (req, res) => {
+router.post('/bulk/album', requireAuth, async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
   const albumName = String(req.body?.albumName || '').trim();
   if (!ids.length) return res.status(400).json({ message: 'ids is required' });
   if (!albumName) return res.status(400).json({ message: 'albumName is required' });
 
-  const result = assignAlbum(ids, albumName);
-  return res.json({ ok: true, ...result });
+  try {
+    const result = await assignAlbum(ids, albumName);
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
 });
 
-router.post('/bulk/doc-project', requireAuth, (req, res) => {
+router.post('/bulk/doc-project', requireAuth, async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
   const projectName = String(req.body?.projectName || '').trim();
   if (!ids.length) return res.status(400).json({ message: 'ids is required' });
   if (!projectName) return res.status(400).json({ message: 'projectName is required' });
 
-  const result = assignDocProject(ids, projectName);
-  return res.json({ ok: true, ...result });
-});
-
-router.post('/bulk/trash', requireAuth, (req, res) => {
-  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
-  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
-
-  const result = moveToTrash(ids);
-  return res.json({ ok: true, ...result });
-});
-
-router.post('/bulk/restore', requireAuth, (req, res) => {
-  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
-  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
-
-  const result = restoreFromTrash(ids);
-  return res.json({ ok: true, ...result });
-});
-
-router.post('/bulk/purge', requireAuth, (req, res) => {
-  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
-  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
-
-  const result = purgeDeleted(ids);
-  return res.json({ ok: true, ...result });
-});
-
-router.get('/_media/hls/:id/master.m3u8', requireAuth, (req, res) => {
-  const asset = getAsset(req.params.id);
-  if (!asset) return res.status(404).json({ message: 'Not found' });
-
-  const hlsMasterAbs = getHlsAbsPathFromAsset(asset);
-  if (!hlsMasterAbs || !fs.existsSync(hlsMasterAbs)) {
-    return res.status(404).json({ message: 'HLS not ready' });
+  try {
+    const result = await assignDocProject(ids, projectName);
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
   }
-
-  res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-  res.setHeader('Cache-Control', 'no-store');
-  return res.sendFile(hlsMasterAbs);
 });
 
-router.get('/_media/hls/:id/:segment', requireAuth, (req, res) => {
-  const asset = getAsset(req.params.id);
-  if (!asset) return res.status(404).json({ message: 'Not found' });
+router.post('/bulk/trash', requireAuth, async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
 
-  const hlsDir = getHlsDirAbsPathFromAsset(asset);
-  if (!hlsDir || !fs.existsSync(hlsDir)) return res.status(404).json({ message: 'HLS not ready' });
-
-  const seg = path.basename(req.params.segment || '');
-  if (!seg || (!seg.endsWith('.ts') && !seg.endsWith('.m3u8'))) {
-    return res.status(400).json({ message: 'Invalid segment' });
+  try {
+    const result = await moveToTrash(ids);
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
   }
+});
 
-  const abs = path.join(hlsDir, seg);
-  if (!fs.existsSync(abs)) return res.status(404).json({ message: 'Segment missing' });
+router.post('/bulk/restore', requireAuth, async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
 
-  if (seg.endsWith('.m3u8')) {
+  try {
+    const result = await restoreFromTrash(ids);
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+});
+
+router.post('/bulk/purge', requireAuth, async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  if (!ids.length) return res.status(400).json({ message: 'ids is required' });
+
+  try {
+    const result = await purgeDeleted(ids);
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+});
+
+router.get('/_media/hls/:id/master.m3u8', requireAuth, async (req, res) => {
+  try {
+    const asset = await getAsset(req.params.id);
+    if (!asset) return res.status(404).json({ message: 'Not found' });
+
+    const hlsMasterAbs = getHlsAbsPathFromAsset(asset);
+    if (!hlsMasterAbs || !fs.existsSync(hlsMasterAbs)) {
+      return res.status(404).json({ message: 'HLS not ready' });
+    }
+
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
     res.setHeader('Cache-Control', 'no-store');
-  } else {
-    res.setHeader('Content-Type', 'video/mp2t');
-    res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+    return res.sendFile(hlsMasterAbs);
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
   }
-
-  return res.sendFile(abs);
 });
 
-router.get('/_media/play/:id', requireAuth, (req, res) => {
-  const asset = getAsset(req.params.id);
-  if (!asset) return res.status(404).json({ message: 'Not found' });
-
-  const playAbs = getPlayableAbsPathFromAsset(asset);
-  if (!playAbs || !fs.existsSync(playAbs)) {
-    return res.redirect(`/api/assets/_media/original/${asset.id}`);
-  }
-
-  res.setHeader('Content-Type', 'video/mp4');
-  res.setHeader('Content-Disposition', `inline; filename="${path.basename(asset.originalName || 'video')}.mp4"`);
-  res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
-  return res.sendFile(playAbs);
-});
-
-router.get('/_media/original/:id', requireAuth, (req, res) => {
-  const asset = getAsset(req.params.id);
-  if (!asset) return res.status(404).json({ message: 'Not found' });
-
-  const abs = getAbsPathFromAsset(asset);
-  if (!fs.existsSync(abs)) return res.status(404).json({ message: 'File missing' });
-
-  res.setHeader('Content-Type', asset.mime || 'application/octet-stream');
-  res.setHeader('Content-Disposition', `inline; filename="${path.basename(asset.originalName || 'file')}"`);
-  res.setHeader('Cache-Control', 'private, max-age=3600');
-  return res.sendFile(abs);
-});
-
-router.put('/:id/albums', requireAuth, (req, res) => {
-  const albumNames = Array.isArray(req.body?.albumNames) ? req.body.albumNames : [];
-  const result = setAssetAlbums(req.params.id, albumNames);
-  if (result.updated === 0) return res.status(404).json({ message: 'Asset not found' });
-  return res.json({ ok: true, ...result });
-});
-
-router.get('/tags', requireAuth, (req, res) => {
+router.get('/_media/hls/:id/:segment', requireAuth, async (req, res) => {
   try {
-    const items = listTags();
+    const asset = await getAsset(req.params.id);
+    if (!asset) return res.status(404).json({ message: 'Not found' });
+
+    const hlsDir = getHlsDirAbsPathFromAsset(asset);
+    if (!hlsDir || !fs.existsSync(hlsDir)) return res.status(404).json({ message: 'HLS not ready' });
+
+    const seg = path.basename(req.params.segment || '');
+    if (!seg || (!seg.endsWith('.ts') && !seg.endsWith('.m3u8'))) {
+      return res.status(400).json({ message: 'Invalid segment' });
+    }
+
+    const abs = path.join(hlsDir, seg);
+    if (!fs.existsSync(abs)) return res.status(404).json({ message: 'Segment missing' });
+
+    if (seg.endsWith('.m3u8')) {
+      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+      res.setHeader('Cache-Control', 'no-store');
+    } else {
+      res.setHeader('Content-Type', 'video/mp2t');
+      res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+    }
+
+    return res.sendFile(abs);
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+});
+
+router.get('/_media/play/:id', requireAuth, async (req, res) => {
+  try {
+    const asset = await getAsset(req.params.id);
+    if (!asset) return res.status(404).json({ message: 'Not found' });
+
+    const playAbs = getPlayableAbsPathFromAsset(asset);
+    if (!playAbs || !fs.existsSync(playAbs)) {
+      return res.redirect(`/api/assets/_media/original/${asset.id}`);
+    }
+
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Disposition', `inline; filename="${path.basename(asset.originalName || 'video')}.mp4"`);
+    res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+    return res.sendFile(playAbs);
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+});
+
+router.get('/_media/original/:id', requireAuth, async (req, res) => {
+  try {
+    const asset = await getAsset(req.params.id);
+    if (!asset) return res.status(404).json({ message: 'Not found' });
+
+    const abs = getAbsPathFromAsset(asset);
+    if (!fs.existsSync(abs)) return res.status(404).json({ message: 'File missing' });
+
+    res.setHeader('Content-Type', asset.mime || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${path.basename(asset.originalName || 'file')}"`);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    return res.sendFile(abs);
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+});
+
+router.put('/:id/albums', requireAuth, async (req, res) => {
+  const albumNames = Array.isArray(req.body?.albumNames) ? req.body.albumNames : [];
+  try {
+    const result = await setAssetAlbums(req.params.id, albumNames);
+    if (result.updated === 0) return res.status(404).json({ message: 'Asset not found' });
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
+});
+
+router.get('/tags', requireAuth, async (req, res) => {
+  try {
+    const items = await listTags();
     return res.json({ ok: true, items });
   } catch (e) {
     return res.status(500).json({ message: e.message });
   }
 });
 
-router.put('/:id/tags', requireAuth, (req, res) => {
+router.put('/:id/tags', requireAuth, async (req, res) => {
   const tags = Array.isArray(req.body?.tags) ? req.body.tags : [];
-  const result = setAssetTags(req.params.id, tags);
-  if (result.updated === 0) return res.status(404).json({ message: 'Asset not found' });
-  return res.json({ ok: true, ...result });
+  try {
+    const result = await setAssetTags(req.params.id, tags);
+    if (result.updated === 0) return res.status(404).json({ message: 'Asset not found' });
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
 });
 
-router.get('/:id', requireAuth, (req, res) => {
-  const asset = getAsset(req.params.id);
-  if (!asset) return res.status(404).json({ message: 'Not found' });
-  return res.json(asset);
+router.get('/:id', requireAuth, async (req, res) => {
+  try {
+    const asset = await getAsset(req.params.id);
+    if (!asset) return res.status(404).json({ message: 'Not found' });
+    return res.json(asset);
+  } catch (e) {
+    return res.status(500).json({ message: e.message });
+  }
 });
 
 module.exports = router;

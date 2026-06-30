@@ -44,7 +44,7 @@ function dirSizeBytes(dirPath) {
   return total;
 }
 
-function getStorageUsage() {
+async function getStorageUsage() {
   const now = Date.now();
   if (cache.value && now - cache.at < cache.ttlMs) return cache.value;
 
@@ -65,7 +65,8 @@ function getStorageUsage() {
   const derivedBytes = dirSizeBytes(derived);
   const trashBytes = dirSizeBytes(trash);
 
-  const processingCount = listAssets(5000, { includeTrash: true }).filter((x) => x.processingStatus === 'processing' && !x.isDeleted).length;
+  const assets = await listAssets(5000, { includeTrash: true });
+  const processingCount = assets.filter((x) => x.processingStatus === 'processing' && !x.isDeleted).length;
 
   if (processingCount > 0 && cache.value) {
     return {
