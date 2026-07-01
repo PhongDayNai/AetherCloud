@@ -55,7 +55,7 @@ async function checkAssetOwnership(req: Request, res: Response, next: NextFuncti
   try {
     const asset = await getAsset(id);
     if (!asset) return res.status(404).json({ message: 'Không tìm thấy tệp tin' });
-    if (!req.user || asset.owner !== req.user.sub) {
+    if (!req.user || asset.ownerId !== req.user.sub) {
       return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin này' });
     }
     req.asset = asset; // Truyền asset đã query sang handler kế tiếp để tái sử dụng
@@ -72,7 +72,7 @@ async function checkBulkOwnership(req: Request, res: Response, next: NextFunctio
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   try {
     const checkRes = await db.query(
-      'SELECT COUNT(*)::int AS count FROM assets WHERE id = ANY($1) AND owner = $2',
+      'SELECT COUNT(*)::int AS count FROM assets WHERE id = ANY($1) AND owner_id = $2',
       [ids, req.user.sub]
     );
     if (checkRes.rows[0].count !== ids.length) {

@@ -12,6 +12,7 @@ import authRoutes from './routes/auth';
 import storageRoutes from './routes/storage';
 import assetsRoutes from './routes/assets';
 import adminRoutes from './routes/admin';
+import spacesRoutes from './routes/spaces';
 
 import { resolveStoragePath } from './lib/assets';
 
@@ -52,6 +53,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/assets', assetsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/spaces', spacesRoutes);
 
 app.get('/api', (_req: Request, res: Response) => {
   res.json({

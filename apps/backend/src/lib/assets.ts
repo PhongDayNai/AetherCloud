@@ -10,7 +10,8 @@ export interface Asset {
   originalName: string;
   mime: string;
   size: number;
-  owner: string;
+  ownerId: string;
+  groupId: string | null;
   uploadedAt: string | null;
   takenAt: string | null;
   relPath: string;
@@ -59,7 +60,8 @@ export function fromDB(row: any): Asset | null {
     originalName: row.original_name,
     mime: row.mime,
     size: Number(row.size),
-    owner: row.owner,
+    ownerId: row.owner_id || row.owner, // fallback cho dữ liệu cũ nếu chưa chạy migration
+    groupId: row.group_id || null,
     uploadedAt: row.uploaded_at ? new Date(row.uploaded_at).toISOString() : null,
     takenAt: row.taken_at ? new Date(row.taken_at).toISOString() : null,
     relPath: row.rel_path,
@@ -400,12 +402,23 @@ export async function saveUploadedFile(file: any, user?: any): Promise<Asset> {
   const relPath = path.relative(LIBRARY_PATH, absPath).replaceAll('\\', '/');
   const isVideo = file.mimetype?.startsWith('video/');
 
+  let ownerId = user?.sub;
+  if (!ownerId) {
+    const adminRes = await db.query("SELECT id FROM users WHERE role = 'admin' AND is_active = true LIMIT 1");
+    if (adminRes.rows.length > 0) {
+      ownerId = adminRes.rows[0].id;
+    } else {
+      throw new Error('Unauthorized or no admin user found to associate asset');
+    }
+  }
+
   const item: Asset = {
     id,
     originalName: file.originalname,
     mime: file.mimetype,
     size: file.size,
-    owner: user?.sub || 'admin',
+    ownerId,
+    groupId: null,
     uploadedAt,
     takenAt,
     relPath,
@@ -427,13 +440,13 @@ export async function saveUploadedFile(file: any, user?: any): Promise<Asset> {
 
   await db.query(`
     INSERT INTO assets (
-      id, original_name, mime, size, owner, uploaded_at, taken_at, rel_path,
+      id, original_name, mime, size, owner_id, group_id, uploaded_at, taken_at, rel_path,
       play_rel_path, hls_rel_path, processing_status, processing_started_at,
       processing_finished_at, ext, album_name, album_names, doc_project_name,
       doc_project_names, tags, is_deleted, deleted_at, type
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
   `, [
-    item.id, item.originalName, item.mime, Number(item.size), item.owner,
+    item.id, item.originalName, item.mime, Number(item.size), item.ownerId, item.groupId,
     item.uploadedAt, item.takenAt, item.relPath, item.playRelPath, item.hlsRelPath,
     item.processingStatus, item.processingStartedAt, item.processingFinishedAt,
     item.ext, item.albumName, item.albumNames, item.docProjectName, item.docProjectNames,
@@ -446,14 +459,15 @@ export async function saveUploadedFile(file: any, user?: any): Promise<Asset> {
 }
 
 export async function listAssets(limit = 200, opts: any = {}): Promise<Asset[]> {
-  const { includeTrash = false, onlyTrash = false, owner } = opts;
+  const { includeTrash = false, onlyTrash = false, owner, ownerId } = opts;
+  const targetOwner = ownerId || owner;
   let queryText = 'SELECT * FROM assets';
   const params: any[] = [];
   const clauses: string[] = [];
 
-  if (owner) {
-    params.push(owner);
-    clauses.push(`owner = $${params.length}`);
+  if (targetOwner) {
+    params.push(targetOwner);
+    clauses.push(`owner_id = $${params.length}`);
   }
 
   if (onlyTrash) {
@@ -505,7 +519,7 @@ export async function listAlbums(owner: string): Promise<any[]> {
     FROM (
       SELECT unnest(album_names) AS name 
       FROM assets 
-      WHERE is_deleted = false AND owner = $1
+      WHERE is_deleted = false AND owner_id = $1
     ) sub 
     GROUP BY name 
     ORDER BY name
@@ -519,7 +533,7 @@ export async function listTags(owner: string): Promise<any[]> {
     FROM (
       SELECT unnest(tags) AS name 
       FROM assets 
-      WHERE is_deleted = false AND owner = $1
+      WHERE is_deleted = false AND owner_id = $1
     ) sub 
     GROUP BY name 
     ORDER BY name
@@ -589,7 +603,7 @@ export async function listDocProjects(owner: string): Promise<any[]> {
     FROM (
       SELECT unnest(doc_project_names) AS name 
       FROM assets 
-      WHERE is_deleted = false AND type != 'image' AND type != 'video' AND owner = $1
+      WHERE is_deleted = false AND type != 'image' AND type != 'video' AND owner_id = $1
     ) sub 
     GROUP BY name 
     ORDER BY name
