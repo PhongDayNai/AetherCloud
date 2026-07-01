@@ -36,18 +36,6 @@ export default function AssetGrid({
 }: AssetGridProps): React.JSX.Element {
   return (
     <section className="contentPane">
-      <div className="groupToggleWrap">
-        <button className={`chip ${groupByTimeEnabled ? 'active' : ''}`} onClick={() => setGroupByTimeEnabled((v) => !v)}>
-          {groupByTimeEnabled ? t('dashboard.toggleGroupOff') : t('dashboard.toggleGroupOn')}
-        </button>
-        {groupByTimeEnabled && (
-          <>
-            <span className="groupLabel">{t('dashboard.groupBy')}:</span>
-            <button className={`chip ${groupMode === 'month' ? 'active' : ''}`} onClick={() => setGroupMode('month')}>{t('dashboard.groupMonth')}</button>
-            <button className={`chip ${groupMode === 'year' ? 'active' : ''}`} onClick={() => setGroupMode('year')}>{t('dashboard.groupYear')}</button>
-          </>
-        )}
-      </div>
 
       {collectionView === 'recent' && <div className="hint">{t('dashboard.recentHint')}</div>}
       {collectionView === 'trash' && <div className="hint">{t('dashboard.trashHint')}</div>}
@@ -77,7 +65,7 @@ export default function AssetGrid({
                       <div key={a.id} className={`tile ${picked ? 'picked' : ''} ${a.processingStatus === 'processing' ? 'tileProcessing' : ''}`} {...cardHandlers(a, () => openPhoto(a.id))} style={{ animationDelay: `${(idx % 24) * 0.02}s` }}>
                         {a.type === 'image' ? (
                           <img src={srcOriginal} alt={a.originalName} className="thumb" />
-                        ) : (
+                        ) : a.type === 'video' ? (
                           a.processingStatus === 'processing' ? (
                             <div className="processingPlaceholder">
                               <div className="pulseLoader" />
@@ -86,6 +74,18 @@ export default function AssetGrid({
                           ) : (
                             <video src={srcPlay} className="thumb" muted preload="metadata" />
                           )
+                        ) : (
+                          <div className="filePlaceholder">
+                            <span className="fileIcon">
+                              {a.originalName.toLowerCase().endsWith('.pdf') ? '📕' 
+                               : a.originalName.toLowerCase().endsWith('.zip') || a.originalName.toLowerCase().endsWith('.rar') || a.originalName.toLowerCase().endsWith('.tar') || a.originalName.toLowerCase().endsWith('.gz') ? '📦'
+                               : a.originalName.toLowerCase().endsWith('.docx') || a.originalName.toLowerCase().endsWith('.doc') ? '📝'
+                               : a.originalName.toLowerCase().endsWith('.xlsx') || a.originalName.toLowerCase().endsWith('.xls') || a.originalName.toLowerCase().endsWith('.csv') ? '📊'
+                               : a.originalName.toLowerCase().endsWith('.md') ? '🔤'
+                               : '📄'}
+                            </span>
+                            <span className="fileExt">{a.originalName.split('.').pop()?.toUpperCase() || 'FILE'}</span>
+                          </div>
                         )}
                         <div className="caption">{a.originalName}</div>
                         {picked && <div className="badge">✓</div>}
@@ -299,6 +299,27 @@ export default function AssetGrid({
           font-size: 11px;
           color: var(--text-muted);
           font-weight: 600;
+        }
+        .filePlaceholder {
+          height: 160px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-input);
+          gap: 12px;
+        }
+        .fileIcon {
+          font-size: 40px;
+        }
+        .fileExt {
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--text-muted);
+          background: var(--bg-item-active);
+          padding: 2px 8px;
+          border-radius: 4px;
+          border: 1px solid var(--border-color);
         }
         @keyframes pulse {
           0% { transform: scale(0.9); opacity: 0.6; }

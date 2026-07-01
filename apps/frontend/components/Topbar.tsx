@@ -9,7 +9,7 @@ interface TopbarProps {
   setSelectionMode: React.Dispatch<React.SetStateAction<boolean>>;
   selectedIds: string[];
   setSelectedIds: (ids: string[]) => void;
-  tab: 'photos' | 'docs';
+  tab: 'photos' | 'docs' | 'all' | 'space' | 'spaces';
   collectionView: string;
   docCollectionView: string;
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;

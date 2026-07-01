@@ -8,7 +8,7 @@ import SmartVideo from './SmartVideo';
 
 interface MediaViewerProps {
   active: Asset | null;
-  tab: 'photos' | 'docs';
+  tab: 'photos' | 'docs' | 'all' | 'space' | 'spaces';
   albumFilteredPhotos: Asset[];
   docsFiltered: Asset[];
   activeIndex: number;
