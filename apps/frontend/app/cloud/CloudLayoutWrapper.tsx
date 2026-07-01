@@ -1,12 +1,55 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Sidebar from '../../components/Sidebar';
 import Topbar from '../../components/Topbar';
 import MediaViewer from '../../components/MediaViewer';
 import SettingsModal from '../../components/SettingsModal';
 import CreateSpaceModal from '../../components/CreateSpaceModal';
-import { useCloud } from '../../context/CloudContext';
+import { useCloud, ToastItem } from '../../context/CloudContext';
+
+interface ToastProps {
+  toast: ToastItem;
+  onClose: (id: string) => void;
+}
+
+function Toast({ toast, onClose }: ToastProps) {
+  const [isExiting, setIsExiting] = React.useState(false);
+
+  useEffect(() => {
+    const exitTimer = setTimeout(() => {
+      setIsExiting(true);
+    }, 4700);
+
+    const removeTimer = setTimeout(() => {
+      onClose(toast.id);
+    }, 3000);
+
+    return () => {
+      clearTimeout(exitTimer);
+      clearTimeout(removeTimer);
+    };
+  }, [toast.id, onClose]);
+
+  const handleClose = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      onClose(toast.id);
+    }, 300);
+  };
+
+  return (
+    <div className={`toastItem ${toast.type === 'error' ? 'toastError' : 'toastInfo'} ${isExiting ? 'toastExiting' : ''}`}>
+      <span className="toastIcon">
+        {toast.type === 'error' ? '✕' : '✓'}
+      </span>
+      <span className="toastMsg">{toast.message}</span>
+      <button className="toastCloseBtn" onClick={handleClose}>
+        ✕
+      </button>
+    </div>
+  );
+}
 
 export default function CloudLayoutWrapper({ children }: { children: React.ReactNode }) {
   const {
@@ -25,11 +68,12 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
     usage, showProfileMenu, setShowProfileMenu, user,
     setShowSettingsModal, handleLogout, t, activeWorkspace,
     setActiveWorkspace, spaces,
-    
+
     search, setSearch, selectionMode, selectedIds, onUpload, addSelectedToAlbum,
     addSelectedToDocProject, moveSelectedToTrash, restoreSelectedFromTrash,
     purgeSelectedForever, msg, err,
-    
+    toasts, removeToast,
+
     active, albumFilteredPhotos, docsFiltered, activeIndex, setActiveIndex,
     showInfo, setShowInfo, showAlbumPicker, setShowAlbumPicker,
     showTagPicker, setShowTagPicker, activeMediaFit, setActiveMediaFit,
@@ -37,7 +81,7 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
     selectedAlbumsForActive, selectedTagsForActive, toggleAlbumSelection,
     toggleTagSelection, saveActiveAlbums, saveActiveTags,
     createNewAlbumInSelection, createNewTagInSelection, loadAlbums, loadTags, setMsg, api,
-    
+
     showDocProjectPicker, setShowDocProjectPicker,
     docProjectQuery, setDocProjectQuery,
     selectedDocProjectsForActive,
@@ -120,8 +164,11 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
           t={t}
         />
 
-        {msg && <div className="info">{msg}</div>}
-        {err && <div className="error">{err}</div>}
+        <div className="toastContainer">
+          {toasts.map((t) => (
+            <Toast key={t.id} toast={t} onClose={removeToast} />
+          ))}
+        </div>
 
         {children}
       </main>
@@ -208,30 +255,142 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
           overflow-y: auto;
           height: 100vh;
         }
-        .info {
-          color: #60a5fa;
-          background: rgba(96, 165, 250, 0.05);
-          border: 1px solid rgba(96, 165, 250, 0.1);
-          padding: 10px 14px;
-          border-radius: 12px;
-          margin-bottom: 16px;
-          font-size: 13px;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .error {
-          color: #f87171;
-          background: rgba(248, 113, 113, 0.05);
-          border: 1px solid rgba(248, 113, 113, 0.1);
-          padding: 10px 14px;
-          border-radius: 12px;
-          margin-bottom: 16px;
-          font-size: 13px;
-          white-space: pre-line;
-        }
         @media (max-width: 900px) {
           .shell { grid-template-columns: 1fr; }
+        }
+
+        /* Toast global styles using :global() */
+        :global(.toastContainer) {
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          z-index: 10000;
+          pointer-events: none;
+          max-width: 360px;
+          width: calc(100vw - 48px);
+        }
+        :global(.toastItem) {
+          pointer-events: auto;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 16px;
+          border-radius: 12px;
+          font-size: 13px;
+          font-weight: 500;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+          animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          width: 100%;
+          box-sizing: border-box;
+          max-height: 120px;
+          overflow: hidden;
+        }
+        :global(.toastItem.toastExiting) {
+          animation: toastSlideOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        :global(.toastInfo) {
+          background: rgba(20, 20, 25, 0.85);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          color: #ffffff;
+          backdrop-filter: blur(12px);
+        }
+        :global(.toastError) {
+          background: rgba(239, 68, 68, 0.15);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          color: #f87171;
+          backdrop-filter: blur(12px);
+        }
+        :global([data-theme='light'] .toastInfo) {
+          background: rgba(255, 255, 255, 0.9);
+          border: 1px solid rgba(0, 0, 0, 0.06);
+          color: #1f2937;
+        }
+        :global([data-theme='light'] .toastError) {
+          background: rgba(254, 226, 226, 0.9);
+          border: 1px solid rgba(239, 68, 68, 0.2);
+          color: #b91c1c;
+        }
+        :global(.toastIcon) {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 18px;
+          height: 18px;
+          border-radius: 99px;
+          font-size: 10px;
+          font-weight: bold;
+          flex-shrink: 0;
+        }
+        :global(.toastInfo .toastIcon) {
+          background: #ffffff;
+          color: #09090b;
+        }
+        :global(.toastError .toastIcon) {
+          background: #ef4444;
+          color: #ffffff;
+        }
+        :global([data-theme='light'] .toastInfo .toastIcon) {
+          background: #1f2937;
+          color: #ffffff;
+        }
+        :global(.toastMsg) {
+          flex: 1;
+          line-height: 1.4;
+          word-break: break-word;
+          white-space: normal;
+        }
+        :global(.toastCloseBtn) {
+          background: transparent;
+          border: 0;
+          color: var(--text-muted);
+          cursor: pointer;
+          padding: 4px;
+          font-size: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: color 0.2s ease;
+          flex-shrink: 0;
+        }
+        :global(.toastCloseBtn:hover) {
+          color: var(--text-primary);
+        }
+        @keyframes toastSlideIn {
+          0% {
+            opacity: 0;
+            transform: translateX(120%) scale(0.9);
+          }
+          70% {
+            transform: translateX(-5%) scale(1.02);
+          }
+          100% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+          }
+        }
+        @keyframes toastSlideOut {
+          0% {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+            max-height: 120px;
+            margin-bottom: 0;
+            padding-top: 12px;
+            padding-bottom: 12px;
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(130%) scale(0.9);
+            max-height: 0;
+            margin-bottom: -10px;
+            padding-top: 0;
+            padding-bottom: 0;
+            border-top-width: 0;
+            border-bottom-width: 0;
+          }
         }
       `}</style>
     </div>

@@ -17,6 +17,12 @@ import {
   docIconOf
 } from '../lib/utils';
 
+export interface ToastItem {
+  id: string;
+  message: string;
+  type: 'info' | 'error';
+}
+
 interface CloudContextType {
   // Config & API
   api: string;
@@ -168,6 +174,9 @@ interface CloudContextType {
   albumFilteredPhotos: Asset[];
   photoGroups: [string, Asset[]][];
   active: Asset | null;
+  toasts: ToastItem[];
+  removeToast: (id: string) => void;
+  addToast: (message: string, type?: 'info' | 'error') => void;
 }
 
 const CloudContext = createContext<CloudContextType | undefined>(undefined);
@@ -180,6 +189,44 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [msg, setMsg] = useState<string>('');
   const [err, setErr] = useState<string>('');
+
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
+
+  const addToast = React.useCallback((message: string, type: 'info' | 'error' = 'info') => {
+    const newToast: ToastItem = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+      message,
+      type
+    };
+    setToastQueue((prev) => [...prev, newToast]);
+  }, []);
+
+  const removeToast = React.useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  useEffect(() => {
+    if (toastQueue.length > 0 && toasts.length < 3) {
+      const nextToast = toastQueue[0];
+      setToastQueue((prev) => prev.slice(1));
+      setToasts((prev) => [...prev, nextToast]);
+    }
+  }, [toastQueue, toasts]);
+
+  useEffect(() => {
+    if (msg) {
+      addToast(msg, 'info');
+      setMsg('');
+    }
+  }, [msg, addToast]);
+
+  useEffect(() => {
+    if (err) {
+      addToast(err, 'error');
+      setErr('');
+    }
+  }, [err, addToast]);
 
   const [tab, setTab] = useState<'photos' | 'docs' | 'dashboard' | 'space' | 'spaces'>('dashboard');
   const [search, setSearch] = useState<string>('');
@@ -1002,7 +1049,10 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       availableAlbums,
       albumFilteredPhotos,
       photoGroups,
-      active
+      active,
+      toasts,
+      removeToast,
+      addToast
     }}>
       {children}
     </CloudContext.Provider>
