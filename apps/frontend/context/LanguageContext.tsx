@@ -255,6 +255,11 @@ const translations = {
     'viewer.tagsUpdateFailed': 'Cập nhật nhãn thất bại',
     'viewer.tagsUpdateSuccess': 'Đã cập nhật nhãn của file thành công!',
     'viewer.tagsSaveError': 'Lỗi lưu nhãn',
+    'viewer.searchProjectPlaceholder': 'Tìm tập tài liệu...',
+    'viewer.createNewProject': 'Tạo tập tài liệu mới',
+    'viewer.projectUpdateFailed': 'Cập nhật tập tài liệu thất bại',
+    'viewer.projectUpdateSuccess': 'Đã cập nhật tập tài liệu của file thành công!',
+    'viewer.projectSaveError': 'Lỗi lưu tập tài liệu',
 
     // Alerts & Dialogs
     'dialogs.logoutOthersTitle': 'Đăng xuất thiết bị khác?',
@@ -541,6 +546,18 @@ const translations = {
     'viewer.searchOrCreateTagPlaceholder': 'Search or create tag...',
     'viewer.createNewTag': 'Create new tag',
     'viewer.newTagPrompt': 'New tag name:',
+    'viewer.albumUpdateFailed': 'Failed to update album',
+    'viewer.albumUpdateSuccess': 'Successfully updated album for this file!',
+    'viewer.albumSaveError': 'Error saving album',
+    'viewer.tagsLoadFailed': 'Failed to load tags',
+    'viewer.tagsUpdateFailed': 'Failed to update tags',
+    'viewer.tagsUpdateSuccess': 'Successfully updated tags for this file!',
+    'viewer.tagsSaveError': 'Error saving tags',
+    'viewer.searchProjectPlaceholder': 'Search document projects...',
+    'viewer.createNewProject': 'Create new project',
+    'viewer.projectUpdateFailed': 'Failed to update document project',
+    'viewer.projectUpdateSuccess': 'Successfully updated document project for this file!',
+    'viewer.projectSaveError': 'Error saving document project',
 
     // Alerts & Dialogs
     'dialogs.logoutOthersTitle': 'Log out other devices?',
