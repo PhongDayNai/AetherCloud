@@ -86,9 +86,9 @@ export default function Topbar({
           position: sticky;
           top: 16px;
           z-index: 10;
-          background: rgba(9, 9, 11, 0.7);
+          background: var(--bg-sidebar);
           backdrop-filter: blur(16px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          border: 1px solid var(--border-strong);
           border-radius: 20px;
           padding: 10px 14px;
           box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
@@ -96,9 +96,9 @@ export default function Topbar({
         .search {
           flex: 1;
           max-width: 600px;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          color: #ffffff;
+          background: var(--bg-input);
+          border: 1px solid var(--border-input);
+          color: var(--text-primary);
           border-radius: 12px;
           padding: 10px 16px;
           font-size: 14px;
@@ -107,12 +107,12 @@ export default function Topbar({
           font-family: inherit;
         }
         .search:focus {
-          background: rgba(255, 255, 255, 0.05);
-          border-color: rgba(255, 255, 255, 0.2);
-          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+          background: var(--bg-input-focus);
+          border-color: var(--border-input-focus);
+          box-shadow: 0 0 0 1px var(--border-color);
         }
         .search::placeholder {
-          color: #52525b;
+          color: var(--text-muted);
         }
         .actions {
           display: flex;
@@ -120,8 +120,8 @@ export default function Topbar({
           align-items: center;
         }
         .uploadBtn {
-          background: #ffffff;
-          color: #09090b;
+          background: var(--button-primary-bg);
+          color: var(--button-primary-text);
           border-radius: 12px;
           padding: 10px 18px;
           cursor: pointer;
@@ -129,18 +129,18 @@ export default function Topbar({
           font-size: 13px;
           transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
           border: 0;
-          box-shadow: 0 4px 14px rgba(255, 255, 255, 0.1);
+          box-shadow: 0 4px 14px var(--button-primary-shadow);
           display: inline-block;
         }
         .uploadBtn:hover {
           transform: translateY(-1px);
-          background: #f4f4f5;
-          box-shadow: 0 6px 20px rgba(255, 255, 255, 0.15);
+          background: var(--button-primary-hover);
+          box-shadow: 0 6px 20px var(--button-primary-hover-shadow);
         }
         .ghost {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          color: #e4e4e7;
+          background: var(--bg-input);
+          border: 1px solid var(--border-input);
+          color: var(--text-secondary);
           border-radius: 12px;
           padding: 9px 16px;
           font-size: 13px;
@@ -150,9 +150,9 @@ export default function Topbar({
           transition: all 0.2s ease;
         }
         .ghost:hover {
-          background: rgba(255, 255, 255, 0.08);
-          border-color: rgba(255, 255, 255, 0.15);
-          color: #ffffff;
+          background: var(--bg-item-active);
+          border-color: var(--border-input-focus);
+          color: var(--text-primary);
           transform: translateY(-1px);
         }
         .danger {

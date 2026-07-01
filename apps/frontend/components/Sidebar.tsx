@@ -304,12 +304,12 @@ export default function Sidebar({
 
       <style jsx>{`
         .sidebar {
-          border-right: 1px solid rgba(255, 255, 255, 0.06);
+          border-right: 1px solid var(--border-color);
           padding: 24px 16px;
           position: sticky;
           top: 0;
           height: 100vh;
-          background: rgba(15, 15, 18, 0.7);
+          background: var(--bg-sidebar);
           backdrop-filter: blur(20px);
           display: flex;
           flex-direction: column;
@@ -321,7 +321,7 @@ export default function Sidebar({
           font-weight: 800;
           letter-spacing: 0.5px;
           margin-bottom: 24px;
-          background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 100%);
+          background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           padding-left: 8px;
@@ -337,7 +337,7 @@ export default function Sidebar({
           border-radius: 12px;
           margin-bottom: 4px;
           background: transparent;
-          color: #a1a1aa;
+          color: var(--text-secondary);
           cursor: pointer;
           font-family: inherit;
           font-weight: 500;
@@ -345,14 +345,14 @@ export default function Sidebar({
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .navItem:hover {
-          background: rgba(255, 255, 255, 0.05);
-          color: #f4f4f5;
+          background: var(--bg-item-hover);
+          color: var(--text-primary);
           transform: translateX(2px);
         }
         .navItem.active {
-          background: rgba(255, 255, 255, 0.08);
-          color: #ffffff;
-          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 4px 12px rgba(0, 0, 0, 0.15);
+          background: var(--bg-item-active);
+          color: var(--text-primary);
+          box-shadow: inset 0 0 0 1px var(--border-color), 0 4px 12px rgba(0, 0, 0, 0.15);
         }
         .ico {
           font-size: 16px;
@@ -365,14 +365,14 @@ export default function Sidebar({
           margin-left: auto;
           font-size: 11px;
           font-weight: 600;
-          background: rgba(255, 255, 255, 0.08);
-          color: #a1a1aa;
+          background: var(--bg-item-active);
+          color: var(--text-secondary);
           padding: 2px 6px;
           border-radius: 6px;
         }
         .navItem.active .count {
-          background: rgba(255, 255, 255, 0.15);
-          color: #ffffff;
+          background: var(--bg-active-count);
+          color: var(--text-active-count);
         }
         .chev {
           margin-left: auto;
@@ -382,7 +382,7 @@ export default function Sidebar({
         }
         .sectionWrap {
           margin-top: 16px;
-          border-top: 1px solid rgba(255, 255, 255, 0.04);
+          border-top: 1px solid var(--border-color);
           padding-top: 16px;
         }
         .sectionTitle {
@@ -390,7 +390,7 @@ export default function Sidebar({
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 1px;
-          color: #71717a;
+          color: var(--text-muted);
           text-transform: uppercase;
           padding-left: 8px;
         }
@@ -399,7 +399,7 @@ export default function Sidebar({
         }
         .subList {
           margin: 4px 0 8px 12px;
-          border-left: 1px solid rgba(255, 255, 255, 0.06);
+          border-left: 1px solid var(--border-color);
           padding-left: 10px;
           display: flex;
           flex-direction: column;
@@ -413,7 +413,7 @@ export default function Sidebar({
           text-align: left;
           border: 0;
           background: transparent;
-          color: #71717a;
+          color: var(--text-muted);
           padding: 6px 10px;
           border-radius: 8px;
           cursor: pointer;
@@ -422,16 +422,16 @@ export default function Sidebar({
           transition: all 0.2s ease;
         }
         .subItem:hover {
-          background: rgba(255, 255, 255, 0.04);
-          color: #e4e4e7;
+          background: var(--bg-item-hover);
+          color: var(--text-secondary);
         }
         .subItem.active {
-          background: rgba(255, 255, 255, 0.06);
-          color: #ffffff;
+          background: var(--bg-item-active);
+          color: var(--text-primary);
         }
         .subHint {
           font-size: 11px;
-          color: #71717a;
+          color: var(--text-muted);
           padding: 6px 10px;
           font-style: italic;
         }
@@ -448,15 +448,15 @@ export default function Sidebar({
           display: none;
         }
         .storageCard {
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.05);
+          background: var(--bg-input);
+          border: 1px solid var(--border-color);
           border-radius: 16px;
           padding: 14px;
           margin-bottom: 12px;
         }
         .profileSection {
           margin-top: auto;
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          border-top: 1px solid var(--border-color);
           position: relative;
           padding-top: 12px;
         }
@@ -470,7 +470,7 @@ export default function Sidebar({
           transition: background 0.2s ease;
         }
         .profileBtn:hover {
-          background: rgba(255, 255, 255, 0.05);
+          background: var(--bg-item-hover);
         }
         .profileAvatar {
           width: 36px;
@@ -491,18 +491,18 @@ export default function Sidebar({
         .profileName {
           font-size: 13.5px;
           font-weight: 600;
-          color: #fff;
+          color: var(--text-primary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
         .profileRole {
           font-size: 11px;
-          color: #71717a;
+          color: var(--text-muted);
           margin-top: 2px;
         }
         .profileChevron {
-          color: #71717a;
+          color: var(--text-muted);
           font-size: 12px;
         }
         .profilePopover {
@@ -510,10 +510,10 @@ export default function Sidebar({
           bottom: calc(100% + 8px);
           left: 0;
           width: 250px;
-          background: #18181b;
-          border: 1px solid #27272a;
+          background: var(--bg-popover);
+          border: 1px solid var(--border-color);
           border-radius: 14px;
-          box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.7);
+          box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.4);
           z-index: 100;
           padding: 20px 16px 12px 16px;
           display: flex;
@@ -530,7 +530,7 @@ export default function Sidebar({
         }
         .popoverUserEmail {
           font-size: 11px;
-          color: #71717a;
+          color: var(--text-muted);
           margin-bottom: 14px;
           word-break: break-all;
           width: 100%;
@@ -558,7 +558,7 @@ export default function Sidebar({
         .popoverUserName {
           font-size: 16px;
           font-weight: 700;
-          color: #fff;
+          color: var(--text-primary);
           margin-bottom: 10px;
           white-space: nowrap;
           overflow: hidden;
@@ -570,16 +570,16 @@ export default function Sidebar({
           font-weight: 600;
           padding: 3px 10px;
           border-radius: 99px;
-          background: rgba(59, 130, 246, 0.15);
-          color: #60a5fa;
-          border: 1px solid rgba(59, 130, 246, 0.2);
+          background: var(--popover-badge-bg);
+          color: var(--popover-badge-text);
+          border: 1px solid var(--popover-badge-border);
           display: inline-block;
           margin-bottom: 14px;
         }
         .popoverDivider {
           border: 0;
           height: 1px;
-          background: #27272a;
+          background: var(--popover-divider);
           margin: 10px 0;
           width: 100%;
         }
@@ -592,7 +592,7 @@ export default function Sidebar({
           display: flex;
           align-items: center;
           gap: 12px;
-          color: #e4e4e7;
+          color: var(--text-secondary);
           font-size: 13.5px;
           cursor: pointer;
           text-align: left;
@@ -600,24 +600,24 @@ export default function Sidebar({
           box-sizing: border-box;
         }
         .popoverItem:hover {
-          background: rgba(255, 255, 255, 0.05);
-          color: #fff;
+          background: var(--bg-item-hover);
+          color: var(--text-primary);
         }
         .popoverIcon {
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #71717a;
+          color: var(--text-muted);
         }
         .popoverItem:hover .popoverIcon {
-          color: #fff;
+          color: var(--text-primary);
         }
         .storageCard .label {
           font-size: 11px;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          color: #71717a;
+          color: var(--text-muted);
           margin-bottom: 8px;
         }
         .row {
@@ -625,34 +625,34 @@ export default function Sidebar({
           justify-content: space-between;
           font-size: 12px;
           margin-bottom: 6px;
-          color: #a1a1aa;
+          color: var(--text-secondary);
         }
         .row b {
-          color: #e4e4e7;
+          color: var(--text-primary);
         }
         .bar {
           height: 6px;
           border-radius: 99px;
           overflow: hidden;
-          background: rgba(255, 255, 255, 0.06);
+          background: var(--bg-item-active);
           margin: 8px 0;
         }
         .barFill {
           height: 100%;
-          background: linear-gradient(90deg, #ffffff, #a1a1aa);
+          background: linear-gradient(90deg, var(--text-primary), var(--text-secondary));
           border-radius: 99px;
         }
         .storageCard small {
           display: block;
           font-size: 10px;
-          color: #71717a;
+          color: var(--text-muted);
           margin-top: 4px;
           line-height: 1.4;
         }
 
         .tagsSection {
           margin: 16px 0;
-          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          border-top: 1px solid var(--border-color);
           padding-top: 16px;
         }
         .tagsHeader {
@@ -660,7 +660,7 @@ export default function Sidebar({
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          color: #71717a;
+          color: var(--text-muted);
           margin-bottom: 10px;
         }
         .tagCloud {
@@ -669,9 +669,9 @@ export default function Sidebar({
           gap: 6px;
         }
         .tagChip {
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          background: rgba(255, 255, 255, 0.02);
-          color: #a1a1aa;
+          border: 1px solid var(--border-color);
+          background: var(--bg-input);
+          color: var(--text-secondary);
           border-radius: 6px;
           padding: 4px 8px;
           cursor: pointer;
@@ -684,24 +684,25 @@ export default function Sidebar({
           transition: all 0.2s ease;
         }
         .tagChip:hover {
-          background: rgba(255, 255, 255, 0.06);
-          color: #e4e4e7;
-          border-color: rgba(255, 255, 255, 0.1);
+          background: var(--bg-item-hover);
+          color: var(--text-primary);
+          border-color: var(--border-input-focus);
         }
         .tagChip.active {
-          background: #ffffff;
-          border-color: #ffffff;
-          color: #09090b;
-          box-shadow: 0 4px 10px rgba(255, 255, 255, 0.1);
+          background: var(--button-primary-bg);
+          border-color: var(--button-primary-bg);
+          color: var(--button-primary-text);
+          box-shadow: 0 4px 10px var(--button-primary-shadow);
         }
         .tagChip.active .count {
-          color: rgba(9, 9, 11, 0.6);
-          background: rgba(9, 9, 11, 0.1);
+          color: var(--button-primary-text);
+          opacity: 0.8;
+          background: var(--bg-tag-active-count);
         }
         .tagChip .count {
           font-size: 9px;
-          color: #71717a;
-          background: rgba(255, 255, 255, 0.04);
+          color: var(--text-muted);
+          background: var(--bg-item-active);
           padding: 1px 4px;
           border-radius: 4px;
         }
