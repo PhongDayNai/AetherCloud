@@ -111,7 +111,7 @@ export default function Sidebar({
         {/* Main Navigation */}
         <div className="mainNav">
           <button className={`navItem ${tab === 'dashboard' ? 'active' : ''}`} onClick={() => { router.push('/cloud/dashboard'); }}>
-            <span className="ico"><Icons.AllFiles /></span><span>{t('sidebar.dashboard') || 'Tổng quan'}</span>
+            <span className="ico"><Icons.Dashboard /></span><span>{t('sidebar.dashboard') || 'Tổng quan'}</span>
           </button>
 
           <button className={`navItem ${tab === 'photos' ? 'active' : ''}`} onClick={() => { setCollectionView('all'); setSelectedAlbum('all'); router.push('/cloud/photos'); }}>
