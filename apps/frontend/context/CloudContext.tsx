@@ -32,8 +32,8 @@ interface CloudContextType {
   setMsg: React.Dispatch<React.SetStateAction<string>>;
   err: string;
   setErr: React.Dispatch<React.SetStateAction<string>>;
-  tab: 'photos' | 'docs' | 'all' | 'space' | 'spaces';
-  setTab: React.Dispatch<React.SetStateAction<'photos' | 'docs' | 'all' | 'space' | 'spaces'>>;
+  tab: 'photos' | 'docs' | 'dashboard' | 'space' | 'spaces';
+  setTab: React.Dispatch<React.SetStateAction<'photos' | 'docs' | 'dashboard' | 'space' | 'spaces'>>;
   search: string;
   setSearch: React.Dispatch<React.SetStateAction<string>>;
   activeWorkspace: { type: 'personal' } | { type: 'space'; id: string; name: string; spaceType: string };
@@ -181,7 +181,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const [msg, setMsg] = useState<string>('');
   const [err, setErr] = useState<string>('');
 
-  const [tab, setTab] = useState<'photos' | 'docs' | 'all' | 'space' | 'spaces'>('all');
+  const [tab, setTab] = useState<'photos' | 'docs' | 'dashboard' | 'space' | 'spaces'>('dashboard');
   const [search, setSearch] = useState<string>('');
 
   const [activeWorkspace, setActiveWorkspace] = useState<{ type: 'personal' } | { type: 'space'; id: string; name: string; spaceType: string }>({ type: 'personal' });
@@ -403,7 +403,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const active = activeIndexInScope
     ? (tab === 'photos' 
         ? albumFilteredPhotos[activeIndex] 
-        : tab === 'all'
+        : tab === 'dashboard'
           ? allActiveAssets[activeIndex]
           : tab === 'space'
             ? spaceAssets[activeIndex]

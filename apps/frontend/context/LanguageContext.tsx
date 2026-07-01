@@ -48,8 +48,8 @@ const translations = {
     // Dashboard Sidebar
     'sidebar.photos': 'Ảnh & Video',
     'sidebar.docs': 'Tài liệu & File',
-    'sidebar.allFiles': 'Tất cả tệp tin',
-    'allFiles.subtitle': 'Xem và quản lý toàn bộ tệp tin, hình ảnh, tài liệu của bạn tại một nơi.',
+    'sidebar.dashboard': 'Tổng quan',
+    'dashboard.subtitle': 'Xem và quản lý toàn bộ tệp tin, hình ảnh, tài liệu của bạn tại một nơi.',
     'photos.subtitle': 'Không gian lưu trữ hình ảnh và thước phim kỷ niệm sinh động của bạn.',
     'docs.subtitle': 'Lưu trữ, đọc và sắp xếp các văn bản, bảng tính, tệp PDF của bạn.',
     'sidebar.storage': 'Dung lượng',
@@ -358,8 +358,8 @@ const translations = {
     // Dashboard Sidebar
     'sidebar.photos': 'Photos & Videos',
     'sidebar.docs': 'Documents & Files',
-    'sidebar.allFiles': 'All Files',
-    'allFiles.subtitle': 'View and manage all your files, images, and documents in one place.',
+    'sidebar.dashboard': 'Dashboard',
+    'dashboard.subtitle': 'View and manage all your files, images, and documents in one place.',
     'photos.subtitle': 'A beautiful space for your pictures and memorable videos.',
     'docs.subtitle': 'Store, read, and organize your text files, spreadsheets, and PDFs.',
     'sidebar.storage': 'Storage',

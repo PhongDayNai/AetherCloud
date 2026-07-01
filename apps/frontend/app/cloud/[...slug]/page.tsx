@@ -103,12 +103,12 @@ export default function DashboardPage(): React.JSX.Element {
   // Sync slug with tab and workspace state reference-safely in context
   useEffect(() => {
     if (!slug || slug.length === 0) {
-      router.replace('/cloud/all');
+      router.replace('/cloud/dashboard');
       return;
     }
 
     const primary = slug[0];
-    if (primary === 'all' || primary === 'photos' || primary === 'docs' || primary === 'spaces') {
+    if (primary === 'dashboard' || primary === 'photos' || primary === 'docs' || primary === 'spaces') {
       setTab(primary);
       setActiveWorkspace((prev) => (prev.type === 'personal' ? prev : { type: 'personal' }));
     } else if (primary === 'space' && slug[1]) {
@@ -309,11 +309,11 @@ export default function DashboardPage(): React.JSX.Element {
         </>
       )}
 
-      {tab === 'all' && (
+      {tab === 'dashboard' && (
         <>
           <div className="pageHeader">
-            <h1>{t('sidebar.allFiles') || 'Tất cả tệp tin'}</h1>
-            <p>{t('allFiles.subtitle') || 'Xem và quản lý toàn bộ tệp tin, hình ảnh, tài liệu của bạn tại một nơi.'}</p>
+            <h1>{t('sidebar.dashboard') || 'Tổng quan'}</h1>
+            <p>{t('dashboard.subtitle') || 'Xem và quản lý toàn bộ tệp tin, hình ảnh, tài liệu của bạn tại một nơi.'}</p>
           </div>
 
           {/* Dashboard Section */}

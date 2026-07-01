@@ -8,7 +8,7 @@ import * as Icons from './Icons';
 
 interface MediaViewerProps {
   active: Asset | null;
-  tab: 'photos' | 'docs' | 'all' | 'space' | 'spaces';
+  tab: 'photos' | 'docs' | 'dashboard' | 'space' | 'spaces';
   albumFilteredPhotos: Asset[];
   docsFiltered: Asset[];
   activeIndex: number;

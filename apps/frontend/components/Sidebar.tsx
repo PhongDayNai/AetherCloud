@@ -6,8 +6,8 @@ import { Asset, User, DocProject, Tag } from '../types';
 import { fmtBytes } from '../lib/utils';
 
 interface SidebarProps {
-  tab: 'photos' | 'docs' | 'all' | 'space' | 'spaces';
-  setTab: (tab: 'photos' | 'docs' | 'all' | 'space' | 'spaces') => void;
+  tab: 'photos' | 'docs' | 'dashboard' | 'space' | 'spaces';
+  setTab: (tab: 'photos' | 'docs' | 'dashboard' | 'space' | 'spaces') => void;
   collectionView: 'all' | 'recent' | 'images' | 'videos' | 'trash';
   setCollectionView: (view: 'all' | 'recent' | 'images' | 'videos' | 'trash') => void;
   selectedAlbum: string;
@@ -110,8 +110,8 @@ export default function Sidebar({
 
         {/* Main Navigation */}
         <div className="mainNav">
-          <button className={`navItem ${tab === 'all' ? 'active' : ''}`} onClick={() => { router.push('/cloud/all'); }}>
-            <span className="ico"><Icons.AllFiles /></span><span>{t('sidebar.allFiles') || 'Tất cả tệp tin'}</span>
+          <button className={`navItem ${tab === 'dashboard' ? 'active' : ''}`} onClick={() => { router.push('/cloud/dashboard'); }}>
+            <span className="ico"><Icons.AllFiles /></span><span>{t('sidebar.dashboard') || 'Tổng quan'}</span>
           </button>
 
           <button className={`navItem ${tab === 'photos' ? 'active' : ''}`} onClick={() => { setCollectionView('all'); setSelectedAlbum('all'); router.push('/cloud/photos'); }}>

@@ -129,8 +129,8 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
       <MediaViewer
         active={active}
         tab={tab}
-        albumFilteredPhotos={tab === 'all' ? allActiveAssets : tab === 'space' ? spaceAssets : albumFilteredPhotos}
-        docsFiltered={tab === 'all' ? allActiveAssets : tab === 'space' ? spaceAssets : docsFiltered}
+        albumFilteredPhotos={tab === 'dashboard' ? allActiveAssets : tab === 'space' ? spaceAssets : albumFilteredPhotos}
+        docsFiltered={tab === 'dashboard' ? allActiveAssets : tab === 'space' ? spaceAssets : docsFiltered}
         activeIndex={activeIndex}
         setActiveIndex={setActiveIndex}
         showInfo={showInfo}

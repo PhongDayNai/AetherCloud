@@ -7,7 +7,7 @@ export default function CloudRedirect(): null {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/cloud/all');
+    router.replace('/cloud/dashboard');
   }, [router]);
 
   return null;

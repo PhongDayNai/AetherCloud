@@ -12,7 +12,7 @@ export default function DashboardCatchAllRedirect(): null {
     if (slug && slug.length > 0) {
       router.replace(`/cloud/${slug.join('/')}`);
     } else {
-      router.replace('/cloud/all');
+      router.replace('/cloud/dashboard');
     }
   }, [slug, router]);
 
