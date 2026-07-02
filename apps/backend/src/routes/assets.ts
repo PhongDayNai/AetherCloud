@@ -25,7 +25,9 @@ import {
   restoreFromTrash,
   purgeDeleted,
   Asset,
+  getUnifiedStats,
 } from '../lib/assets';
+import { getStorageUsage } from '../lib/storage';
 
 const router = express.Router();
 const tempDir = '/tmp/aethercloud-upload';
@@ -92,8 +94,27 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
   const includeTrash = String(req.query.includeTrash || 'false') === 'true';
   const onlyTrash = String(req.query.onlyTrash || 'false') === 'true';
   const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
+  
+  const type = req.query.type ? String(req.query.type) : undefined;
+  const subType = req.query.subType ? String(req.query.subType) : undefined;
+  const category = req.query.category ? String(req.query.category) : undefined;
+  const album = req.query.album ? String(req.query.album) : undefined;
+  const tag = req.query.tag ? String(req.query.tag) : undefined;
+  const docProject = req.query.docProject ? String(req.query.docProject) : undefined;
+
   try {
-    const items = await listAssets(limit, { includeTrash, onlyTrash, owner: req.user.sub, cursor });
+    const items = await listAssets(limit, { 
+      includeTrash, 
+      onlyTrash, 
+      owner: req.user.sub, 
+      cursor,
+      type,
+      subType,
+      category,
+      album,
+      tag,
+      docProject
+    });
     
     let nextCursor: string | null = null;
     if (items.length > 0 && items.length === limit) {
@@ -159,7 +180,7 @@ router.post('/upload-chunk/:uploadId/complete', requireAuth, async (req: Request
   }
   ws.end();
 
-  await new Promise((resolve) => ws.on('finish', resolve));
+  await new Promise<void>((resolve) => ws.on('finish', () => resolve()));
 
   try {
     const stat = fs.statSync(merged);
@@ -401,6 +422,18 @@ router.put('/:id/tags', requireAuth, checkAssetOwnership, async (req: Request, r
     const result = await setAssetTags(req.params.id, tags);
     if (result.updated === 0) return res.status(404).json({ message: 'Asset not found' });
     return res.json({ ok: true, ...result });
+  } catch (e: any) {
+    return res.status(500).json({ message: e.message });
+  }
+});
+
+// 19b. GET thống kê hợp nhất cho Dashboard
+router.get('/stats', requireAuth, async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+  try {
+    const storage = await getStorageUsage();
+    const stats = await getUnifiedStats(req.user.sub, storage);
+    return res.json(stats);
   } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }

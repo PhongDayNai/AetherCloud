@@ -33,6 +33,43 @@ export interface Asset {
 
 const isDocker = fs.existsSync('/.dockerenv');
 
+export const CATEGORY_EXTENSIONS: Record<string, string[]> = {
+  pdf: ['pdf'],
+  word: ['doc', 'docx', 'docm', 'dotx', 'odt', 'pages', 'rtf'],
+  excel: ['xls', 'xlsx', 'xlsm', 'xlsb', 'csv', 'tsv', 'ods', 'numbers'],
+  powerpoint: ['ppt', 'pptx', 'pptm', 'ppsx', 'odp'], // .key được xử lý động riêng biệt
+  markdown: ['md', 'markdown', 'mdx'],
+  text: ['txt', 'log'],
+  ebook: ['epub', 'azw', 'azw1', 'azw3', 'azw4', 'azw8', 'kfx', 'tpz', 'mobi', 'prc', 'fb2', 'pdb', 'lrf', 'lrx', 'lit', 'djvu', 'djv', 'cbz', 'cbr', 'cb7', 'cbt', 'cba', 'ibooks', 'xeb'],
+  database: ['db', 'db3', 'sqlite', 'sqlite3', 'sqlite2', 'sqlitedb', 'mdb', 'accdb', 'dbf', 'fpt', 'cdx', 'ndf', 'ldf', 'frm', 'ibd', 'myd', 'myi', 'dump', 'ora', 'dbs', 'fdb', 'gdb', 'dbm', 'realm', 'mdbx', 'ldb', 'rdb', 'aof', 'mv.db', 'h2.db', 'duckdb', 'parquet', 'orc', 'feather', 'arrow', 'gpkg', 'sst'],
+  archive: ['zip', 'zipx', 'rar', '7z', 'tar', 'tgz', 'tbz', 'tbz2', 'txz', 'tzst', 'tlz', 'tlz4', 'taz', 'gz', 'bz2', 'xz', 'lz', 'lz4', 'lzma', 'zst', 'br', 'Z', 'cpio', 'ar', 'ace', 'arc', 'lzh', 'lha', 'zoo', 'sit', 'sitx'],
+  installer: ['apk', 'aab', 'xapk', 'ipa', 'exe', 'msi', 'msix', 'msixbundle', 'appx', 'appxbundle', 'appinstaller', 'pkg', 'mpkg', 'deb', 'rpm', 'snap', 'flatpak', 'appimage', 'run', 'bin', 'jar', 'war', 'ear', 'whl', 'egg', 'crx', 'xpi', 'vsix'],
+  'disk-image': ['iso', 'img', 'ima', 'toast', 'nrg', 'mds', 'ccd', 'cue', 'cdi', 'daa', 'uif', 'wim', 'esd', 'dmg', 'vdi', 'vhd', 'vhdx', 'vmdk', 'qcow', 'qcow2', 'ova', 'ovf', 'hdd', 'mdf'], // .cue được giữ ở đây
+  font: ['ttf', 'ttc', 'otf', 'otc', 'woff', 'woff2', 'eot', 'fon', 'fnt', 'bdf', 'pcf', 'pfb', 'pfm', 'afm', 'ufo'],
+  certificate: ['pem', 'crt', 'cer', 'der', 'csr', 'key', 'pub', 'pk8', 'pkcs8', 'p7b', 'p7c', 'p7s', 'p8', 'p10', 'p12', 'pfx', 'p11', 'jks', 'keystore', 'truststore', 'bks', 'bcfks', 'ppk', 'gpg', 'pgp', 'gpgsig', 'asc', 'sig', 'p7m', 'crl', 'cat', 'mobileprovision', 'spc'],
+  design: ['psd', 'psb', 'ai', 'indd', 'indt', 'idml', 'xd', 'eps', 'fig', 'sketch', 'xcf', 'kra', 'svg', 'cdr', 'cmx', 'afdesign', 'afphoto', 'afpub', 'canva', 'clip', 'sai', 'sai2'],
+  cad: ['dwg', 'dxf', 'dwt', 'step', 'stp', 'iges', 'igs', 'stl', 'fbx', '3ds', 'max', 'blend', 'glb', 'gltf', 'dae', 'abc', 'usd', 'usda', 'usdc', 'usdz', '3dm', 'skp', 'sldprt', 'sldasm', 'slddrw', 'ipt', 'iam', 'idw', 'catpart', 'catproduct', 'catdrawing', 'prt', 'x_t', 'x_b', 'sat', 'sab', 'ifc', 'rvt', 'rfa', 'scad', 'ply', 'las', 'laz', 'obj'],
+  executable: ['dll', 'com', 'scr', 'cpl', 'ocx', 'drv', 'sys', 'mui', 'so', 'out', 'elf', 'ko', 'dylib', 'app', 'bundle', 'o', 'a', 'lib', 'lo', 'la', 'class', 'pyc', 'pyo', 'ni.dll', 'wasm'],
+  code: [
+    'c', 'cc', 'cp', 'cpp', 'cxx', 'c++', 'h', 'hh', 'hp', 'hpp', 'hxx', 'h++', 'inl', 'ipp', 'tpp', 'cs', 'vb', 'fs', 'fsi', 'fsx', 'java', 'kt', 'kts', 'scala', 'sc', 'groovy', 'gvy', 'gy', 'gsh', 'go', 'rs', 'zig', 'swift', 'm', 'mm', 'dart', 'js', 'mjs', 'cjs', 'jsx', 'ts', 'mts', 'cts', 'tsx', 'html', 'htm', 'xhtml', 'css', 'scss', 'sass', 'less', 'styl', 'vue', 'svelte', 'astro', 'php', 'php3', 'php4', 'php5', 'phtml', 'py', 'pyw', 'pyi', 'pyx', 'pxd', 'pxi', 'ipynb', 'rb', 'rbw', 'rake', 'pl', 'pm', 't', 'lua', 'r', 'rmd', 'jl', 'hs', 'lhs', 'ml', 'mli', 'elm', 'erl', 'hrl', 'ex', 'exs', 'clj', 'cljs', 'cljc', 'edn', 'lisp', 'lsp', 'el', 'scm', 'ss', 'nim', 'nims', 'cr', 'v', 'vsh', 'd', 'adb', 'ads', 'pas', 'pp', 'lpr', 'f', 'f77', 'f90', 'f95', 'f03', 'f08', 'cob', 'cbl', 'asm', 's', 'S', 'sh', 'bash', 'zsh', 'fish', 'ksh', 'csh', 'tcsh', 'ps1', 'psm1', 'psd1', 'bat', 'cmd', 'awk', 'sed', 'sql', 'psql', 'pgsql', 'graphql', 'gql', 'proto', 'thrift', 'sol', 'move', 'wat', 'pro', 'prolog', 'gd', 'glsl', 'vert', 'frag', 'geom', 'comp', 'tesc', 'tese', 'bicep'
+  ],
+  config: [
+    'json', 'json5', 'jsonc', 'jsonld', 'xml', 'xsd', 'xsl', 'xslt', 'wsdl', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'cnf', 'properties', 'env', 'dockerfile', 'dockerignore', 'containerfile', 'gitignore', 'gitattributes', 'gitmodules', 'editorconfig', 'npmrc', 'yarnrc', 'pnpmfile', 'pnpm-workspace', 'npmignore', 'lock', 'cmake', 'make', 'mk', 'gradle', 'bazel', 'bzl', 'meson', 'ninja', 'tf', 'tfvars', 'hcl', 'jenkinsfile', 'kubeconfig', 'har', 'manifest', 'service', 'target'
+  ]
+};
+
+export const CONFIG_FILENAMES = [
+  'dockerfile', 'containerfile', 'makefile', 'cmakelists.txt',
+  '.gitignore', '.gitattributes', '.gitmodules', '.editorconfig',
+  '.env', '.env.local', '.env.production', '.env.development', '.env.test',
+  'package-lock.json', 'package.json', 'tsconfig.json', 'jsconfig.json',
+  'composer.json', 'composer.lock', 'cargo.toml', 'cargo.lock',
+  'go.mod', 'go.sum', 'gemfile', 'gemfile.lock', 'podfile', 'podfile.lock',
+  'jenkinsfile', 'procfile', 'vagrantfile', 'brewfile', 'tiltfile',
+  'taskfile.yml', 'pnpm-workspace.yaml', 'docker-compose.yml', 'docker-compose.yaml',
+  'compose.yaml', 'compose.yml', 'kustomization.yaml', 'chart.yaml', 'values.yaml'
+];
+
 export function resolveStoragePath(p: string): string {
   if (!isDocker && p.startsWith('/data')) {
     const localRoot = path.resolve(__dirname, '../../../storage');
@@ -459,7 +496,19 @@ export async function saveUploadedFile(file: any, user?: any): Promise<Asset> {
 }
 
 export async function listAssets(limit = 200, opts: any = {}): Promise<Asset[]> {
-  const { includeTrash = false, onlyTrash = false, owner, ownerId, cursor } = opts;
+  const { 
+    includeTrash = false, 
+    onlyTrash = false, 
+    owner, 
+    ownerId, 
+    cursor,
+    type,
+    subType,
+    category,
+    album,
+    tag,
+    docProject
+  } = opts;
   const targetOwner = ownerId || owner;
   let queryText = 'SELECT * FROM assets';
   const params: any[] = [];
@@ -474,6 +523,87 @@ export async function listAssets(limit = 200, opts: any = {}): Promise<Asset[]> 
     clauses.push('is_deleted = true');
   } else if (!includeTrash) {
     clauses.push('is_deleted = false');
+  }
+
+  if (type) {
+    if (type === 'photos') {
+      clauses.push(`(type = 'image' OR type = 'video')`);
+    } else if (type === 'docs') {
+      clauses.push(`type = 'file'`);
+    }
+  }
+
+  if (subType) {
+    if (subType === 'image' || subType === 'video') {
+      params.push(subType);
+      clauses.push(`type = $${params.length}`);
+    }
+  }
+
+  if (album) {
+    params.push(album);
+    clauses.push(`(album_name = $${params.length} OR $${params.length} = ANY(album_names))`);
+  }
+
+  if (tag) {
+    params.push(tag);
+    clauses.push(`$${params.length} = ANY(tags)`);
+  }
+
+  if (docProject) {
+    params.push(docProject);
+    clauses.push(`(doc_project_name = $${params.length} OR $${params.length} = ANY(doc_project_names))`);
+  }
+
+  if (category) {
+    if (category === 'other') {
+      const allKnownExts = Object.values(CATEGORY_EXTENSIONS).flat();
+      params.push(allKnownExts);
+      const pAllExts = `$${params.length}`;
+      
+      params.push(CONFIG_FILENAMES.map(f => f.toLowerCase()));
+      const pConfigFiles = `$${params.length}`;
+      
+      clauses.push(`(
+        NOT (LTRIM(LOWER(ext), '.') = ANY(${pAllExts}))
+        AND NOT (LOWER(original_name) = ANY(${pConfigFiles}))
+      )`);
+    } else if (category === 'powerpoint') {
+      const powerpointExts = CATEGORY_EXTENSIONS.powerpoint;
+      params.push(powerpointExts);
+      const pPowerpointExts = `$${params.length}`;
+      
+      clauses.push(`(
+        LTRIM(LOWER(ext), '.') = ANY(${pPowerpointExts})
+        OR (LTRIM(LOWER(ext), '.') = 'key' AND (size > 102400 OR COALESCE(mime, '') LIKE '%keynote%' OR COALESCE(mime, '') LIKE '%iwork%'))
+      )`);
+    } else if (category === 'certificate') {
+      const certificateExts = CATEGORY_EXTENSIONS.certificate;
+      params.push(certificateExts);
+      const pCertificateExts = `$${params.length}`;
+      
+      clauses.push(`(
+        LTRIM(LOWER(ext), '.') = ANY(${pCertificateExts})
+        OR (LTRIM(LOWER(ext), '.') = 'key' AND (size <= 102400 AND (COALESCE(mime, '') NOT LIKE '%keynote%' AND COALESCE(mime, '') NOT LIKE '%iwork%')))
+      )`);
+    } else if (category === 'config') {
+      const configExts = CATEGORY_EXTENSIONS.config;
+      params.push(configExts);
+      const pConfigExts = `$${params.length}`;
+      
+      params.push(CONFIG_FILENAMES.map(f => f.toLowerCase()));
+      const pConfigFiles = `$${params.length}`;
+      
+      clauses.push(`(
+        LOWER(original_name) = ANY(${pConfigFiles})
+        OR LTRIM(LOWER(ext), '.') = ANY(${pConfigExts})
+      )`);
+    } else {
+      const exts = CATEGORY_EXTENSIONS[category] || [];
+      params.push(exts);
+      const pExts = `$${params.length}`;
+      clauses.push(`LTRIM(LOWER(ext), '.') = ANY(${pExts})`);
+    }
   }
 
   if (cursor) {
@@ -804,13 +934,135 @@ export async function purgeDeleted(ids: string[] = []): Promise<{ removed: numbe
       removed++;
     }
     await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
   } finally {
     client.release();
   }
   return { removed };
+}
+
+export async function getUnifiedStats(ownerId: string, storage: any): Promise<any> {
+  // 1. Chạy SQL đếm số lượng tệp theo loại
+  const countRes = await db.query(`
+    SELECT 
+      COUNT(CASE WHEN is_deleted = false AND (type = 'image' OR type = 'video') THEN 1 END)::int AS photos_count,
+      COUNT(CASE WHEN is_deleted = false AND type = 'image' THEN 1 END)::int AS images_count,
+      COUNT(CASE WHEN is_deleted = false AND type = 'video' THEN 1 END)::int AS videos_count,
+      COUNT(CASE WHEN is_deleted = false AND type = 'file' THEN 1 END)::int AS docs_count,
+      COUNT(CASE WHEN is_deleted = true THEN 1 END)::int AS trash_count
+    FROM assets
+    WHERE owner_id = $1
+  `, [ownerId]);
+  
+  const counts = {
+    photosCount: countRes.rows[0]?.photos_count || 0,
+    imagesCount: countRes.rows[0]?.images_count || 0,
+    videosCount: countRes.rows[0]?.videos_count || 0,
+    docsCount: countRes.rows[0]?.docs_count || 0,
+    trashCount: countRes.rows[0]?.trash_count || 0,
+  };
+
+  // 2. Chạy SQL CTE đếm chi tiết theo category
+  const configFilenamesLower = CONFIG_FILENAMES.map(f => f.toLowerCase());
+  const catRes = await db.query(`
+    WITH classified AS (
+      SELECT 
+        id,
+        CASE 
+          WHEN LOWER(original_name) = ANY($2) OR LTRIM(LOWER(ext), '.') = ANY($3) THEN 'config'
+          WHEN LTRIM(LOWER(ext), '.') = 'pdf' THEN 'pdf'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($4) THEN 'word'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($5) THEN 'excel'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($6) OR (LTRIM(LOWER(ext), '.') = 'key' AND (size > 102400 OR COALESCE(mime, '') LIKE '%keynote%' OR COALESCE(mime, '') LIKE '%iwork%')) THEN 'powerpoint'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($7) THEN 'markdown'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($8) THEN 'text'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($9) THEN 'ebook'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($10) THEN 'database'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($11) THEN 'archive'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($12) THEN 'installer'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($13) THEN 'disk-image'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($14) THEN 'font'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($15) OR (LTRIM(LOWER(ext), '.') = 'key' AND size <= 102400 AND (COALESCE(mime, '') NOT LIKE '%keynote%' AND COALESCE(mime, '') NOT LIKE '%iwork%')) THEN 'certificate'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($16) THEN 'design'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($17) THEN 'cad'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($18) THEN 'executable'
+          WHEN LTRIM(LOWER(ext), '.') = ANY($19) THEN 'code'
+          ELSE 'other'
+        END AS cat
+      FROM assets
+      WHERE owner_id = $1 AND is_deleted = false AND type = 'file'
+    )
+    SELECT cat, COUNT(*)::int AS count 
+    FROM classified 
+    GROUP BY cat
+  `, [
+    ownerId,
+    configFilenamesLower,
+    CATEGORY_EXTENSIONS.config,
+    CATEGORY_EXTENSIONS.word,
+    CATEGORY_EXTENSIONS.excel,
+    CATEGORY_EXTENSIONS.powerpoint,
+    CATEGORY_EXTENSIONS.markdown,
+    CATEGORY_EXTENSIONS.text,
+    CATEGORY_EXTENSIONS.ebook,
+    CATEGORY_EXTENSIONS.database,
+    CATEGORY_EXTENSIONS.archive,
+    CATEGORY_EXTENSIONS.installer,
+    CATEGORY_EXTENSIONS['disk-image'],
+    CATEGORY_EXTENSIONS.font,
+    CATEGORY_EXTENSIONS.certificate,
+    CATEGORY_EXTENSIONS.design,
+    CATEGORY_EXTENSIONS.cad,
+    CATEGORY_EXTENSIONS.executable,
+    CATEGORY_EXTENSIONS.code
+  ]);
+
+  const docCategoryCounts: Record<string, number> = {};
+  for (const key of Object.keys(CATEGORY_EXTENSIONS).concat('other')) {
+    docCategoryCounts[key] = 0;
+  }
+  for (const row of catRes.rows) {
+    docCategoryCounts[row.cat] = row.count;
+  }
+
+  // 3. Lấy tags, albums, docProjects
+  const [tags, albums, docProjects] = await Promise.all([
+    listTags(ownerId),
+    listAlbums(ownerId),
+    listDocProjects(ownerId)
+  ]);
+
+  // 4. Lấy 50 ảnh/video mới nhất
+  const recentPhotos = await listAssets(50, {
+    ownerId,
+    type: 'photos',
+    includeTrash: false
+  });
+
+  // 5. Lấy 15 tài liệu mới nhất mỗi category hoạt động
+  const recentDocs: Record<string, Asset[]> = {};
+  for (const key of Object.keys(CATEGORY_EXTENSIONS).concat('other')) {
+    recentDocs[key] = [];
+  }
+  const activeCategories = Object.keys(docCategoryCounts).filter(cat => docCategoryCounts[cat] > 0);
+  
+  await Promise.all(activeCategories.map(async (cat) => {
+    recentDocs[cat] = await listAssets(15, {
+      ownerId,
+      category: cat,
+      includeTrash: false
+    });
+  }));
+
+  return {
+    counts,
+    storage,
+    docCategoryCounts,
+    tags,
+    albums,
+    docProjects,
+    recentPhotos,
+    recentDocs
+  };
 }
 
 ensureDirs();
