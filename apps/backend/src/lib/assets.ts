@@ -556,53 +556,62 @@ export async function listAssets(limit = 200, opts: any = {}): Promise<Asset[]> 
   }
 
   if (category) {
-    if (category === 'other') {
-      const allKnownExts = Object.values(CATEGORY_EXTENSIONS).flat();
-      params.push(allKnownExts);
-      const pAllExts = `$${params.length}`;
-      
-      params.push(CONFIG_FILENAMES.map(f => f.toLowerCase()));
-      const pConfigFiles = `$${params.length}`;
-      
-      clauses.push(`(
-        NOT (LTRIM(LOWER(ext), '.') = ANY(${pAllExts}))
-        AND NOT (LOWER(original_name) = ANY(${pConfigFiles}))
-      )`);
-    } else if (category === 'powerpoint') {
-      const powerpointExts = CATEGORY_EXTENSIONS.powerpoint;
-      params.push(powerpointExts);
-      const pPowerpointExts = `$${params.length}`;
-      
-      clauses.push(`(
-        LTRIM(LOWER(ext), '.') = ANY(${pPowerpointExts})
-        OR (LTRIM(LOWER(ext), '.') = 'key' AND (size > 102400 OR COALESCE(mime, '') LIKE '%keynote%' OR COALESCE(mime, '') LIKE '%iwork%'))
-      )`);
-    } else if (category === 'certificate') {
-      const certificateExts = CATEGORY_EXTENSIONS.certificate;
-      params.push(certificateExts);
-      const pCertificateExts = `$${params.length}`;
-      
-      clauses.push(`(
-        LTRIM(LOWER(ext), '.') = ANY(${pCertificateExts})
-        OR (LTRIM(LOWER(ext), '.') = 'key' AND (size <= 102400 AND (COALESCE(mime, '') NOT LIKE '%keynote%' AND COALESCE(mime, '') NOT LIKE '%iwork%')))
-      )`);
-    } else if (category === 'config') {
-      const configExts = CATEGORY_EXTENSIONS.config;
-      params.push(configExts);
-      const pConfigExts = `$${params.length}`;
-      
-      params.push(CONFIG_FILENAMES.map(f => f.toLowerCase()));
-      const pConfigFiles = `$${params.length}`;
-      
-      clauses.push(`(
-        LOWER(original_name) = ANY(${pConfigFiles})
-        OR LTRIM(LOWER(ext), '.') = ANY(${pConfigExts})
-      )`);
-    } else {
-      const exts = CATEGORY_EXTENSIONS[category] || [];
-      params.push(exts);
-      const pExts = `$${params.length}`;
-      clauses.push(`LTRIM(LOWER(ext), '.') = ANY(${pExts})`);
+    const cats = category.split(',');
+    const orClauses: string[] = [];
+
+    for (const cat of cats) {
+      if (cat === 'other') {
+        const allKnownExts = Object.values(CATEGORY_EXTENSIONS).flat();
+        params.push(allKnownExts);
+        const pAllExts = `$${params.length}`;
+        
+        params.push(CONFIG_FILENAMES.map(f => f.toLowerCase()));
+        const pConfigFiles = `$${params.length}`;
+        
+        orClauses.push(`(
+          NOT (LTRIM(LOWER(ext), '.') = ANY(${pAllExts}))
+          AND NOT (LOWER(original_name) = ANY(${pConfigFiles}))
+        )`);
+      } else if (cat === 'powerpoint') {
+        const powerpointExts = CATEGORY_EXTENSIONS.powerpoint;
+        params.push(powerpointExts);
+        const pPowerpointExts = `$${params.length}`;
+        
+        orClauses.push(`(
+          LTRIM(LOWER(ext), '.') = ANY(${pPowerpointExts})
+          OR (LTRIM(LOWER(ext), '.') = 'key' AND (size > 102400 OR COALESCE(mime, '') LIKE '%keynote%' OR COALESCE(mime, '') LIKE '%iwork%'))
+        )`);
+      } else if (cat === 'certificate') {
+        const certificateExts = CATEGORY_EXTENSIONS.certificate;
+        params.push(certificateExts);
+        const pCertificateExts = `$${params.length}`;
+        
+        orClauses.push(`(
+          LTRIM(LOWER(ext), '.') = ANY(${pCertificateExts})
+          OR (LTRIM(LOWER(ext), '.') = 'key' AND (size <= 102400 AND (COALESCE(mime, '') NOT LIKE '%keynote%' AND COALESCE(mime, '') NOT LIKE '%iwork%')))
+        )`);
+      } else if (cat === 'config') {
+        const configExts = CATEGORY_EXTENSIONS.config;
+        params.push(configExts);
+        const pConfigExts = `$${params.length}`;
+        
+        params.push(CONFIG_FILENAMES.map(f => f.toLowerCase()));
+        const pConfigFiles = `$${params.length}`;
+        
+        orClauses.push(`(
+          LOWER(original_name) = ANY(${pConfigFiles})
+          OR LTRIM(LOWER(ext), '.') = ANY(${pConfigExts})
+        )`);
+      } else {
+        const exts = CATEGORY_EXTENSIONS[cat] || [];
+        params.push(exts);
+        const pExts = `$${params.length}`;
+        orClauses.push(`LTRIM(LOWER(ext), '.') = ANY(${pExts})`);
+      }
+    }
+
+    if (orClauses.length > 0) {
+      clauses.push(`(${orClauses.join(' OR ')})`);
     }
   }
 
