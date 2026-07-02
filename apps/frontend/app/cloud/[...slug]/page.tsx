@@ -74,6 +74,8 @@ export default function DashboardPage(): React.JSX.Element {
     editingSpace,
     setEditingSpace,
     handleUpdateSpace,
+    saveToPersonalPost,
+    setSaveToPersonalPost,
     
     // operations
     handleCreatePost,
@@ -877,13 +879,37 @@ export default function DashboardPage(): React.JSX.Element {
                 type="file" 
                 id="space-file-upload" 
                 multiple 
-                onChange={(e) => setPostFiles(Array.from(e.target.files || []))} 
+                onChange={(e) => {
+                  setPostFiles(Array.from(e.target.files || []));
+                  e.target.value = '';
+                }} 
                 style={{ display: 'none' }}
               />
               <button className="submitPostBtn" onClick={handleCreatePost} disabled={!postCaption.trim() && postFiles.length === 0}>
                 {t('spaces.postButton')}
               </button>
             </div>
+            
+            {postFiles.length > 0 && (
+              <div className="composerCheckboxContainer">
+                <label className={`saveToPersonalPostLabel ${saveToPersonalPost ? 'active' : ''}`}>
+                  <input 
+                    type="checkbox" 
+                    checked={saveToPersonalPost} 
+                    onChange={(e) => setSaveToPersonalPost(e.target.checked)} 
+                    className="hidden-checkbox"
+                  />
+                  <span className="custom-checkbox">
+                    {saveToPersonalPost && (
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="checkbox-text">{t('spaces.saveToPersonalCheckbox')}</span>
+                </label>
+              </div>
+            )}
             {postFiles.length > 0 && (
               <div className="attachedFiles">
                 {postFiles.map((f, i) => (
@@ -1180,6 +1206,96 @@ export default function DashboardPage(): React.JSX.Element {
       )}
 
       <style jsx>{`
+        .composerCheckboxContainer {
+          margin: 8px 0;
+          display: flex;
+          align-items: center;
+        }
+        .saveToPersonalPostLabel {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--text-muted);
+          transition: color 0.2s ease;
+          user-select: none;
+          padding: 6px 0;
+          position: relative;
+        }
+        .saveToPersonalPostLabel:hover {
+          color: var(--text-secondary);
+        }
+        .hidden-checkbox {
+          position: absolute;
+          opacity: 0;
+          width: 0;
+          height: 0;
+          overflow: hidden;
+        }
+        .custom-checkbox {
+          width: 16px;
+          height: 16px;
+          border: 2px solid #525252;
+          border-radius: 4px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: transparent;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          color: #000000;
+          flex-shrink: 0;
+        }
+        .saveToPersonalPostLabel:hover .custom-checkbox {
+          border-color: #a3a3a3;
+          background: rgba(255, 255, 255, 0.05);
+        }
+        .saveToPersonalPostLabel.active .custom-checkbox {
+          border-color: #ffffff;
+          background: #ffffff;
+          box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+        }
+        .saveToPersonalPostLabel.active .checkbox-text {
+          background: linear-gradient(to right, #a3a3a3 15%, #ffffff 50%, #a3a3a3 85%);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: textShimmer 2.5s linear infinite;
+          font-weight: 600;
+        }
+
+        /* Light Mode Overrides */
+        :global([data-theme='light']) .custom-checkbox {
+          border-color: #d4d4d4;
+          color: #ffffff;
+        }
+        :global([data-theme='light']) .saveToPersonalPostLabel:hover .custom-checkbox {
+          border-color: #737373;
+          background: rgba(0, 0, 0, 0.03);
+        }
+        :global([data-theme='light']) .saveToPersonalPostLabel.active .custom-checkbox {
+          border-color: #000000;
+          background: #000000;
+          box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
+        }
+        :global([data-theme='light']) .saveToPersonalPostLabel.active .checkbox-text {
+          background: linear-gradient(to right, #737373 15%, #000000 50%, #737373 85%);
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          font-weight: 600;
+        }
+
+        @keyframes textShimmer {
+          0% {
+            background-position: 200% center;
+          }
+          100% {
+            background-position: -200% center;
+          }
+        }
+
         .dashboardSection {
           margin-bottom: 28px;
           display: flex;

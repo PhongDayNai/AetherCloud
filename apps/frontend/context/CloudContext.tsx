@@ -59,6 +59,8 @@ interface CloudContextType {
   setPostCaption: React.Dispatch<React.SetStateAction<string>>;
   postFiles: File[];
   setPostFiles: React.Dispatch<React.SetStateAction<File[]>>;
+  saveToPersonalPost: boolean;
+  setSaveToPersonalPost: (val: boolean) => void;
 
   selectionMode: boolean;
   setSelectionMode: React.Dispatch<React.SetStateAction<boolean>>;
@@ -277,6 +279,21 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const [posts, setPosts] = useState<any[]>([]);
   const [postCaption, setPostCaption] = useState<string>('');
   const [postFiles, setPostFiles] = useState<File[]>([]);
+  
+  const [saveToPersonalPost, setSaveToPersonalPostState] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('aethercloud_save_to_personal_post_upload');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const setSaveToPersonalPost = (val: boolean) => {
+    setSaveToPersonalPostState(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aethercloud_save_to_personal_post_upload', String(val));
+    }
+  };
 
   const [selectionMode, setSelectionMode] = useState<boolean>(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -612,6 +629,11 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       setMsg(t('spaces.posting') || "Đang đăng bài viết...");
       const fd = new FormData();
       fd.append('caption', postCaption.trim());
+      fd.append('saveToPersonal', String(saveToPersonalPost));
+
+      const lastModifieds = postFiles.map(f => f.lastModified);
+      fd.append('lastModifieds', JSON.stringify(lastModifieds));
+
       for (const f of postFiles) {
         fd.append('files', f);
       }
@@ -1495,6 +1517,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       posts, setPosts,
       postCaption, setPostCaption,
       postFiles, setPostFiles,
+      saveToPersonalPost, setSaveToPersonalPost,
       selectionMode, setSelectionMode,
       selectedIds, setSelectedIds,
       activeIndex, setActiveIndex,
