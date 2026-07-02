@@ -638,10 +638,10 @@ export default function DashboardPage(): React.JSX.Element {
           {/* Recent Photos & Videos Section */}
           <div className="recentSection">
             <div className="recentSectionHeader">
-              <h2>Ảnh & video gần đây</h2>
+              <h2>{t('dashboard.recentPhotosVideos')}</h2>
             </div>
             {recentPhotos.length === 0 ? (
-              <div className="recentEmptyHint">Không có ảnh hoặc video nào gần đây.</div>
+              <div className="recentEmptyHint">{t('dashboard.noRecentPhotosVideos')}</div>
             ) : (
               <>
                 <div className="recentPhotosGrid" style={{ gridTemplateColumns: `repeat(${photoCols}, 1fr)` }}>
@@ -664,7 +664,7 @@ export default function DashboardPage(): React.JSX.Element {
                 </div>
                 <div className="sectionFooter">
                   <button className="viewAllBtn" onClick={() => { setTab('photos'); router.push('/cloud/photos'); }}>
-                    Xem tất cả ảnh & video &rarr;
+                    {t('dashboard.viewAllPhotosVideos')} &rarr;
                   </button>
                 </div>
               </>
@@ -674,10 +674,10 @@ export default function DashboardPage(): React.JSX.Element {
           {/* Recent Documents Section */}
           <div className="recentSection" style={{ marginTop: '32px' }}>
             <div className="recentSectionHeader">
-              <h2>Tài liệu gần đây</h2>
+              <h2>{t('dashboard.recentDocs')}</h2>
             </div>
             {recentDocsData.length === 0 ? (
-              <div className="recentEmptyHint">Không có tài liệu nào gần đây.</div>
+              <div className="recentEmptyHint">{t('dashboard.noRecentDocs')}</div>
             ) : (
               <>
                 {recentDocsData.map(({ category, files }) => (
@@ -705,7 +705,7 @@ export default function DashboardPage(): React.JSX.Element {
                       {/* Card Xem tất cả loại tài liệu này ở cuối dòng */}
                       <div 
                         className="docCard viewAllDocCard"
-                        title={`Xem tất cả tệp ${t('categories.' + category) || category.toUpperCase()}`}
+                        title={t('dashboard.viewAllDocsOfCategory', { category: t('categories.' + category) || category.toUpperCase() })}
                         onClick={() => {
                           setTab('docs');
                           setDocCategoryFilter(category);
@@ -713,7 +713,9 @@ export default function DashboardPage(): React.JSX.Element {
                         }}
                       >
                         <div className="viewAllDocContent">
-                          <span className="viewAllDocText">Xem tất cả tệp {t('categories.' + category) || category.toUpperCase()}</span>
+                          <span className="viewAllDocText">
+                            {t('dashboard.viewAllDocsOfCategory', { category: t('categories.' + category) || category.toUpperCase() })}
+                          </span>
                           <span className="viewAllDocArrow">&rarr;</span>
                         </div>
                       </div>
@@ -722,7 +724,7 @@ export default function DashboardPage(): React.JSX.Element {
                 ))}
                 <div className="sectionFooter">
                   <button className="viewAllBtn" onClick={() => { setTab('docs'); setDocCategoryFilter('all'); router.push('/cloud/docs'); }}>
-                    Xem tất cả tài liệu &rarr;
+                    {t('dashboard.viewAllDocs')} &rarr;
                   </button>
                 </div>
               </>

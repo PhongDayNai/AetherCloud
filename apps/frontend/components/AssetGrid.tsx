@@ -117,7 +117,7 @@ export default function AssetGrid({
                           a.processingStatus === 'processing' ? (
                             <div className="processingPlaceholder">
                               <div className="pulseLoader" />
-                              <span className="processingText">Đang xử lý...</span>
+                              <span className="processingText">{t('buttons.processing') || 'Đang xử lý...'}</span>
                             </div>
                           ) : (
                             <video src={srcPlay} className="thumb" muted preload="none" />
