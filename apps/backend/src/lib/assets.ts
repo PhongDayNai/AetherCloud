@@ -459,7 +459,7 @@ export async function saveUploadedFile(file: any, user?: any): Promise<Asset> {
 }
 
 export async function listAssets(limit = 200, opts: any = {}): Promise<Asset[]> {
-  const { includeTrash = false, onlyTrash = false, owner, ownerId } = opts;
+  const { includeTrash = false, onlyTrash = false, owner, ownerId, cursor } = opts;
   const targetOwner = ownerId || owner;
   let queryText = 'SELECT * FROM assets';
   const params: any[] = [];
@@ -476,11 +476,26 @@ export async function listAssets(limit = 200, opts: any = {}): Promise<Asset[]> 
     clauses.push('is_deleted = false');
   }
 
+  if (cursor) {
+    try {
+      const decoded = JSON.parse(Buffer.from(cursor, 'base64').toString('utf8'));
+      if (decoded.takenAt && decoded.id) {
+        params.push(decoded.takenAt);
+        const pTakenAt = `$${params.length}`;
+        params.push(decoded.id);
+        const pId = `$${params.length}`;
+        clauses.push(`(taken_at < ${pTakenAt} OR (taken_at = ${pTakenAt} AND id < ${pId}))`);
+      }
+    } catch (e) {
+      console.error('Failed to parse cursor in listAssets:', e);
+    }
+  }
+
   if (clauses.length > 0) {
     queryText += ' WHERE ' + clauses.join(' AND ');
   }
 
-  queryText += ' ORDER BY taken_at DESC LIMIT $' + (params.length + 1);
+  queryText += ' ORDER BY taken_at DESC, id DESC LIMIT $' + (params.length + 1);
   params.push(Math.max(1, Math.min(limit, 5000)));
 
   const res = await db.query(queryText, params);

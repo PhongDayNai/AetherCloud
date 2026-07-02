@@ -91,9 +91,18 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
   const limit = Number(req.query.limit || 200);
   const includeTrash = String(req.query.includeTrash || 'false') === 'true';
   const onlyTrash = String(req.query.onlyTrash || 'false') === 'true';
+  const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
   try {
-    const items = await listAssets(limit, { includeTrash, onlyTrash, owner: req.user.sub });
-    return res.json({ items });
+    const items = await listAssets(limit, { includeTrash, onlyTrash, owner: req.user.sub, cursor });
+    
+    let nextCursor: string | null = null;
+    if (items.length > 0 && items.length === limit) {
+      const lastItem = items[items.length - 1];
+      const cursorObj = { takenAt: lastItem.takenAt, id: lastItem.id };
+      nextCursor = Buffer.from(JSON.stringify(cursorObj)).toString('base64');
+    }
+
+    return res.json({ items, nextCursor });
   } catch (e: any) {
     return res.status(500).json({ message: e.message });
   }

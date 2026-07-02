@@ -115,6 +115,7 @@ CREATE INDEX IF NOT EXISTS idx_assets_taken_at ON assets (taken_at DESC);
 CREATE INDEX IF NOT EXISTS idx_assets_is_deleted ON assets (is_deleted);
 CREATE INDEX IF NOT EXISTS idx_assets_type ON assets (type);
 CREATE INDEX IF NOT EXISTS idx_assets_owner_id ON assets (owner_id);
+CREATE INDEX IF NOT EXISTS idx_assets_pagination ON assets (owner_id, is_deleted, taken_at DESC, id DESC);
 
 -- Tạo bảng Không gian con (Spaces)
 CREATE TABLE IF NOT EXISTS spaces (
