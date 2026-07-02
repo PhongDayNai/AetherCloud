@@ -4,7 +4,7 @@
 import * as Icons from './Icons';
 import { DocIcon } from './Icons';
 import { Asset } from '../types';
-import { fmtBytes, docCategoryOf } from '../lib/utils';
+import { fmtBytes, docCategoryOf, DOC_CATEGORY_LABELS } from '../lib/utils';
 import { useCloud } from '../context/CloudContext';
 
 const ChevronRight = ({ size = 14, className = '' }) => (
@@ -62,6 +62,33 @@ export default function DocView({
   toggleGroup
 }: DocViewProps): React.JSX.Element {
   const { docCategoryCounts } = useCloud();
+
+  const getCatLabel = (cat: string) => {
+    if (cat === 'all') return t('sidebar.all') || 'All';
+    const labelKey = `categories.${cat}`;
+    const translated = t(labelKey);
+    if (translated === labelKey) {
+      return cat.toUpperCase();
+    }
+    return translated;
+  };
+
+  const getGroupLabel = (groupName: string) => {
+    if (groupName === 'all') return t('sidebar.all') || 'All';
+    if (groupName === 'Ảnh & Video') return t('spaces.typeMedia') || 'Photos & Videos';
+    if (groupName === 'Tài liệu khác' || groupName === 'Khác') return t('spaces.formatOther') || 'Other';
+    
+    // Tìm key category tương ứng dựa theo DOC_CATEGORY_LABELS tiếng Việt
+    const entry = Object.entries(DOC_CATEGORY_LABELS).find(([_, v]) => v === groupName);
+    if (entry) {
+      const catKey = entry[0];
+      const translated = t(`categories.${catKey}`);
+      if (translated !== `categories.${catKey}`) {
+        return translated;
+      }
+    }
+    return groupName;
+  };
 
   const categoriesToShow = ['all', 'pdf', 'word', 'excel', 'powerpoint', 'markdown', 'text', 'ebook', 'database', 'archive', 'installer', 'disk-image', 'font', 'certificate', 'design', 'cad', 'executable', 'code', 'config', 'other'].filter(cat => {
     if (cat === 'all') return true;
@@ -128,8 +155,8 @@ export default function DocView({
                 {cat === 'all' 
                   ? (t('sidebar.all') || 'Tất cả') 
                   : isActive 
-                    ? `✓ ${t('categories.' + cat) || cat.toUpperCase()}` 
-                    : `+ ${t('categories.' + cat) || cat.toUpperCase()}`}
+                    ? `✓ ${getCatLabel(cat)}` 
+                    : `+ ${getCatLabel(cat)}`}
               </button>
             );
           })}
@@ -166,7 +193,7 @@ export default function DocView({
                 <span className={`groupHeaderChevron ${isOpen ? 'open' : ''}`} style={{ display: 'inline-flex', alignItems: 'center' }}>
                   <ChevronRight size={14} />
                 </span>
-                <span>{group}</span>
+                <span>{getGroupLabel(group)}</span>
                 <span className="groupCount">{items.length}</span>
               </div>
             )}
