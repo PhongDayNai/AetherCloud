@@ -95,8 +95,8 @@ interface CloudContextType {
   setTagQuery: React.Dispatch<React.SetStateAction<string>>;
   docTypeFilter: string;
   setDocTypeFilter: React.Dispatch<React.SetStateAction<string>>;
-  docCategoryFilter: string;
-  setDocCategoryFilter: React.Dispatch<React.SetStateAction<string>>;
+  docCategoryFilter: string[];
+  setDocCategoryFilter: (val: string[] | string | ((prev: string[]) => string[])) => void;
   docCollectionView: 'all' | 'recent' | 'trash';
   setDocCollectionView: React.Dispatch<React.SetStateAction<'all' | 'recent' | 'trash'>>;
   allFilesCollectionView: 'all' | 'recent' | 'trash';
@@ -291,7 +291,19 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const [showTagPicker, setShowTagPicker] = useState<boolean>(false);
   const [tagQuery, setTagQuery] = useState<string>('');
   const [docTypeFilter, setDocTypeFilter] = useState<string>('all');
-  const [docCategoryFilter, setDocCategoryFilter] = useState<string>('all');
+  const [docCategoryFilter, setDocCategoryFilterState] = useState<string[]>(['all']);
+
+  const setDocCategoryFilter = (val: string[] | string | ((prev: string[]) => string[])) => {
+    setDocCategoryFilterState(prev => {
+      if (typeof val === 'function') {
+        return val(prev);
+      }
+      if (Array.isArray(val)) {
+        return val;
+      }
+      return [val];
+    });
+  };
   const [docCollectionView, setDocCollectionView] = useState<'all' | 'recent' | 'trash'>('all');
   const [allFilesCollectionView, setAllFilesCollectionView] = useState<'all' | 'recent' | 'trash'>('all');
   const [docKindsExpanded, setDocKindsExpanded] = useState<boolean>(false);
@@ -372,7 +384,9 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
     if (selectedDocProject !== 'all') {
       list = list.filter((d) => (d.docProjectNames || []).includes(selectedDocProject) || d.docProjectName === selectedDocProject);
     }
-    if (docCategoryFilter !== 'all') list = list.filter((d) => docCategoryOf(d) === docCategoryFilter);
+    if (docCategoryFilter && !docCategoryFilter.includes('all')) {
+      list = list.filter((d) => docCategoryFilter.includes(docCategoryOf(d)));
+    }
     if (docTypeFilter !== 'all') list = list.filter((d) => docTypeOf(d) === docTypeFilter);
     return list;
   }, [docsBase, selectedDocProject, docCategoryFilter, docTypeFilter]);
@@ -456,15 +470,30 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
     return m;
   }, [docsBase, stats]);
 
-  const docsGrouped = useMemo(() => {
-    const m = new Map<string, Asset[]>();
-    for (const d of docsFiltered) {
-      const key = DOC_CATEGORY_LABELS[docCategoryOf(d)] || 'Khác';
-      if (!m.has(key)) m.set(key, []);
-      m.get(key)!.push(d);
+  const docsGrouped = useMemo<[string, Asset[]][]>(() => {
+    const isMultiCategory = docCategoryFilter.length > 1 && !docCategoryFilter.includes('all');
+
+    if (isMultiCategory) {
+      const m = new Map<string, Asset[]>();
+      for (const d of docsFiltered) {
+        const key = DOC_CATEGORY_LABELS[docCategoryOf(d)] || 'Khác';
+        if (!m.has(key)) m.set(key, []);
+        m.get(key)!.push(d);
+      }
+      return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    } else {
+      if (!groupByTimeEnabled) return [['all', docsFiltered]];
+      const m = new Map<string, Asset[]>();
+      for (const d of docsFiltered) {
+        const key = groupMode === 'year' 
+          ? yearLabel(d.takenAt || d.uploadedAt) 
+          : monthLabel(d.takenAt || d.uploadedAt, language);
+        if (!m.has(key)) m.set(key, []);
+        m.get(key)!.push(d);
+      }
+      return Array.from(m.entries());
     }
-    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [docsFiltered]);
+  }, [docsFiltered, docCategoryFilter, groupByTimeEnabled, groupMode, language]);
 
   const [selectedAlbum, setSelectedAlbum] = useState<string>('all');
 
@@ -570,7 +599,8 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
 
   const currentDocsKey = useMemo(() => {
     const sortedTags = selectedFilterTags.slice().sort().join(',');
-    return `${docCategoryFilter}::${docTypeFilter}::${selectedDocProject}::${docCollectionView}::${sortedTags}`;
+    const sortedCats = docCategoryFilter.slice().sort().join(',');
+    return `${sortedCats}::${docTypeFilter}::${selectedDocProject}::${docCollectionView}::${sortedTags}`;
   }, [docCategoryFilter, docTypeFilter, selectedDocProject, docCollectionView, selectedFilterTags]);
 
   // 2. Tìm phần tử neo hiển thị đầu tiên trong viewport
