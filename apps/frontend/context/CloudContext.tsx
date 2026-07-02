@@ -886,7 +886,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
         setHasMore(newHasMore);
       }
     } catch (e: any) {
-      setErr(e.message || "Tải dữ liệu thất bại");
+      setErr(e.message || t('messages.loadDataFailed') || "Tải dữ liệu thất bại");
     } finally {
       setIsLoadingMore(false);
     }
@@ -946,7 +946,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
         setHasMore(newHasMore);
       }
     } catch (e: any) {
-      setErr(e.message || "Tải dữ liệu thất bại");
+      setErr(e.message || t('messages.loadDataFailed') || "Tải dữ liệu thất bại");
     } finally {
       setIsLoadingMore(false);
     }
@@ -1062,7 +1062,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
         setNextCursor(data.nextCursor || null);
         setHasMore(!!data.nextCursor);
       } catch (e: any) {
-        setErr(e.message || "Tải thêm dữ liệu thất bại");
+        setErr(e.message || t('messages.loadMoreFailed') || "Tải thêm dữ liệu thất bại");
       } finally {
         setIsLoadingMore(false);
       }

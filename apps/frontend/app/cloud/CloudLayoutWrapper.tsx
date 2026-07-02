@@ -20,7 +20,7 @@ function Toast({ toast, onClose }: ToastProps) {
   useEffect(() => {
     const exitTimer = setTimeout(() => {
       setIsExiting(true);
-    }, 4700);
+    }, 2700);
 
     const removeTimer = setTimeout(() => {
       onClose(toast.id);
