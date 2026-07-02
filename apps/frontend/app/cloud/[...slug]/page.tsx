@@ -528,8 +528,7 @@ export default function DashboardPage(): React.JSX.Element {
               <div className="processingBanner">
                 <span className="spinningIcon"><Icons.Flash size={16} /></span>
                 <span>
-                  {t('dashboard.processingFiles', { count: usage.processingCount }) || 
-                    `Hệ thống đang tối ưu hóa ${usage.processingCount} tệp tin ngầm...`}
+                  {t('dashboard.processingFiles', { count: usage.processingCount })}
                 </span>
               </div>
             )}
@@ -592,7 +591,7 @@ export default function DashboardPage(): React.JSX.Element {
                   <div className="statInfo">
                     <h4>{t('sidebar.allPhotosVideos') || 'Ảnh & Video'}</h4>
                     <p className="statCount">{t('dashboard.photosVideosCount', { count: dashboardStats.photosVideosCount }) || `${dashboardStats.photosVideosCount} tệp`}</p>
-                    <p className="statSize">{stats?.albums?.length || 0} album</p>
+                    <p className="statSize">{t('dashboard.albumsCount', { count: stats?.albums?.length || 0 }) || `${stats?.albums?.length || 0} album`}</p>
                   </div>
                 </div>
 
@@ -604,7 +603,7 @@ export default function DashboardPage(): React.JSX.Element {
                   <div className="statInfo">
                     <h4>{t('sidebar.documents') || 'Tài liệu'}</h4>
                     <p className="statCount">{t('dashboard.docsCount', { count: dashboardStats.docsCount }) || `${dashboardStats.docsCount} tài liệu`}</p>
-                    <p className="statSize">{stats?.docProjects?.length || 0} tập tài liệu</p>
+                    <p className="statSize">{t('dashboard.docProjectsCount', { count: stats?.docProjects?.length || 0 }) || `${stats?.docProjects?.length || 0} tập tài liệu`}</p>
                   </div>
                 </div>
 
