@@ -82,7 +82,7 @@ export default function Topbar({
           gap: 16px;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 24px;
+          margin-bottom: 38px;
           position: sticky;
           top: 16px;
           z-index: 10;
