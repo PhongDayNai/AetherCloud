@@ -37,11 +37,11 @@ export default function CreateSpaceModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setErrorMsg('Vui lòng nhập tên không gian.');
+      setErrorMsg(t('spaces.nameRequired') || 'Vui lòng nhập tên không gian.');
       return;
     }
     if (!type) {
-      setErrorMsg('Vui lòng chọn phân loại không gian.');
+      setErrorMsg(t('spaces.typeRequired') || 'Vui lòng chọn phân loại không gian.');
       return;
     }
     setErrorMsg('');
@@ -52,7 +52,7 @@ export default function CreateSpaceModal({
         onClose();
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Không tạo được không gian con.');
+      setErrorMsg(err.message || t('spaces.createFailed') || 'Không tạo được không gian con.');
     } finally {
       setLoading(false);
     }
