@@ -63,6 +63,9 @@ export default function DashboardPage(): React.JSX.Element {
     albumFilteredPhotos,
     photoGroups,
     active,
+    hasMore,
+    isLoadingMore,
+    loadMoreAssets,
     
     // extra properties for dashboard
     usage,
@@ -95,6 +98,32 @@ export default function DashboardPage(): React.JSX.Element {
       trashSize
     };
   }, [assets, spaces, usage]);
+
+  const sentinelRef = React.useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!hasMore || isLoadingMore) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        loadMoreAssets();
+      }
+    }, {
+      root: null,
+      rootMargin: '150px',
+    });
+
+    const currentSentinel = sentinelRef.current;
+    if (currentSentinel) {
+      observer.observe(currentSentinel);
+    }
+
+    return () => {
+      if (currentSentinel) {
+        observer.unobserve(currentSentinel);
+      }
+    };
+  }, [hasMore, isLoadingMore, loadMoreAssets]);
 
   function toggleGroup(key: string) {
     setExpandedGroups((prev) => ({ ...prev, [key]: !(prev[key] ?? true) }));
@@ -648,12 +677,77 @@ export default function DashboardPage(): React.JSX.Element {
         </div>
       )}
 
+      {hasMore && (
+        tab === 'photos' || 
+        tab === 'docs' || 
+        tab === 'dashboard' || 
+        (tab === 'space' && activeWorkspace.type === 'space' && activeWorkspace.spaceType === 'project')
+      ) && (
+        <div ref={sentinelRef} className="sentinelContainer">
+          {isLoadingMore ? (
+            <div className="sentinelLoading">
+              <span className="sentinelSpinner"></span>
+              <span>{t('messages.loading') || 'Đang tải thêm...'}</span>
+            </div>
+          ) : (
+            <button className="sentinelLoadMoreBtn" onClick={() => loadMoreAssets()}>
+              {t('actions.loadMore') || 'Xem thêm'}
+            </button>
+          )}
+        </div>
+      )}
+
       <style jsx>{`
         .dashboardSection {
           margin-bottom: 28px;
           display: flex;
           flex-direction: column;
           gap: 16px;
+        }
+        .sentinelContainer {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 32px 0;
+          margin-top: 16px;
+        }
+        .sentinelLoading {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--text-muted);
+          font-size: 13px;
+          font-weight: 500;
+        }
+        .sentinelSpinner {
+          width: 18px;
+          height: 18px;
+          border: 2px solid var(--border-color);
+          border-top-color: var(--button-primary-bg);
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        .sentinelLoadMoreBtn {
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid var(--border-tile);
+          color: var(--text-primary);
+          padding: 8px 24px;
+          border-radius: 99px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .sentinelLoadMoreBtn:hover {
+          background: rgba(255, 255, 255, 0.08);
+          border-color: var(--border-tile-hover);
+          transform: translateY(-1px);
+        }
+        :global([data-theme='light']) .sentinelLoadMoreBtn {
+          background: rgba(0, 0, 0, 0.02);
+        }
+        :global([data-theme='light']) .sentinelLoadMoreBtn:hover {
+          background: rgba(0, 0, 0, 0.05);
         }
         .processingBanner {
           display: flex;

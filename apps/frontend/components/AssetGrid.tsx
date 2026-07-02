@@ -283,6 +283,8 @@ export default function AssetGrid({
           box-shadow: var(--card-shadow);
           transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
           animation: cardEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+          content-visibility: auto;
+          contain-intrinsic-size: 200px 222px;
         }
         .tile:hover {
           border-color: var(--border-tile-hover);

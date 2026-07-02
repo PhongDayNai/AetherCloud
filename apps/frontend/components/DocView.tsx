@@ -271,6 +271,8 @@ export default function DocView({
           display: flex;
           align-items: center;
           gap: 12px;
+          content-visibility: auto;
+          contain-intrinsic-size: 280px 74px;
         }
         .docCard:hover {
           transform: translateY(-2px);

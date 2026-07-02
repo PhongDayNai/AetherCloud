@@ -177,6 +177,10 @@ interface CloudContextType {
   toasts: ToastItem[];
   removeToast: (id: string) => void;
   addToast: (message: string, type?: 'info' | 'error') => void;
+  nextCursor: string | null;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  loadMoreAssets: () => Promise<void>;
 }
 
 const CloudContext = createContext<CloudContextType | undefined>(undefined);
@@ -189,6 +193,10 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [msg, setMsg] = useState<string>('');
   const [err, setErr] = useState<string>('');
+
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
@@ -535,7 +543,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
 
       const [usageRes, assetsRes, projectsRes, tagsRes, spacesRes] = await Promise.all([
         fetch(`${api}/api/storage/usage`, { credentials: 'include' }),
-        fetch(`${api}/api/assets?limit=1500&includeTrash=true`, { credentials: 'include' }),
+        fetch(`${api}/api/assets?limit=100&includeTrash=true`, { credentials: 'include' }),
         fetch(`${api}/api/assets/doc-projects`, { credentials: 'include' }),
         fetch(`${api}/api/assets/tags`, { credentials: 'include' }),
         fetch(`${api}/api/spaces`, { credentials: 'include' }),
@@ -549,6 +557,8 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
 
       setUsage(usageData);
       setAssets(assetsData.items || []);
+      setNextCursor(assetsData.nextCursor || null);
+      setHasMore(!!assetsData.nextCursor);
       setDocProjects(projectsData.items || []);
       setTags(tagsData.items || []);
       setSpaces(spacesData.spaces || []);
@@ -562,6 +572,23 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e: any) {
       setErr(e.message || t('messages.loadDataFailed'));
+    }
+  }
+
+  async function loadMoreAssets() {
+    if (!nextCursor || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const res = await fetch(`${api}/api/assets?limit=100&includeTrash=true&cursor=${nextCursor}`, { credentials: 'include' });
+      if (!res.ok) throw new Error(t('messages.loadDataFailed'));
+      const data = await res.json();
+      setAssets((prev) => [...prev, ...(data.items || [])]);
+      setNextCursor(data.nextCursor || null);
+      setHasMore(!!data.nextCursor);
+    } catch (e: any) {
+      setErr(e.message || "Tải thêm dữ liệu thất bại");
+    } finally {
+      setIsLoadingMore(false);
     }
   }
 
@@ -1052,7 +1079,11 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       active,
       toasts,
       removeToast,
-      addToast
+      addToast,
+      nextCursor,
+      hasMore,
+      isLoadingMore,
+      loadMoreAssets
     }}>
       {children}
     </CloudContext.Provider>
