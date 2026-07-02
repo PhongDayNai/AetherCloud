@@ -529,9 +529,9 @@ export default function DashboardPage(): React.JSX.Element {
                     return (
                       <div key={a.id} data-id={a.id} className={`tile ${picked ? 'picked' : ''}`} {...cardHandlers(a, () => openAll(a.id))}>
                         {a.type === 'image' ? (
-                          <img src={srcOriginal} alt={a.originalName} className="thumb" />
+                          <img src={srcOriginal} alt={a.originalName} className="thumb" loading="lazy" />
                         ) : (
-                          <video src={srcPlay} className="thumb" muted preload="metadata" />
+                          <video src={srcPlay} className="thumb" muted preload="none" />
                         )}
                         <div className="caption">{a.originalName}</div>
                         {picked && <div className="badge">✓</div>}
@@ -893,6 +893,7 @@ export default function DashboardPage(): React.JSX.Element {
           transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
           content-visibility: auto;
           contain-intrinsic-size: 200px 222px;
+          will-change: transform, opacity;
         }
         .tile:hover {
           border-color: var(--border-tile-hover);

@@ -110,7 +110,7 @@ export default function AssetGrid({
                     return (
                       <div key={a.id} data-id={a.id} className={`tile ${picked ? 'picked' : ''} ${a.processingStatus === 'processing' ? 'tileProcessing' : ''}`} {...cardHandlers(a, () => openPhoto(a.id))} style={{ animationDelay: `${(idx % 24) * 0.02}s` }}>
                         {a.type === 'image' ? (
-                          <img src={srcOriginal} alt={a.originalName} className="thumb" />
+                          <img src={srcOriginal} alt={a.originalName} className="thumb" loading="lazy" />
                         ) : a.type === 'video' ? (
                           a.processingStatus === 'processing' ? (
                             <div className="processingPlaceholder">
@@ -118,7 +118,7 @@ export default function AssetGrid({
                               <span className="processingText">Đang xử lý...</span>
                             </div>
                           ) : (
-                            <video src={srcPlay} className="thumb" muted preload="metadata" />
+                            <video src={srcPlay} className="thumb" muted preload="none" />
                           )
                         ) : (
                           <div className="filePlaceholder">
@@ -289,6 +289,7 @@ export default function AssetGrid({
           animation: cardEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
           content-visibility: auto;
           contain-intrinsic-size: 200px 222px;
+          will-change: transform, opacity;
         }
         .tile:hover {
           border-color: var(--border-tile-hover);
