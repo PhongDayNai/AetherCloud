@@ -162,7 +162,18 @@ router.get('/:spaceId/posts', requireAuth, checkSpaceOwnership, async (req: Requ
 // 4. POST tạo bài viết mới trong không gian con (hỗ trợ upload trực tiếp hoặc đính kèm id cũ)
 router.post('/:spaceId/posts', requireAuth, checkSpaceOwnership, upload.array('files', 10), async (req: Request, res: Response) => {
   const { spaceId } = req.params;
-  const { caption } = req.body || {};
+  const { caption, saveToPersonal, lastModifieds } = req.body || {};
+  const isSaveToPersonal = String(saveToPersonal) === 'true';
+
+  let lastModifiedsArray: any[] = [];
+  if (lastModifieds) {
+    try {
+      lastModifiedsArray = JSON.parse(lastModifieds);
+    } catch {
+      // Ignore parse error
+    }
+  }
+
   let assetIdsInput = req.body.assetIds || req.body.asset_ids || [];
 
   // Parse assetIds nếu gửi dạng string JSON hoặc comma separated
@@ -207,8 +218,17 @@ router.post('/:spaceId/posts', requireAuth, checkSpaceOwnership, upload.array('f
 
     // C. Upload file mới và tự động đính kèm vào bài đăng
     const files = (req.files as Express.Multer.File[]) || [];
-    for (const file of files) {
-      const savedAsset = await saveUploadedFile(file, req.user);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileLastModified = lastModifiedsArray[i] || null;
+
+      const savedAsset = await saveUploadedFile(
+        { ...file, lastModified: fileLastModified },
+        req.user,
+        null,
+        isSaveToPersonal
+      );
+
       await client.query(
         'INSERT INTO post_assets (post_id, asset_id) VALUES ($1, $2)',
         [postId, savedAsset.id]

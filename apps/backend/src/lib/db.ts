@@ -72,6 +72,11 @@ BEGIN
   
   -- Cho phép owner có thể NULL
   ALTER TABLE assets ALTER COLUMN owner DROP NOT NULL;
+
+  -- Phase 3 migrations for assets
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='is_library') THEN
+    ALTER TABLE assets ADD COLUMN is_library BOOLEAN NOT NULL DEFAULT TRUE;
+  END IF;
 END $$;
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -108,6 +113,7 @@ CREATE TABLE IF NOT EXISTS assets (
   tags TEXT[] DEFAULT '{}',
   is_deleted BOOLEAN DEFAULT FALSE,
   deleted_at TIMESTAMPTZ,
+  is_library BOOLEAN DEFAULT TRUE,
   type VARCHAR(50) NOT NULL
 );
 
@@ -115,6 +121,7 @@ CREATE INDEX IF NOT EXISTS idx_assets_taken_at ON assets (taken_at DESC);
 CREATE INDEX IF NOT EXISTS idx_assets_is_deleted ON assets (is_deleted);
 CREATE INDEX IF NOT EXISTS idx_assets_type ON assets (type);
 CREATE INDEX IF NOT EXISTS idx_assets_owner_id ON assets (owner_id);
+CREATE INDEX IF NOT EXISTS idx_assets_is_library ON assets (is_library);
 CREATE INDEX IF NOT EXISTS idx_assets_pagination ON assets (owner_id, is_deleted, taken_at DESC, id DESC);
 
 -- Tạo bảng Không gian con (Spaces)

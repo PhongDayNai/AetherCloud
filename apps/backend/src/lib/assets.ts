@@ -28,6 +28,7 @@ export interface Asset {
   tags: string[];
   isDeleted: boolean;
   deletedAt: string | null;
+  isLibrary: boolean;
   type: string;
 }
 
@@ -115,6 +116,7 @@ export function fromDB(row: any): Asset | null {
     tags: row.tags || [],
     isDeleted: Boolean(row.is_deleted),
     deletedAt: row.deleted_at ? new Date(row.deleted_at).toISOString() : null,
+    isLibrary: row.is_library !== undefined ? Boolean(row.is_library) : true,
     type: row.type,
   };
 }
@@ -400,7 +402,7 @@ async function scheduleVideoDerivatives(id: string, absPath: string): Promise<vo
   }
 }
 
-export async function saveUploadedFile(file: any, user?: any): Promise<Asset> {
+export async function saveUploadedFile(file: any, user?: any, groupId: string | null = null, isLibrary = true): Promise<Asset> {
   ensureDirs();
   const now = new Date();
   const yyyy = String(now.getUTCFullYear());
@@ -455,7 +457,7 @@ export async function saveUploadedFile(file: any, user?: any): Promise<Asset> {
     mime: file.mimetype,
     size: file.size,
     ownerId,
-    groupId: null,
+    groupId,
     uploadedAt,
     takenAt,
     relPath,
@@ -472,6 +474,7 @@ export async function saveUploadedFile(file: any, user?: any): Promise<Asset> {
     tags: [],
     isDeleted: false,
     deletedAt: null,
+    isLibrary,
     type: file.mimetype?.startsWith('image/') ? 'image' : file.mimetype?.startsWith('video/') ? 'video' : 'file',
   };
 
@@ -480,14 +483,14 @@ export async function saveUploadedFile(file: any, user?: any): Promise<Asset> {
       id, original_name, mime, size, owner_id, group_id, uploaded_at, taken_at, rel_path,
       play_rel_path, hls_rel_path, processing_status, processing_started_at,
       processing_finished_at, ext, album_name, album_names, doc_project_name,
-      doc_project_names, tags, is_deleted, deleted_at, type
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+      doc_project_names, tags, is_deleted, deleted_at, is_library, type
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
   `, [
     item.id, item.originalName, item.mime, Number(item.size), item.ownerId, item.groupId,
     item.uploadedAt, item.takenAt, item.relPath, item.playRelPath, item.hlsRelPath,
     item.processingStatus, item.processingStartedAt, item.processingFinishedAt,
     item.ext, item.albumName, item.albumNames, item.docProjectName, item.docProjectNames,
-    item.tags, item.isDeleted, item.deletedAt, item.type
+    item.tags, item.isDeleted, item.deletedAt, item.isLibrary, item.type
   ]);
 
   if (isVideo) scheduleVideoDerivatives(id, absPath);
@@ -507,7 +510,8 @@ export async function listAssets(limit = 200, opts: any = {}): Promise<Asset[]> 
     category,
     album,
     tag,
-    docProject
+    docProject,
+    includeNonLibrary = false
   } = opts;
   const targetOwner = ownerId || owner;
   let queryText = 'SELECT * FROM assets';
@@ -523,6 +527,10 @@ export async function listAssets(limit = 200, opts: any = {}): Promise<Asset[]> 
     clauses.push('is_deleted = true');
   } else if (!includeTrash) {
     clauses.push('is_deleted = false');
+  }
+
+  if (!includeNonLibrary) {
+    clauses.push('is_library = true');
   }
 
   if (type) {
