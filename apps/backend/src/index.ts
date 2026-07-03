@@ -13,6 +13,7 @@ import storageRoutes from './routes/storage';
 import assetsRoutes from './routes/assets';
 import adminRoutes from './routes/admin';
 import spacesRoutes from './routes/spaces';
+import groupsRoutes from './routes/groups';
 
 import { resolveStoragePath } from './lib/assets';
 import { runOrphanedCleanup } from './lib/cleaner';
@@ -55,6 +56,7 @@ app.use('/api/storage', storageRoutes);
 app.use('/api/assets', assetsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/spaces', spacesRoutes);
+app.use('/api/groups', groupsRoutes);
 
 app.get('/api', (_req: Request, res: Response) => {
   res.json({
