@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import * as db from '../lib/db';
 import { requireAuth } from '../middleware/requireAuth';
-import { isValidUUID, getGroupMemberRole } from '../lib/utils';
+import { isValidUUID, getGroupMemberRole, isGroupMember } from '../lib/utils';
 
 const router = express.Router();
 
@@ -180,11 +180,7 @@ router.post('/:groupId/members', requireAuth, requireGroupMember, async (req: Re
     const targetUserId = userRes.rows[0].id;
 
     // Kiểm tra xem đã là thành viên chưa
-    const checkRes = await db.query(
-      'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
-      [groupId, targetUserId]
-    );
-    if (checkRes.rows.length > 0) {
+    if (await isGroupMember(groupId, targetUserId)) {
       return res.status(400).json({ message: 'Người dùng này đã là thành viên của nhóm' });
     }
 
@@ -216,14 +212,11 @@ router.put('/:groupId/members/:userId', requireAuth, requireGroupMember, async (
 
   try {
     // Không thể tự đổi vai trò của owner
-    const targetRes = await db.query(
-      'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
-      [groupId, userId]
-    );
-    if (targetRes.rows.length === 0) {
+    const targetRole = await getGroupMemberRole(groupId, userId);
+    if (!targetRole) {
       return res.status(404).json({ message: 'Không tìm thấy thành viên này trong nhóm' });
     }
-    if (targetRes.rows[0].role === 'owner') {
+    if (targetRole === 'owner') {
       return res.status(400).json({ message: 'Không thể thay đổi vai trò của chủ sở hữu nhóm' });
     }
 
@@ -258,11 +251,7 @@ router.post('/:groupId/owner', requireAuth, requireGroupMember, async (req: Requ
 
   // Xác minh người nhận chuyển nhượng có phải thành viên nhóm không (Đưa ra ngoài transaction)
   try {
-    const checkRes = await db.query(
-      'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
-      [groupId, targetUserId]
-    );
-    if (checkRes.rows.length === 0) {
+    if (!(await isGroupMember(groupId, targetUserId))) {
       return res.status(400).json({ message: 'Người nhận chuyển nhượng phải là thành viên của nhóm' });
     }
   } catch (err: any) {
@@ -307,14 +296,10 @@ router.delete('/:groupId/members/:userId', requireAuth, requireGroupMember, asyn
 
   try {
     // Lấy thông tin thành viên cần xóa
-    const targetRes = await db.query(
-      'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
-      [groupId, userId]
-    );
-    if (targetRes.rows.length === 0) {
+    const targetRole = await getGroupMemberRole(groupId, userId);
+    if (!targetRole) {
       return res.status(404).json({ message: 'Không tìm thấy thành viên này trong nhóm' });
     }
-    const targetRole = targetRes.rows[0].role;
 
     // Trường hợp 1: Tự rời nhóm
     if (userId === req.user?.sub) {

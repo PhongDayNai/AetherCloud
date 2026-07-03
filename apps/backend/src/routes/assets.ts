@@ -65,14 +65,11 @@ async function checkAssetOwnership(req: Request, res: Response, next: NextFuncti
 
     if (asset.groupId) {
       // Kiểm tra quyền thành viên nhóm
-      const memberRes = await db.query(
-        'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
-        [asset.groupId, req.user.sub]
-      );
-      if (memberRes.rows.length === 0) {
+      const role = await getGroupMemberRole(asset.groupId, req.user.sub);
+      if (!role) {
         return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin thuộc nhóm này' });
       }
-      req.groupRole = memberRes.rows[0].role;
+      req.groupRole = role;
     } else {
       // Kiểm tra sở hữu cá nhân
       if (asset.ownerId !== req.user.sub) {
@@ -782,11 +779,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       for (const row of result.rows) {
         let hasAccess = false;
         if (row.group_id) {
-          const memberRes = await db.query(
-            'SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2',
-            [row.group_id, req.user?.sub]
-          );
-          if (memberRes.rows.length > 0) hasAccess = true;
+          if (await isGroupMember(row.group_id, req.user?.sub)) hasAccess = true;
         } else {
           if (row.owner_id === req.user?.sub) hasAccess = true;
         }
