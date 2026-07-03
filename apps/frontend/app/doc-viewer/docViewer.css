@@ -1,0 +1,780 @@
+/* docViewer.css - Standalone Minimal DocViewer Layout */
+
+.docViewerContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-color: transparent; /* transparent to let root body backgrounds shine through */
+  color: var(--text-main, #f4f4f5);
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+/* Minimal Header styling */
+.viewerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 20px;
+  background: rgba(18, 18, 22, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 100;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 50%;
+}
+
+.btnToggleSidebar {
+  background: transparent;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btnToggleSidebar:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.logoText {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #3b82f6;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.logoText span {
+  color: #71717a;
+}
+
+.fileName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.headerCenter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.playgroundBadge {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #a1a1aa;
+}
+
+.userAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #a1a1aa;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  border: none;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+}
+
+.btn.primary:hover {
+  filter: brightness(1.1);
+}
+
+.btnClose {
+  background: transparent;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btnClose:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+/* Body layout */
+.viewerBody {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 56px);
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Collapsible Left Sidebar */
+.fileSidebar {
+  width: 260px;
+  height: 100%;
+  background: rgba(18, 18, 22, 0.6);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.fileSidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  border-right: none;
+}
+
+.sidebarHeader {
+  padding: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #71717a;
+  letter-spacing: 1px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.fileList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #a1a1aa;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileItem:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #ffffff;
+}
+
+.fileItem.active {
+  background: rgba(37, 99, 235, 0.12);
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.fileItemIcon {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+}
+
+.fileItemName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Content Frame */
+.viewerContent {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0; /* Prevents container from stretching past viewport height */
+  background-color: transparent; /* transparent to let root body backgrounds shine through */
+  height: 100%;
+}
+
+/* Document Header inside sheet container */
+.docContentHeader {
+  padding: 24px 28px 16px 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.docContentTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 6px 0;
+  word-break: break-all;
+}
+
+.docContentMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #71717a;
+}
+
+/* Center max-width wrapper for 2 sides look (Code, Fallback) */
+.docContentWrapper {
+  max-width: 1000px;
+  width: calc(100% - 48px);
+  margin: 24px auto;
+  background-color: #0c0c0e;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  height: calc(100vh - 104px); /* Fixed height to allow scrolling inside container sheet */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Large width layout wrapper specifically for PDF and Markdown Split */
+.pdfContentWrapper,
+.markdownContentWrapper {
+  max-width: 1400px;
+  width: calc(100% - 48px);
+  margin: 24px auto;
+  background-color: #0c0c0e;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  height: calc(100vh - 104px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Loading/Error screens */
+.centerOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background-color: transparent;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(59, 130, 246, 0.1);
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.errorTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f87171;
+}
+
+.errorDesc {
+  color: #71717a;
+  font-size: 13.5px;
+}
+
+/* PDF layout and wrapper styling */
+.pdfContainer {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  display: flex;
+}
+
+.pdfFrame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #18181b;
+}
+
+/* Markdown Split screen */
+.splitLayout {
+  display: flex;
+  width: 100%;
+  flex: 1;
+  min-height: 0; /* Enable proper height shrinking in Markdown split panel */
+  overflow: hidden;
+  height: 100%;
+}
+
+.leftPane {
+  width: 50%;
+  height: 100%;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  background-color: #0c0c0e;
+}
+
+.editorInput {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: #d4d4d8;
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
+  font-size: 13.5px;
+  line-height: 1.65;
+  padding: 24px;
+  resize: none;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.rightPane {
+  width: 50%;
+  height: 100%;
+  overflow-y: auto;
+  background-color: #09090b;
+}
+
+.previewContainer {
+  padding: 32px 40px;
+  color: #d4d4d8;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.previewContainer h1, .previewContainer h2, .previewContainer h3 {
+  color: #ffffff;
+  margin-top: 1.4em;
+  margin-bottom: 0.5em;
+  font-weight: 700;
+}
+
+.previewContainer h1 { font-size: 1.8em; border-bottom: 1px solid rgba(255, 255, 255, 0.06); padding-bottom: 0.3em; }
+.previewContainer h2 { font-size: 1.4em; }
+.previewContainer h3 { font-size: 1.2em; }
+.previewContainer p { margin-bottom: 1em; }
+
+.previewContainer pre {
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 1.2em 0;
+  overflow-x: auto;
+}
+
+.previewContainer code {
+  font-family: 'Fira Code', monospace;
+  font-size: 0.9em;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.previewContainer pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Code Viewer with Line Numbers */
+.codeViewContainer {
+  width: 100%;
+  background-color: #0c0c0e;
+  display: flex;
+  flex: 1;
+  min-height: 0; /* Enable height shrinking in flexbox layout */
+  overflow: hidden;
+}
+
+.codeContainer {
+  display: flex;
+  width: 100%;
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
+  font-size: 13.5px;
+  line-height: 1.6;
+  flex: 1;
+  min-height: 0;
+  overflow: auto; /* Handle all vertical & horizontal scrolling natively */
+}
+
+.lineNumbers {
+  position: sticky;
+  left: 0;
+  padding: 24px 12px 24px 16px;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  color: #52525b;
+  text-align: right;
+  user-select: none;
+  min-width: 35px;
+  background-color: #0c0c0e; /* Match theme background to hide scrolling code behind */
+  z-index: 10;
+}
+
+.lineNo {
+  height: 21.6px; /* matches line-height 1.6 * 13.5px */
+}
+
+.codePre {
+  margin: 0;
+  padding: 24px 16px;
+  overflow: visible; /* Let parent scroll container handle all scrolling! */
+  flex: 1;
+  background: transparent;
+}
+
+.codeLine {
+  height: 21.6px;
+  white-space: pre;
+}
+
+/* Fallback screen */
+.fallbackContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 40px;
+  overflow-y: auto;
+}
+
+.fallbackCard {
+  background: rgba(18, 18, 22, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.fallbackIcon {
+  font-size: 56px;
+}
+
+.fallbackName {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  word-break: break-all;
+}
+
+.fallbackMeta {
+  color: #71717a;
+  font-size: 13px;
+}
+
+/* Light Theme overrides */
+.docViewerContainer[data-theme='light'],
+[data-theme='light'] .docViewerContainer {
+  background-color: transparent;
+  color: #18181b;
+}
+
+[data-theme='light'] .viewerHeader {
+  background: rgba(255, 255, 255, 0.85); /* premium translucent blur */
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .fileName {
+  color: #18181b;
+}
+
+[data-theme='light'] .logoText {
+  color: #2563eb;
+}
+
+[data-theme='light'] .logoText span {
+  color: #71717a;
+}
+
+[data-theme='light'] .userInfo {
+  color: #52525b;
+}
+
+[data-theme='light'] .btn {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #52525b;
+}
+
+[data-theme='light'] .btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+  color: #18181b;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme='light'] .btnClose {
+  color: #71717a;
+}
+
+[data-theme='light'] .btnClose:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #18181b;
+}
+
+[data-theme='light'] .viewerContent {
+  background-color: transparent;
+}
+
+[data-theme='light'] .docContentHeader {
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .docContentTitle {
+  color: #000000;
+}
+
+[data-theme='light'] .docContentMeta {
+  color: #71717a;
+}
+
+[data-theme='light'] .docContentWrapper {
+  background-color: #ffffff;
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='light'] .pdfContentWrapper,
+[data-theme='light'] .markdownContentWrapper {
+  background-color: #ffffff;
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='light'] .fileSidebar {
+  background: rgba(255, 255, 255, 0.8); /* translucent bright sidebar matching dashboard */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-right-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .sidebarHeader {
+  color: #71717a;
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .fileItem {
+  color: #3f3f46;
+}
+
+[data-theme='light'] .fileItem:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #000000;
+}
+
+[data-theme='light'] .fileItem.active {
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+}
+
+[data-theme='light'] .leftPane {
+  background-color: #fafdff;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .editorInput {
+  color: #18181b;
+}
+
+[data-theme='light'] .rightPane {
+  background-color: #ffffff;
+}
+
+[data-theme='light'] .previewContainer {
+  color: #24292e;
+}
+
+[data-theme='light'] .previewContainer h1, 
+[data-theme='light'] .previewContainer h2, 
+[data-theme='light'] .previewContainer h3 {
+  color: #1b1f23;
+}
+
+[data-theme='light'] .previewContainer h1 {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .previewContainer pre {
+  background: #f6f8fa;
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .previewContainer code {
+  background: rgba(0, 0, 0, 0.04);
+  color: #24292e;
+}
+
+[data-theme='light'] .previewContainer pre code {
+  color: #24292e;
+}
+
+[data-theme='light'] .lineNumbers {
+  background-color: #ffffff;
+  border-right-color: rgba(0, 0, 0, 0.06);
+  color: #71717a;
+}
+
+[data-theme='light'] .codePre {
+  color: #24292e;
+}
+
+[data-theme='light'] .codeViewContainer {
+  background-color: #ffffff;
+}
+
+/* highlight.js token overrides for Light Mode */
+[data-theme='light'] .hljs-keyword,
+[data-theme='light'] .hljs-operator,
+[data-theme='light'] .hljs-selector-tag { color: #d73a49; font-weight: 600; }
+[data-theme='light'] .hljs-string,
+[data-theme='light'] .hljs-type,
+[data-theme='light'] .hljs-built_in,
+[data-theme='light'] .hljs-bullet,
+[data-theme='light'] .hljs-symbol { color: #032f62; }
+[data-theme='light'] .hljs-comment,
+[data-theme='light'] .hljs-quote { color: #6a737d; font-style: italic; }
+[data-theme='light'] .hljs-number,
+[data-theme='light'] .hljs-literal { color: #005cc5; }
+[data-theme='light'] .hljs-title,
+[data-theme='light'] .hljs-section,
+[data-theme='light'] .hljs-function { color: #6f42c1; font-weight: 600; }
+[data-theme='light'] .hljs-variable,
+[data-theme='light'] .hljs-template-variable { color: #e36209; }
+[data-theme='light'] .hljs-params { color: #24292e; }
+[data-theme='light'] .hljs-attr,
+[data-theme='light'] .hljs-attribute,
+[data-theme='light'] .hljs-property { color: #005cc5; } /* fixes JSON keys on white bg! */
+[data-theme='light'] .hljs-tag,
+[data-theme='light'] .hljs-name { color: #22863a; }
+[data-theme='light'] .hljs-meta { color: #6f42c1; }
+[data-theme='light'] .hljs { color: #24292e; background: transparent; }
+
+[data-theme='light'] .fallbackCard {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme='light'] .fallbackName {
+  color: #18181b;
+}
+
+/* Responsive CSS */
+@media (max-width: 768px) {
+  .docContentWrapper {
+    margin: 16px;
+    height: calc(100vh - 104px);
+  }
+  .pdfContentWrapper,
+  .markdownContentWrapper {
+    margin: 16px;
+    height: calc(100vh - 104px);
+    width: calc(100% - 32px);
+  }
+  .splitLayout {
+    flex-direction: column;
+  }
+  .leftPane, .rightPane {
+    width: 100%;
+    height: 50vh;
+  }
+  .leftPane {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  [data-theme='light'] .leftPane {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
