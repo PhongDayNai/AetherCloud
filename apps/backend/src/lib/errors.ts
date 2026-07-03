@@ -7,25 +7,25 @@ export class DomainError extends Error {
 }
 
 export class NotFoundError extends DomainError {
-  constructor(message: string = 'Không tìm thấy tài nguyên') {
+  constructor(message: string = 'Resource not found') {
     super(message, 404);
   }
 }
 
 export class ForbiddenError extends DomainError {
-  constructor(message: string = 'Bạn không có quyền thực hiện hành động này') {
+  constructor(message: string = 'You do not have permission to perform this action') {
     super(message, 403);
   }
 }
 
 export class ValidationError extends DomainError {
-  constructor(message: string = 'Dữ liệu không hợp lệ') {
+  constructor(message: string = 'Invalid data') {
     super(message, 400);
   }
 }
 
 export class ConflictError extends DomainError {
-  constructor(message: string = 'Tài nguyên đã tồn tại') {
+  constructor(message: string = 'Resource already exists') {
     super(message, 409);
   }
 }
