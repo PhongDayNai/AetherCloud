@@ -30,6 +30,8 @@ export interface Asset {
   deletedAt: string | null;
   isLibrary: boolean;
   type: string;
+  version: number;
+  lastModifiedById: string | null;
 }
 
 const isDocker = fs.existsSync('/.dockerenv');
@@ -152,6 +154,8 @@ export function fromDB(row: any): Asset | null {
     deletedAt: row.deleted_at ? new Date(row.deleted_at).toISOString() : null,
     isLibrary: row.is_library !== undefined ? Boolean(row.is_library) : true,
     type: row.type,
+    version: row.version !== undefined ? Number(row.version) : 1,
+    lastModifiedById: row.last_modified_by || null,
   };
 }
 
@@ -552,6 +556,8 @@ export async function saveUploadedFile(file: any, user?: any, groupId: string | 
     deletedAt: null,
     isLibrary,
     type: file.mimetype?.startsWith('image/') ? 'image' : file.mimetype?.startsWith('video/') ? 'video' : 'file',
+    version: 1,
+    lastModifiedById: ownerId,
   };
 
   await db.query(`
@@ -559,14 +565,14 @@ export async function saveUploadedFile(file: any, user?: any, groupId: string | 
       id, original_name, mime, size, owner_id, group_id, uploaded_at, taken_at, rel_path,
       play_rel_path, hls_rel_path, processing_status, processing_started_at,
       processing_finished_at, ext, album_name, album_names, doc_project_name,
-      doc_project_names, tags, is_deleted, deleted_at, is_library, type
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+      doc_project_names, tags, is_deleted, deleted_at, is_library, type, version, last_modified_by
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
   `, [
     item.id, item.originalName, item.mime, Number(item.size), item.ownerId, item.groupId,
     item.uploadedAt, item.takenAt, item.relPath, item.playRelPath, item.hlsRelPath,
     item.processingStatus, item.processingStartedAt, item.processingFinishedAt,
     item.ext, item.albumName, item.albumNames, item.docProjectName, item.docProjectNames,
-    item.tags, item.isDeleted, item.deletedAt, item.isLibrary, item.type
+    item.tags, item.isDeleted, item.deletedAt, item.isLibrary, item.type, item.version, item.lastModifiedById
   ]);
 
   if (isVideo) scheduleVideoDerivatives(id, absPath);
@@ -1056,6 +1062,16 @@ export async function purgeDeleted(ids: string[] = []): Promise<{ removed: numbe
           } catch {}
         }
       }
+
+      // 4. Xóa thư mục lưu lịch sử phiên bản (versions directory) của asset này
+      const versionsDir = path.join(LIBRARY_PATH, 'derived', 'versions', item.id);
+      try {
+        if (fs.existsSync(versionsDir)) {
+          fs.rmSync(versionsDir, { recursive: true, force: true });
+        }
+      } catch (err: any) {
+        console.error(`Failed to delete versions directory for asset ${item.id}:`, err.message);
+      }
       
       await client.query('DELETE FROM assets WHERE id = $1', [item.id]);
       removed++;
@@ -1216,3 +1232,20 @@ export async function getUnifiedStats(ownerId: string, storage: any, groupId: st
 }
 
 ensureDirs();
+
+export function isEditableTextAsset(asset: Asset): boolean {
+  const mime = (asset.mime || '').toLowerCase();
+  if (mime.startsWith('text/')) return true;
+  if (mime === 'application/json' || mime === 'application/xml' || mime === 'application/javascript' || mime === 'application/x-javascript' || mime === 'application/ecmascript') {
+    return true;
+  }
+
+  const ext = (asset.ext || '').replace(/^\./, '').toLowerCase();
+  const textExts = new Set([
+    ...CATEGORY_EXTENSIONS.markdown,
+    ...CATEGORY_EXTENSIONS.text,
+    ...CATEGORY_EXTENSIONS.code,
+    ...CATEGORY_EXTENSIONS.config,
+  ]);
+  return textExts.has(ext);
+}

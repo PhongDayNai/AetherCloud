@@ -62,20 +62,28 @@ BEGIN
     ALTER TABLE users ADD COLUMN avatar_url VARCHAR(1000);
   END IF;
 
-  -- Phase 2 migrations for assets
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='owner_id') THEN
-    ALTER TABLE assets ADD COLUMN owner_id UUID REFERENCES users(id) ON DELETE CASCADE;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='group_id') THEN
-    ALTER TABLE assets ADD COLUMN group_id UUID;
-  END IF;
-  
-  -- Cho phép owner có thể NULL
-  ALTER TABLE assets ALTER COLUMN owner DROP NOT NULL;
+  -- Phase 2 & 3 migrations for assets (only alter if table exists; fresh installs will create it with columns)
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='assets') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='owner_id') THEN
+      ALTER TABLE assets ADD COLUMN owner_id UUID REFERENCES users(id) ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='group_id') THEN
+      ALTER TABLE assets ADD COLUMN group_id UUID;
+    END IF;
+    
+    -- Cho phép owner có thể NULL
+    ALTER TABLE assets ALTER COLUMN owner DROP NOT NULL;
 
-  -- Phase 3 migrations for assets
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='is_library') THEN
-    ALTER TABLE assets ADD COLUMN is_library BOOLEAN NOT NULL DEFAULT TRUE;
+    -- Phase 3 migrations for assets
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='is_library') THEN
+      ALTER TABLE assets ADD COLUMN is_library BOOLEAN NOT NULL DEFAULT TRUE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='version') THEN
+      ALTER TABLE assets ADD COLUMN version INT NOT NULL DEFAULT 1;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='last_modified_by') THEN
+      ALTER TABLE assets ADD COLUMN last_modified_by UUID REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
   END IF;
 END $$;
 
@@ -99,16 +107,20 @@ CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
 
 DO $$
 BEGIN
-  -- Thêm group_id vào bảng spaces
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='spaces' AND column_name='group_id') THEN
-    ALTER TABLE spaces ADD COLUMN group_id UUID REFERENCES groups(id) ON DELETE CASCADE;
+  -- Thêm group_id vào bảng spaces (chỉ chạy nếu table spaces đã tồn tại)
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='spaces') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='spaces' AND column_name='group_id') THEN
+      ALTER TABLE spaces ADD COLUMN group_id UUID REFERENCES groups(id) ON DELETE CASCADE;
+    END IF;
+    -- Giữ nguyên owner_id của space là NOT NULL để xác định rõ người tạo
+    ALTER TABLE spaces ALTER COLUMN owner_id SET NOT NULL;
   END IF;
-  -- Giữ nguyên owner_id của space là NOT NULL để xác định rõ người tạo
-  ALTER TABLE spaces ALTER COLUMN owner_id SET NOT NULL;
 
   -- Thêm khóa ngoại cho group_id trong bảng assets trỏ đến groups(id) ON DELETE CASCADE
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_assets_group') THEN
-    ALTER TABLE assets ADD CONSTRAINT fk_assets_group FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='assets') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_assets_group') THEN
+      ALTER TABLE assets ADD CONSTRAINT fk_assets_group FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE;
+    END IF;
   END IF;
 END $$;
 
@@ -147,7 +159,9 @@ CREATE TABLE IF NOT EXISTS assets (
   is_deleted BOOLEAN DEFAULT FALSE,
   deleted_at TIMESTAMPTZ,
   is_library BOOLEAN DEFAULT TRUE,
-  type VARCHAR(50) NOT NULL
+  type VARCHAR(50) NOT NULL,
+  version INT NOT NULL DEFAULT 1,
+  last_modified_by UUID REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_assets_taken_at ON assets (taken_at DESC);
@@ -156,6 +170,20 @@ CREATE INDEX IF NOT EXISTS idx_assets_type ON assets (type);
 CREATE INDEX IF NOT EXISTS idx_assets_owner_id ON assets (owner_id);
 CREATE INDEX IF NOT EXISTS idx_assets_is_library ON assets (is_library);
 CREATE INDEX IF NOT EXISTS idx_assets_pagination ON assets (owner_id, is_deleted, taken_at DESC, id DESC);
+
+-- Bảng lưu trữ lịch sử phiên bản tệp tin (Asset Versions)
+CREATE TABLE IF NOT EXISTS asset_versions (
+  id UUID PRIMARY KEY,
+  asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+  version_number INT NOT NULL,
+  rel_path VARCHAR(1000) NOT NULL,
+  size BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  UNIQUE (asset_id, version_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_asset_versions_lookup ON asset_versions (asset_id, version_number DESC);
 
 -- Tạo bảng Không gian con (Spaces)
 CREATE TABLE IF NOT EXISTS spaces (
@@ -191,11 +219,13 @@ CREATE TABLE IF NOT EXISTS post_assets (
 -- Hỗ trợ thùng rác cho Space con (Spaces)
 DO $$ 
 BEGIN 
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'spaces' AND column_name = 'is_deleted') THEN
-    ALTER TABLE spaces ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'spaces' AND column_name = 'deleted_at') THEN
-    ALTER TABLE spaces ADD COLUMN deleted_at TIMESTAMPTZ;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='spaces') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'spaces' AND column_name = 'is_deleted') THEN
+      ALTER TABLE spaces ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'spaces' AND column_name = 'deleted_at') THEN
+      ALTER TABLE spaces ADD COLUMN deleted_at TIMESTAMPTZ;
+    END IF;
   END IF;
 END $$;
 
@@ -204,10 +234,12 @@ CREATE INDEX IF NOT EXISTS idx_spaces_is_deleted ON spaces(is_deleted);
 -- Nâng cấp khóa ngoại owner_id của assets thành ON DELETE SET NULL để bảo toàn dữ liệu nhóm
 DO $$ 
 BEGIN 
-  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'assets_owner_id_fkey') THEN
-    ALTER TABLE assets DROP CONSTRAINT assets_owner_id_fkey;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='assets') THEN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'assets_owner_id_fkey') THEN
+      ALTER TABLE assets DROP CONSTRAINT assets_owner_id_fkey;
+    END IF;
+    ALTER TABLE assets ADD CONSTRAINT assets_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL;
   END IF;
-  ALTER TABLE assets ADD CONSTRAINT assets_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL;
 END $$;
 `;
 
