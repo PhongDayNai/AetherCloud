@@ -5,6 +5,7 @@ import fs from 'fs';
 import * as db from '../lib/db';
 import { requireAuth } from '../middleware/requireAuth';
 import { saveUploadedFile } from '../lib/assets';
+import { isValidUUID, filterValidUUIDs, getGroupMemberRole } from '../lib/utils';
 
 const router = express.Router();
 const tempDir = '/tmp/aethercloud-upload-spaces';
@@ -21,6 +22,9 @@ const upload = multer({
 // Middleware kiểm tra quyền sở hữu đối với space
 async function checkSpaceOwnership(req: Request, res: Response, next: NextFunction) {
   const { spaceId } = req.params;
+  if (!isValidUUID(spaceId)) {
+    return res.status(400).json({ message: 'spaceId không đúng định dạng UUID' });
+  }
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   try {
     const result = await db.query('SELECT * FROM spaces WHERE id = $1', [spaceId]);
@@ -37,14 +41,11 @@ async function checkSpaceOwnership(req: Request, res: Response, next: NextFuncti
     
     if (space.group_id) {
       // Kiểm tra xem user có phải thành viên nhóm không
-      const memberRes = await db.query(
-        'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
-        [space.group_id, req.user.sub]
-      );
-      if (memberRes.rows.length === 0) {
+      const role = await getGroupMemberRole(space.group_id, req.user.sub);
+      if (!role) {
         return res.status(403).json({ message: 'Bạn không có quyền truy cập không gian con của nhóm này' });
       }
-      req.groupRole = memberRes.rows[0].role; // Lưu lại vai trò
+      req.groupRole = role; // Lưu lại vai trò
     } else {
       // Kiểm tra sở hữu cá nhân
       if (space.owner_id !== req.user.sub) {
@@ -63,6 +64,11 @@ async function checkSpaceOwnership(req: Request, res: Response, next: NextFuncti
 router.get('/', requireAuth, async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   const groupId = req.query.groupId ? String(req.query.groupId) : undefined;
+
+  if (groupId && !isValidUUID(groupId)) {
+    return res.status(400).json({ message: 'groupId không đúng định dạng UUID' });
+  }
+
   const includeTrash = String(req.query.includeTrash || 'false') === 'true';
   const onlyTrash = String(req.query.onlyTrash || 'false') === 'true';
 
@@ -76,14 +82,10 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
     if (groupId) {
       // Xác minh quyền thành viên nhóm
-      const memberRes = await db.query(
-        'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, req.user.sub]
-      );
-      if (memberRes.rows.length === 0) {
+      const role = await getGroupMemberRole(groupId, req.user.sub);
+      if (!role) {
         return res.status(403).json({ message: 'Bạn không có quyền truy cập không gian con của nhóm này' });
       }
-      const role = memberRes.rows[0].role;
 
       // Thành viên thường (member) không được xem các Space trong thùng rác của nhóm
       let actualCondition = sqlCondition;
@@ -120,17 +122,17 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Loại không gian con không hợp lệ' });
   }
 
+  if (groupId && !isValidUUID(groupId)) {
+    return res.status(400).json({ message: 'groupId không đúng định dạng UUID' });
+  }
+
   try {
     if (groupId) {
       // Xác minh quyền Admin/Owner của nhóm để tạo Space nhóm
-      const memberRes = await db.query(
-        'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
-        [groupId, req.user.sub]
-      );
-      if (memberRes.rows.length === 0) {
+      const role = await getGroupMemberRole(groupId, req.user.sub);
+      if (!role) {
         return res.status(403).json({ message: 'Bạn không phải là thành viên của nhóm này' });
       }
-      const role = memberRes.rows[0].role;
       if (role !== 'owner' && role !== 'admin') {
         return res.status(403).json({ message: 'Chỉ chủ sở hữu hoặc quản trị viên nhóm mới được tạo không gian con chung' });
       }
@@ -287,7 +289,7 @@ router.get('/:spaceId/posts', requireAuth, checkSpaceOwnership, async (req: Requ
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN post_assets pa ON p.id = pa.post_id
-      LEFT JOIN assets a ON pa.asset_id = a.id
+      LEFT JOIN assets a ON pa.asset_id = a.id AND a.is_deleted = false
       WHERE p.space_id = $1
       ORDER BY p.created_at DESC
     `;
@@ -356,6 +358,9 @@ router.post('/:spaceId/posts', requireAuth, checkSpaceOwnership, upload.array('f
     }
   }
 
+  // Lọc chỉ giữ lại các ID đúng định dạng UUID để tránh lỗi Postgres quăng Exception kiểu dữ liệu
+  const validAssetIds = filterValidUUIDs(assetIdsInput);
+
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -372,7 +377,7 @@ router.post('/:spaceId/posts', requireAuth, checkSpaceOwnership, upload.array('f
     const groupId = req.space?.group_id || null;
 
     // B. Đính kèm các asset_ids có sẵn (phải thuộc quyền sở hữu của user hoặc thuộc về nhóm chứa space)
-    if (Array.isArray(assetIdsInput) && assetIdsInput.length > 0) {
+    if (validAssetIds.length > 0) {
       let checkRes;
       if (groupId) {
         // Lấy tất cả tệp tin hợp lệ và đang hoạt động (do user sở hữu hoặc thuộc nhóm này)
@@ -384,7 +389,7 @@ router.post('/:spaceId/posts', requireAuth, checkSpaceOwnership, upload.array('f
              owner_id = $2 OR 
              group_id = $3
            )`,
-          [assetIdsInput, req.user?.sub, groupId]
+          [validAssetIds, req.user?.sub, groupId]
         );
         
         for (const original of checkRes.rows) {
@@ -432,7 +437,7 @@ router.post('/:spaceId/posts', requireAuth, checkSpaceOwnership, upload.array('f
         // Space cá nhân, đính kèm trực tiếp tệp cá nhân của user đang hoạt động
         checkRes = await client.query(
           'SELECT id FROM assets WHERE id = ANY($1) AND is_deleted = false AND owner_id = $2 AND group_id IS NULL',
-          [assetIdsInput, req.user?.sub]
+          [validAssetIds, req.user?.sub]
         );
         const validIds = checkRes.rows.map(r => r.id);
         for (const aid of validIds) {
