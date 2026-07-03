@@ -8,7 +8,7 @@ import { ValidationError } from '../../lib/errors';
 
 export async function refresh(token: string) {
   if (!token) {
-    throw new ValidationError('Thiếu token');
+    throw new ValidationError('Token is missing');
   }
 
   const payload = verifyRefresh(token);
@@ -21,7 +21,7 @@ export async function refresh(token: string) {
   );
 
   if (tokenRes.rows.length === 0) {
-    throw new ValidationError('Token không hợp lệ hoặc đã hết hạn');
+    throw new ValidationError('Token is invalid or expired');
   }
 
   // Kiểm tra thông tin người dùng
@@ -29,7 +29,7 @@ export async function refresh(token: string) {
   if (userRes.rows.length === 0 || !userRes.rows[0].is_active) {
     // Hủy token
     await db.query('DELETE FROM refresh_tokens WHERE token_hash = $1', [refreshHash]);
-    throw new ValidationError('Tài khoản không hoạt động');
+    throw new ValidationError('Account is inactive');
   }
 
   const user = userRes.rows[0];

@@ -4,20 +4,20 @@ import { ValidationError, ForbiddenError } from '../../lib/errors';
 
 export async function transferGroupOwnership(groupId: string, targetUserId: string, actorUserId: string) {
   if (!isValidUUID(groupId) || !isValidUUID(targetUserId)) {
-    throw new ValidationError('ID không đúng định dạng UUID');
+    throw new ValidationError('ID is not in valid UUID format');
   }
 
   const actorRole = await getGroupMemberRole(groupId, actorUserId);
   if (actorRole !== 'owner') {
-    throw new ForbiddenError('Chỉ chủ sở hữu nhóm hiện tại mới có quyền chuyển nhượng nhóm');
+    throw new ForbiddenError('Only the current group owner can transfer group ownership');
   }
 
   if (targetUserId === actorUserId) {
-    throw new ValidationError('Bạn đã là chủ sở hữu của nhóm này');
+    throw new ValidationError('You are already the owner of this group');
   }
 
   if (!(await isGroupMember(groupId, targetUserId))) {
-    throw new ValidationError('Người nhận chuyển nhượng phải là thành viên của nhóm');
+    throw new ValidationError('The transferee must be a member of the group');
   }
 
   const client = await db.pool.connect();

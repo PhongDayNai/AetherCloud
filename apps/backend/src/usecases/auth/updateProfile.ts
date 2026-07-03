@@ -4,7 +4,7 @@ import { ValidationError } from '../../lib/errors';
 
 export async function updateProfile(userId: string, name: any) {
   if (!name || !name.trim()) {
-    throw new ValidationError('Tên hiển thị không được bỏ trống');
+    throw new ValidationError('Display name cannot be empty');
   }
 
   await db.query('UPDATE users SET name = $1 WHERE id = $2', [name.trim(), userId]);

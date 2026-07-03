@@ -4,7 +4,7 @@ import { ForbiddenError, ValidationError } from '../../lib/errors';
 
 export async function listSpaces(userId: string, groupId: string | undefined, includeTrash: boolean, onlyTrash: boolean) {
   if (groupId && !isValidUUID(groupId)) {
-    throw new ValidationError('groupId không đúng định dạng UUID');
+    throw new ValidationError('groupId is not in valid UUID format');
   }
 
   let sqlCondition = 'AND is_deleted = false';
@@ -17,7 +17,7 @@ export async function listSpaces(userId: string, groupId: string | undefined, in
   if (groupId) {
     const role = await getGroupMemberRole(groupId, userId);
     if (!role) {
-      throw new ForbiddenError('Bạn không có quyền truy cập không gian con của nhóm này');
+      throw new ForbiddenError('You do not have permission to access the spaces of this group');
     }
 
     let actualCondition = sqlCondition;

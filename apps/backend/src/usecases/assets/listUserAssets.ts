@@ -16,10 +16,10 @@ export async function listUserAssets(userId: string, limit: number, options: {
 }) {
   if (options.groupId) {
     if (!isValidUUID(options.groupId)) {
-      throw new ValidationError('groupId không đúng định dạng UUID');
+      throw new ValidationError('groupId is not in valid UUID format');
     }
     if (!(await isGroupMember(options.groupId, userId))) {
-      throw new ForbiddenError('Bạn không có quyền truy cập tệp tin của nhóm này');
+      throw new ForbiddenError('You do not have permission to access files in this group');
     }
   }
 

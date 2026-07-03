@@ -4,16 +4,16 @@ import { NotFoundError, ForbiddenError, ValidationError } from '../../lib/errors
 
 export async function updateSpace(spaceId: string, name: string, description: string | undefined, type: string, userId: string) {
   if (!name || !type) {
-    throw new ValidationError('Thiếu tên hoặc loại không gian con');
+    throw new ValidationError('Name or type of space is missing');
   }
 
   if (!['journal', 'collection', 'project'].includes(type)) {
-    throw new ValidationError('Loại không gian con không hợp lệ');
+    throw new ValidationError('Invalid space type');
   }
 
   const spaceRes = await db.query('SELECT * FROM spaces WHERE id = $1', [spaceId]);
   if (spaceRes.rows.length === 0) {
-    throw new NotFoundError('Không tìm thấy không gian con này');
+    throw new NotFoundError('Space not found');
   }
   const space = spaceRes.rows[0];
 
@@ -21,18 +21,18 @@ export async function updateSpace(spaceId: string, name: string, description: st
   if (space.group_id) {
     groupRole = await getGroupMemberRole(space.group_id, userId);
     if (!groupRole) {
-      throw new ForbiddenError('Bạn không có quyền truy cập không gian con của nhóm này');
+      throw new ForbiddenError('You do not have permission to access the spaces of this group');
     }
   } else {
     if (space.owner_id !== userId) {
-      throw new ForbiddenError('Bạn không có quyền truy cập không gian con này');
+      throw new ForbiddenError('You do not have permission to access this space');
     }
   }
 
   const isSpaceOwner = space.owner_id === userId;
   const isGroupOwner = space.group_id && groupRole === 'owner';
   if (!isSpaceOwner && !isGroupOwner) {
-    throw new ForbiddenError('Chỉ người tạo không gian con hoặc chủ sở hữu nhóm mới có quyền thay đổi');
+    throw new ForbiddenError('Only the space creator or group owner has permission to change it');
   }
 
   const result = await db.query(

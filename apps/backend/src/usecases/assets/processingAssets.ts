@@ -4,13 +4,13 @@ import { ValidationError, ForbiddenError } from '../../lib/errors';
 
 export async function getProcessingAssets(groupId: string | undefined, userId: string) {
   if (groupId && !isValidUUID(groupId)) {
-    throw new ValidationError('groupId không đúng định dạng UUID');
+    throw new ValidationError('groupId is not in valid UUID format');
   }
 
   let result;
   if (groupId) {
     if (!(await isGroupMember(groupId, userId))) {
-      throw new ForbiddenError('Bạn không có quyền truy cập thông tin nhóm này');
+      throw new ForbiddenError('You do not have permission to access this group information');
     }
 
     result = await db.query(

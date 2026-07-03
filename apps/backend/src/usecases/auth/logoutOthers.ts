@@ -4,7 +4,7 @@ import { ValidationError } from '../../lib/errors';
 
 export async function logoutOthers(userId: string, token: string) {
   if (!token) {
-    throw new ValidationError('Thiếu token phiên hiện tại');
+    throw new ValidationError('Current session token is missing');
   }
 
   const refreshHash = hashToken(token);

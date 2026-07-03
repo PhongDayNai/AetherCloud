@@ -4,39 +4,39 @@ import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from '.
 
 export async function addGroupMember(groupId: string, email: string, role: string, actorUserId: string) {
   if (!isValidUUID(groupId)) {
-    throw new ValidationError('groupId không đúng định dạng UUID');
+    throw new ValidationError('groupId is not in valid UUID format');
   }
 
   if (!email || !email.trim()) {
-    throw new ValidationError('Email thành viên không được để trống');
+    throw new ValidationError('Member email cannot be empty');
   }
 
   if (role === 'owner') {
-    throw new ValidationError('Không thể thêm trực tiếp thành viên với vai trò chủ sở hữu');
+    throw new ValidationError('Cannot add a member directly as owner');
   }
   if (role !== 'admin' && role !== 'member') {
-    throw new ValidationError('Vai trò không hợp lệ (admin hoặc member)');
+    throw new ValidationError('Invalid role (admin or member)');
   }
 
   const actorRole = await getGroupMemberRole(groupId, actorUserId);
   if (actorRole !== 'owner' && actorRole !== 'admin') {
-    throw new ForbiddenError('Chỉ chủ sở hữu hoặc quản trị viên mới được thêm thành viên');
+    throw new ForbiddenError('Only the owner or admins can add members');
   }
 
   if (role === 'admin' && actorRole !== 'owner') {
-    throw new ForbiddenError('Chỉ chủ sở hữu nhóm mới có quyền chỉ định quản trị viên mới');
+    throw new ForbiddenError('Only the group owner can assign new admins');
   }
 
   // Tìm user theo email
   const userRes = await db.query('SELECT id FROM users WHERE email = $1 AND is_active = true LIMIT 1', [email.trim().toLowerCase()]);
   if (userRes.rows.length === 0) {
-    throw new NotFoundError('Không tìm thấy người dùng hoạt động với email này');
+    throw new NotFoundError('Active user not found with this email');
   }
   const targetUserId = userRes.rows[0].id;
 
   // Kiểm tra xem đã là thành viên chưa
   if (await isGroupMember(groupId, targetUserId)) {
-    throw new ConflictError('Người dùng này đã là thành viên của nhóm');
+    throw new ConflictError('This user is already a member of the group');
   }
 
   await db.query(

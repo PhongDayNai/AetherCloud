@@ -4,12 +4,12 @@ import { ValidationError, ForbiddenError } from '../../lib/errors';
 
 export async function deleteGroup(groupId: string, actorUserId: string) {
   if (!isValidUUID(groupId)) {
-    throw new ValidationError('groupId không đúng định dạng UUID');
+    throw new ValidationError('groupId is not in valid UUID format');
   }
 
   const actorRole = await getGroupMemberRole(groupId, actorUserId);
   if (actorRole !== 'owner') {
-    throw new ForbiddenError('Chỉ chủ sở hữu nhóm mới có quyền xóa nhóm');
+    throw new ForbiddenError('Only the group owner can delete the group');
   }
 
   const client = await db.pool.connect();

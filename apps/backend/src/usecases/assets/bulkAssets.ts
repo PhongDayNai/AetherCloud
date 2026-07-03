@@ -15,11 +15,11 @@ import { ValidationError, ForbiddenError } from '../../lib/errors';
 export async function listUserAlbums(userId: string, groupId: string | null) {
   if (groupId) {
     if (!isValidUUID(groupId)) {
-      throw new ValidationError('groupId không đúng định dạng UUID');
+      throw new ValidationError('groupId is not in valid UUID format');
     }
     const isMember = await isGroupMember(groupId, userId);
     if (!isMember) {
-      throw new ForbiddenError('Bạn không có quyền truy cập thông tin nhóm này');
+      throw new ForbiddenError('You do not have permission to access this group information');
     }
   }
   return listAlbums(userId, groupId);
@@ -28,11 +28,11 @@ export async function listUserAlbums(userId: string, groupId: string | null) {
 export async function listUserDocProjects(userId: string, groupId: string | null) {
   if (groupId) {
     if (!isValidUUID(groupId)) {
-      throw new ValidationError('groupId không đúng định dạng UUID');
+      throw new ValidationError('groupId is not in valid UUID format');
     }
     const isMember = await isGroupMember(groupId, userId);
     if (!isMember) {
-      throw new ForbiddenError('Bạn không có quyền truy cập thông tin nhóm này');
+      throw new ForbiddenError('You do not have permission to access this group information');
     }
   }
   return listDocProjects(userId, groupId);
@@ -64,11 +64,11 @@ export async function purgeBulkAssets(ids: string[], bulkAssets: any[], userId: 
   for (const asset of bulkAssets) {
     if (asset.group_id) {
       if (asset.groupRole !== 'owner') {
-        throw new ForbiddenError('Chỉ chủ sở hữu nhóm mới có quyền xóa vĩnh viễn các tệp tin trong nhóm');
+        throw new ForbiddenError('Only the group owner can permanently delete files in the group');
       }
     } else {
       if (asset.owner_id !== userId) {
-        throw new ForbiddenError('Bạn không có quyền xóa vĩnh viễn tệp tin cá nhân của người khác');
+        throw new ForbiddenError('You do not have permission to permanently delete other people\'s personal files');
       }
     }
   }
@@ -77,17 +77,17 @@ export async function purgeBulkAssets(ids: string[], bulkAssets: any[], userId: 
 
 export async function bulkShareToGroup(ids: string[], groupId: string, userId: string) {
   if (!groupId) {
-    throw new ValidationError('groupId là bắt buộc');
+    throw new ValidationError('groupId is required');
   }
 
   if (!isValidUUID(groupId)) {
-    throw new ValidationError('groupId không đúng định dạng UUID');
+    throw new ValidationError('groupId is not in valid UUID format');
   }
 
   const validIds = filterValidUUIDs(ids);
 
   if (!(await isGroupMember(groupId, userId))) {
-    throw new ForbiddenError('Bạn không phải là thành viên của nhóm nhận chia sẻ');
+    throw new ForbiddenError('You are not a member of the recipient group');
   }
 
   const client = await db.pool.connect();

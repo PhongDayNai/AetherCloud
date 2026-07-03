@@ -4,12 +4,12 @@ import { ValidationError, NotFoundError } from '../../lib/errors';
 
 export async function changePassword(userId: string, oldPassword: any, newPassword: any) {
   if (!oldPassword || !newPassword) {
-    throw new ValidationError('Thiếu mật khẩu cũ hoặc mật khẩu mới');
+    throw new ValidationError('Old password or new password is missing');
   }
 
   const userRes = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
   if (userRes.rows.length === 0) {
-    throw new NotFoundError('Người dùng không tồn tại');
+    throw new NotFoundError('User does not exist');
   }
 
   const user = userRes.rows[0];
@@ -17,7 +17,7 @@ export async function changePassword(userId: string, oldPassword: any, newPasswo
   // Xác thực mật khẩu cũ
   const oldHash = hashPassword(oldPassword, user.salt);
   if (oldHash !== user.password_hash) {
-    throw new ValidationError('Mật khẩu cũ không chính xác');
+    throw new ValidationError('Incorrect old password');
   }
 
   // Tạo salt mới và băm mật khẩu mới

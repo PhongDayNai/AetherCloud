@@ -18,10 +18,10 @@ export async function initUploadChunk(
 
   if (groupId) {
     if (!isValidUUID(groupId)) {
-      throw new ValidationError('groupId không đúng định dạng UUID');
+      throw new ValidationError('groupId is not in valid UUID format');
     }
     if (!(await isGroupMember(groupId, userId))) {
-      throw new ForbiddenError('Bạn không có quyền tải tệp lên nhóm này');
+      throw new ForbiddenError('You do not have permission to upload files to this group');
     }
   }
 
@@ -37,7 +37,7 @@ export async function completeUploadChunk(
 ) {
   if (groupId) {
     if (!(await isGroupMember(groupId, user.sub))) {
-      throw new ForbiddenError('Bạn không còn là thành viên của nhóm này');
+      throw new ForbiddenError('You are no longer a member of this group');
     }
   }
 
@@ -62,10 +62,10 @@ export async function uploadSmallFiles(
 ) {
   if (groupId) {
     if (!isValidUUID(groupId)) {
-      throw new ValidationError('groupId không đúng định dạng UUID');
+      throw new ValidationError('groupId is not in valid UUID format');
     }
     if (!(await isGroupMember(groupId, user.sub))) {
-      throw new ForbiddenError('Bạn không quyền tải tệp lên nhóm này');
+      throw new ForbiddenError('You do not have permission to upload files to this group');
     }
   }
 

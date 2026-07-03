@@ -4,7 +4,7 @@ import { ValidationError, NotFoundError } from '../../lib/errors';
 
 export async function deactivateInvitation(invitationId: string) {
   if (!isValidUUID(invitationId)) {
-    throw new ValidationError('id không đúng định dạng UUID');
+    throw new ValidationError('id is not in valid UUID format');
   }
 
   const result = await db.query(
@@ -13,6 +13,6 @@ export async function deactivateInvitation(invitationId: string) {
   );
 
   if (result.rowCount === 0) {
-    throw new NotFoundError('Không tìm thấy mã mời');
+    throw new NotFoundError('Invitation code not found');
   }
 }

@@ -75,7 +75,7 @@ router.delete('/:spaceId', requireAuth, async (req: Request, res: Response) => {
 
   try {
     await spacesUsecase.trashSpace(spaceId, req.user.sub);
-    return res.json({ ok: true, message: 'Đã đưa không gian con vào thùng rác thành công' });
+    return res.json({ ok: true, message: 'Successfully moved the space to trash' });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
@@ -91,7 +91,7 @@ router.post('/:spaceId/restore', requireAuth, async (req: Request, res: Response
 
   try {
     await spacesUsecase.restoreSpace(spaceId, req.user.sub);
-    return res.json({ ok: true, message: 'Khôi phục không gian con thành công' });
+    return res.json({ ok: true, message: 'Successfully restored the space' });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
@@ -107,7 +107,7 @@ router.delete('/:spaceId/purge', requireAuth, async (req: Request, res: Response
 
   try {
     await spacesUsecase.purgeSpace(spaceId, req.user.sub);
-    return res.json({ ok: true, message: 'Đã xóa vĩnh viễn không gian con thành công. Các tệp đính kèm mồ côi sẽ tự động được dọn dẹp.' });
+    return res.json({ ok: true, message: 'Successfully deleted the space permanently. Orphaned attachments will be automatically cleaned up.' });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });

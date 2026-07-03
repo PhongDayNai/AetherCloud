@@ -26,7 +26,7 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(err.statusCode).json({ message: err.message });
     }
     console.error('[Auth Route] Login error:', err);
-    return res.status(500).json({ message: 'Lỗi máy chủ nội bộ' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 });
 
@@ -45,14 +45,14 @@ router.post('/register', async (req: Request, res: Response) => {
       return res.status(err.statusCode).json({ message: err.message });
     }
     console.error('[Auth Route] Register error:', err);
-    return res.status(500).json({ message: 'Lỗi máy chủ nội bộ' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 });
 
 // 3. Làm mới Token (Refresh)
 router.post('/refresh', async (req: Request, res: Response) => {
   const token = req.cookies?.[REFRESH_COOKIE];
-  if (!token) return res.status(401).json({ message: 'Thiếu token' });
+  if (!token) return res.status(401).json({ message: 'Missing token' });
 
   try {
     const { access } = await authUsecase.refresh(token);
@@ -69,7 +69,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
     }
-    return res.status(401).json({ message: 'Token không hợp lệ' });
+    return res.status(401).json({ message: 'Invalid token' });
   }
 });
 
@@ -96,7 +96,7 @@ router.get('/me', requireAuth, async (req: Request, res: Response) => {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
     }
-    return res.status(500).json({ message: 'Lỗi máy chủ nội bộ' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 });
 
@@ -106,13 +106,13 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response)
   const { old_password, new_password } = req.body || {};
   try {
     await authUsecase.changePassword(req.user.sub, old_password, new_password);
-    return res.json({ ok: true, message: 'Đổi mật khẩu thành công' });
+    return res.json({ ok: true, message: 'Password changed successfully' });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
     }
     console.error('[Auth Route] Change password error:', err);
-    return res.status(500).json({ message: 'Lỗi máy chủ nội bộ' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 });
 
@@ -122,13 +122,13 @@ router.post('/logout-others', requireAuth, async (req: Request, res: Response) =
   const token = req.cookies?.[REFRESH_COOKIE];
   try {
     await authUsecase.logoutOthers(req.user.sub, token);
-    return res.json({ ok: true, message: 'Đã đăng xuất khỏi các thiết bị khác thành công' });
+    return res.json({ ok: true, message: 'Successfully logged out of other devices' });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
     }
     console.error('[Auth Route] Logout others error:', err);
-    return res.status(500).json({ message: 'Lỗi máy chủ nội bộ' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 });
 
@@ -139,13 +139,13 @@ router.post('/update-profile', requireAuth, async (req: Request, res: Response) 
   try {
     const { newAccess, user } = await authUsecase.updateProfile(req.user.sub, name);
     res.cookie(ACCESS_COOKIE, newAccess, cookieOpts());
-    return res.json({ ok: true, message: 'Cập nhật hồ sơ thành công', user });
+    return res.json({ ok: true, message: 'Profile updated successfully', user });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
     }
     console.error('[Auth Route] Update profile error:', err);
-    return res.status(500).json({ message: 'Lỗi máy chủ nội bộ' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 });
 

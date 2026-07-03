@@ -49,20 +49,20 @@ async function checkAssetOwnership(req: Request, res: Response, next: NextFuncti
   const { id } = req.params;
   try {
     const asset = await getAsset(id);
-    if (!asset) return res.status(404).json({ message: 'Không tìm thấy tệp tin' });
+    if (!asset) return res.status(404).json({ message: 'File not found' });
     if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
 
     if (asset.groupId) {
       // Kiểm tra quyền thành viên nhóm
       const role = await getGroupMemberRole(asset.groupId, req.user.sub);
       if (!role) {
-        return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin thuộc nhóm này' });
+        return res.status(403).json({ message: 'You do not have permission to access files in this group' });
       }
       req.groupRole = role;
     } else {
       // Kiểm tra sở hữu cá nhân
       if (asset.ownerId !== req.user.sub) {
-        return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin này' });
+        return res.status(403).json({ message: 'You do not have permission to access this file' });
       }
     }
 
@@ -73,11 +73,11 @@ async function checkAssetOwnership(req: Request, res: Response, next: NextFuncti
         const isCreator = asset.ownerId === req.user.sub;
         const isManager = req.groupRole === 'owner' || req.groupRole === 'admin';
         if (!isCreator && !isManager) {
-          return res.status(403).json({ message: 'Chỉ người đóng góp hoặc quản trị viên nhóm mới có quyền thay đổi tệp tin này' });
+          return res.status(403).json({ message: 'Only contributors or group admins can modify this file' });
         }
       } else {
         if (asset.ownerId !== req.user.sub) {
-          return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa tệp tin này' });
+          return res.status(403).json({ message: 'You do not have permission to edit this file' });
         }
       }
     }
@@ -93,7 +93,7 @@ async function checkAssetOwnership(req: Request, res: Response, next: NextFuncti
 async function checkBulkOwnership(req: Request, res: Response, next: NextFunction) {
   const idsInput = Array.isArray(req.body?.ids) ? req.body.ids : [];
   const ids = filterValidUUIDs(idsInput);
-  if (!ids.length) return res.status(400).json({ message: 'Danh sách ids không chứa UUID hợp lệ' });
+  if (!ids.length) return res.status(400).json({ message: 'Ids list does not contain valid UUIDs' });
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
 
   try {
@@ -102,7 +102,7 @@ async function checkBulkOwnership(req: Request, res: Response, next: NextFunctio
       [ids]
     );
     if (assetsRes.rows.length !== ids.length) {
-      return res.status(404).json({ message: 'Một số tệp tin không tồn tại hoặc ID không hợp lệ' });
+      return res.status(404).json({ message: 'Some files do not exist or have invalid IDs' });
     }
 
     const verifiedAssets: any[] = [];
@@ -111,16 +111,16 @@ async function checkBulkOwnership(req: Request, res: Response, next: NextFunctio
       if (asset.group_id) {
         role = await getGroupMemberRole(asset.group_id, req.user.sub);
         if (!role) {
-          return res.status(403).json({ message: 'Bạn không có quyền thao tác trên một số tệp tin của nhóm' });
+          return res.status(403).json({ message: 'You do not have permission to perform actions on some group files' });
         }
         const isCreator = asset.owner_id === req.user.sub;
         const isManager = role === 'owner' || role === 'admin';
         if (!isCreator && !isManager) {
-          return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa hoặc xóa tệp tin của thành viên khác' });
+          return res.status(403).json({ message: 'You do not have permission to edit or delete files belonging to other members' });
         }
       } else {
         if (asset.owner_id !== req.user.sub) {
-          return res.status(403).json({ message: 'Bạn không có quyền thao tác trên một số tệp tin cá nhân của người khác' });
+          return res.status(403).json({ message: 'You do not have permission to perform actions on other people\'s personal files' });
         }
       }
       verifiedAssets.push({ ...asset, groupRole: role });
@@ -471,10 +471,12 @@ router.get('/_media/original/:id', requireAuth, checkAssetOwnership, async (req:
 router.put('/:id/albums', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
   const albumNames = Array.isArray(req.body?.albumNames) ? req.body.albumNames : [];
   try {
-    const result = await setAssetAlbums(req.params.id, albumNames);
-    if (result.updated === 0) return res.status(404).json({ message: 'Asset not found' });
+    const result = await assetsUsecase.updateAssetAlbums(req.params.id, albumNames);
     return res.json({ ok: true, ...result });
   } catch (e: any) {
+    if (e instanceof DomainError) {
+      return res.status(e.statusCode).json({ message: e.message });
+    }
     return res.status(500).json({ message: e.message });
   }
 });
@@ -483,10 +485,12 @@ router.put('/:id/albums', requireAuth, checkAssetOwnership, async (req: Request,
 router.put('/:id/doc-projects', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
   const projectNames = Array.isArray(req.body?.projectNames) ? req.body.projectNames : [];
   try {
-    const result = await setAssetDocProjects(req.params.id, projectNames);
-    if (result.updated === 0) return res.status(404).json({ message: 'Không tìm thấy tài liệu hoặc định dạng không đúng' });
+    const result = await assetsUsecase.updateAssetDocProjects(req.params.id, projectNames);
     return res.json({ ok: true, ...result });
   } catch (e: any) {
+    if (e instanceof DomainError) {
+      return res.status(e.statusCode).json({ message: e.message });
+    }
     return res.status(500).json({ message: e.message });
   }
 });
@@ -571,16 +575,16 @@ router.get('/processing', requireAuth, async (req: Request, res: Response) => {
 router.get('/status', requireAuth, async (req: Request, res: Response) => {
   const idsInput = String(req.query.ids || '').trim();
   if (!idsInput) {
-    return res.status(400).json({ message: 'Danh sách ids là bắt buộc (ids=id1,id2,...)' });
+    return res.status(400).json({ message: 'Ids list is required (ids=id1,id2,...)' });
   }
 
   const ids = filterValidUUIDs(idsInput.split(','));
   if (ids.length === 0) {
-    return res.status(400).json({ message: 'Danh sách ids không chứa UUID hợp lệ' });
+    return res.status(400).json({ message: 'Ids list does not contain valid UUIDs' });
   }
 
   try {
-    const statuses = await assetsUsecase.getAssetsStatus(ids, req.user?.sub);
+    const statuses = await assetsUsecase.getAssetsStatus(ids, req.user!.sub);
     return res.json({ ok: true, statuses });
   } catch (e: any) {
     return res.status(500).json({ message: e.message });

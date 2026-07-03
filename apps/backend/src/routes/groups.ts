@@ -10,11 +10,11 @@ const router = express.Router();
 export async function requireGroupMember(req: Request, res: Response, next: NextFunction) {
   const groupId = req.params.groupId || req.body.groupId || req.query.groupId;
   if (!groupId) {
-    return res.status(400).json({ message: 'Thiếu ID nhóm (groupId)' });
+    return res.status(400).json({ message: 'Missing group ID (groupId)' });
   }
 
   if (!isValidUUID(groupId)) {
-    return res.status(400).json({ message: 'groupId không đúng định dạng UUID' });
+    return res.status(400).json({ message: 'groupId is not in valid UUID format' });
   }
 
   if (!req.user) {
@@ -24,7 +24,7 @@ export async function requireGroupMember(req: Request, res: Response, next: Next
   try {
     const role = await getGroupMemberRole(groupId, req.user.sub);
     if (!role) {
-      return res.status(403).json({ message: 'Bạn không phải là thành viên của nhóm này' });
+      return res.status(403).json({ message: 'You are not a member of this group' });
     }
     req.groupRole = role; // Lưu vai trò để dùng ở các handler sau
     next();
@@ -36,7 +36,7 @@ export async function requireGroupMember(req: Request, res: Response, next: Next
 // 1. GET danh sách nhóm của user hiện tại
 router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
-    const groups = await groupUsecase.getUserGroups(req.user?.sub);
+    const groups = await groupUsecase.getUserGroups(req.user!.sub);
     return res.json({ ok: true, groups });
   } catch (err: any) {
     return res.status(500).json({ message: err.message });
@@ -46,7 +46,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
 // 1b. GET chi tiết nhóm (yêu cầu là thành viên)
 router.get('/:groupId', requireAuth, requireGroupMember, async (req: Request, res: Response) => {
   try {
-    const group = await groupUsecase.getGroupDetails(req.params.groupId, req.user?.sub);
+    const group = await groupUsecase.getGroupDetails(req.params.groupId, req.user!.sub);
     return res.json({ ok: true, group });
   } catch (err: any) {
     if (err instanceof DomainError) {
@@ -59,7 +59,7 @@ router.get('/:groupId', requireAuth, requireGroupMember, async (req: Request, re
 // 2. POST tạo nhóm mới
 router.post('/', requireAuth, async (req: Request, res: Response) => {
   try {
-    const group = await groupUsecase.createGroup(req.body?.name, req.user?.sub);
+    const group = await groupUsecase.createGroup(req.body?.name, req.user!.sub);
     return res.json({ ok: true, group });
   } catch (err: any) {
     if (err instanceof DomainError) {
@@ -72,7 +72,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
 // 3. GET danh sách thành viên trong nhóm
 router.get('/:groupId/members', requireAuth, requireGroupMember, async (req: Request, res: Response) => {
   try {
-    const members = await groupUsecase.getGroupMembers(req.params.groupId, req.user?.sub);
+    const members = await groupUsecase.getGroupMembers(req.params.groupId, req.user!.sub);
     return res.json({ ok: true, members });
   } catch (err: any) {
     if (err instanceof DomainError) {
@@ -87,8 +87,8 @@ router.post('/:groupId/members', requireAuth, requireGroupMember, async (req: Re
   const { groupId } = req.params;
   const { email, role = 'member' } = req.body || {};
   try {
-    await groupUsecase.addGroupMember(groupId, email, role, req.user?.sub);
-    return res.json({ ok: true, message: 'Thêm thành viên thành công' });
+    await groupUsecase.addGroupMember(groupId, email, role, req.user!.sub);
+    return res.json({ ok: true, message: 'Member added successfully' });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
@@ -102,8 +102,8 @@ router.put('/:groupId/members/:userId', requireAuth, requireGroupMember, async (
   const { groupId, userId } = req.params;
   const { role } = req.body || {};
   try {
-    await groupUsecase.updateGroupMemberRole(groupId, userId, role, req.user?.sub);
-    return res.json({ ok: true, message: 'Cập nhật vai trò thành công' });
+    await groupUsecase.updateGroupMemberRole(groupId, userId, role, req.user!.sub);
+    return res.json({ ok: true, message: 'Role updated successfully' });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
@@ -117,8 +117,8 @@ router.post('/:groupId/owner', requireAuth, requireGroupMember, async (req: Requ
   const { groupId } = req.params;
   const { targetUserId } = req.body || {};
   try {
-    await groupUsecase.transferGroupOwnership(groupId, targetUserId, req.user?.sub);
-    return res.json({ ok: true, message: 'Chuyển nhượng quyền sở hữu nhóm thành công. Vai trò mới của bạn là Quản trị viên.' });
+    await groupUsecase.transferGroupOwnership(groupId, targetUserId, req.user!.sub);
+    return res.json({ ok: true, message: 'Group ownership transferred successfully. Your new role is Admin.' });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
@@ -131,7 +131,7 @@ router.post('/:groupId/owner', requireAuth, requireGroupMember, async (req: Requ
 router.delete('/:groupId/members/:userId', requireAuth, requireGroupMember, async (req: Request, res: Response) => {
   const { groupId, userId } = req.params;
   try {
-    const message = await groupUsecase.removeGroupMember(groupId, userId, req.user?.sub);
+    const message = await groupUsecase.removeGroupMember(groupId, userId, req.user!.sub);
     return res.json({ ok: true, message });
   } catch (err: any) {
     if (err instanceof DomainError) {
@@ -145,8 +145,8 @@ router.delete('/:groupId/members/:userId', requireAuth, requireGroupMember, asyn
 router.delete('/:groupId', requireAuth, requireGroupMember, async (req: Request, res: Response) => {
   const { groupId } = req.params;
   try {
-    await groupUsecase.deleteGroup(groupId, req.user?.sub);
-    return res.json({ ok: true, message: 'Đã xóa nhóm thành công' });
+    await groupUsecase.deleteGroup(groupId, req.user!.sub);
+    return res.json({ ok: true, message: 'Group deleted successfully' });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });

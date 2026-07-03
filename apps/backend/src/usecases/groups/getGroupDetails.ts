@@ -4,12 +4,12 @@ import { NotFoundError, ForbiddenError, ValidationError } from '../../lib/errors
 
 export async function getGroupDetails(groupId: string, userId: string) {
   if (!isValidUUID(groupId)) {
-    throw new ValidationError('groupId không đúng định dạng UUID');
+    throw new ValidationError('groupId is not in valid UUID format');
   }
 
   const role = await getGroupMemberRole(groupId, userId);
   if (!role) {
-    throw new ForbiddenError('Bạn không phải là thành viên của nhóm này');
+    throw new ForbiddenError('You are not a member of this group');
   }
 
   const result = await db.query(
@@ -19,7 +19,7 @@ export async function getGroupDetails(groupId: string, userId: string) {
     [groupId]
   );
   if (result.rows.length === 0) {
-    throw new NotFoundError('Không tìm thấy nhóm này');
+    throw new NotFoundError('Group not found');
   }
 
   return { ...result.rows[0], role };

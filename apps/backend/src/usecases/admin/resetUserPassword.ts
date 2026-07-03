@@ -5,11 +5,11 @@ import { ValidationError, NotFoundError } from '../../lib/errors';
 
 export async function resetUserPassword(targetUserId: string, tempPassword: any) {
   if (!isValidUUID(targetUserId)) {
-    throw new ValidationError('id người dùng không đúng định dạng UUID');
+    throw new ValidationError('User id is not in valid UUID format');
   }
 
   if (!tempPassword) {
-    throw new ValidationError('Yêu cầu mật khẩu tạm thời');
+    throw new ValidationError('Temporary password is required');
   }
 
   const client = await db.pool.connect();
@@ -19,7 +19,7 @@ export async function resetUserPassword(targetUserId: string, tempPassword: any)
     // Kiểm tra xem user có tồn tại không
     const userRes = await client.query('SELECT role FROM users WHERE id = $1', [targetUserId]);
     if (userRes.rows.length === 0) {
-      throw new NotFoundError('Không tìm thấy người dùng');
+      throw new NotFoundError('User not found');
     }
 
     const salt = generateSalt();

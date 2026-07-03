@@ -4,24 +4,24 @@ import { NotFoundError, ForbiddenError, ValidationError } from '../../lib/errors
 
 export async function updateGroupMemberRole(groupId: string, targetUserId: string, role: string, actorUserId: string) {
   if (!isValidUUID(groupId) || !isValidUUID(targetUserId)) {
-    throw new ValidationError('ID không đúng định dạng UUID');
+    throw new ValidationError('ID is not in valid UUID format');
   }
 
   if (!role || (role !== 'admin' && role !== 'member')) {
-    throw new ValidationError('Vai trò cập nhật không hợp lệ (admin hoặc member)');
+    throw new ValidationError('Invalid updated role (admin or member)');
   }
 
   const actorRole = await getGroupMemberRole(groupId, actorUserId);
   if (actorRole !== 'owner') {
-    throw new ForbiddenError('Chỉ chủ sở hữu nhóm mới có quyền thay đổi vai trò thành viên');
+    throw new ForbiddenError('Only the group owner can change member roles');
   }
 
   const targetRole = await getGroupMemberRole(groupId, targetUserId);
   if (!targetRole) {
-    throw new NotFoundError('Không tìm thấy thành viên này trong nhóm');
+    throw new NotFoundError('Member not found in the group');
   }
   if (targetRole === 'owner') {
-    throw new ValidationError('Không thể thay đổi vai trò của chủ sở hữu nhóm');
+    throw new ValidationError('Cannot change the role of the group owner');
   }
 
   await db.query(

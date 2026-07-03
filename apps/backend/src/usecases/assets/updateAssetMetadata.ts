@@ -4,7 +4,7 @@ import { NotFoundError } from '../../lib/errors';
 export async function updateAssetAlbums(assetId: string, albumNames: string[]) {
   const result = await setAssetAlbums(assetId, albumNames);
   if (result.updated === 0) {
-    throw new NotFoundError('Không tìm thấy tệp tin');
+    throw new NotFoundError('File not found');
   }
   return result;
 }
@@ -12,7 +12,7 @@ export async function updateAssetAlbums(assetId: string, albumNames: string[]) {
 export async function updateAssetDocProjects(assetId: string, projectNames: string[]) {
   const result = await setAssetDocProjects(assetId, projectNames);
   if (result.updated === 0) {
-    throw new NotFoundError('Không tìm thấy tài liệu hoặc định dạng không đúng');
+    throw new NotFoundError('Document not found or invalid format');
   }
   return result;
 }

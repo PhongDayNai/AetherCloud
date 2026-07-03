@@ -4,12 +4,12 @@ import { ForbiddenError, ValidationError } from '../../lib/errors';
 
 export async function getGroupMembers(groupId: string, userId: string) {
   if (!isValidUUID(groupId)) {
-    throw new ValidationError('groupId không đúng định dạng UUID');
+    throw new ValidationError('groupId is not in valid UUID format');
   }
 
   const isMember = await isGroupMember(groupId, userId);
   if (!isMember) {
-    throw new ForbiddenError('Bạn không phải là thành viên của nhóm này');
+    throw new ForbiddenError('You are not a member of this group');
   }
 
   const result = await db.query(

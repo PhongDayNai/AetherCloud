@@ -11,7 +11,7 @@ import { ValidationError } from '../../lib/errors';
 
 export async function register(email: any, password: any, name: any, inviteCode: any) {
   if (!email || !password || !name) {
-    throw new ValidationError('Thiếu thông tin đăng ký bắt buộc');
+    throw new ValidationError('Required registration fields are missing');
   }
 
   const client = await db.pool.connect();
@@ -24,7 +24,7 @@ export async function register(email: any, password: any, name: any, inviteCode:
     // A. Kiểm tra mã mời nếu không mở đăng ký công khai
     if (!allowPublicSignup) {
       if (!inviteCode) {
-        throw new ValidationError('Yêu cầu mã mời đăng ký');
+        throw new ValidationError('Registration invitation code is required');
       }
 
       const inviteRes = await client.query(
@@ -33,24 +33,24 @@ export async function register(email: any, password: any, name: any, inviteCode:
       );
 
       if (inviteRes.rows.length === 0) {
-        throw new ValidationError('Mã mời không tồn tại');
+        throw new ValidationError('Invitation code does not exist');
       }
 
       const invite = inviteRes.rows[0];
 
       // Kiểm tra trạng thái hoạt động của mã mời
       if (!invite.is_active) {
-        throw new ValidationError('Mã mời đã bị vô hiệu hóa hoặc dùng hết lượt');
+        throw new ValidationError('Invitation code is deactivated or fully used');
       }
 
       // Kiểm tra hạn sử dụng
       if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-        throw new ValidationError('Mã mời đã hết hạn sử dụng');
+        throw new ValidationError('Invitation code has expired');
       }
 
       // Kiểm tra giới hạn số lần sử dụng
       if (invite.max_uses !== null && invite.uses_count >= invite.max_uses) {
-        throw new ValidationError('Mã mời đã dùng hết số lần tối đa');
+        throw new ValidationError('Invitation code has reached maximum usage limit');
       }
 
       invitationId = invite.id;
@@ -69,7 +69,7 @@ export async function register(email: any, password: any, name: any, inviteCode:
     const emailLower = email.trim().toLowerCase();
     const dupRes = await client.query('SELECT 1 FROM users WHERE email = $1', [emailLower]);
     if (dupRes.rows.length > 0) {
-      throw new ValidationError('Email đã được sử dụng');
+      throw new ValidationError('Email is already in use');
     }
 
     // C. Tạo người dùng mới

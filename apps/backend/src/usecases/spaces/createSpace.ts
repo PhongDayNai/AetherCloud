@@ -5,24 +5,24 @@ import { ForbiddenError, ValidationError } from '../../lib/errors';
 
 export async function createSpace(name: string, description: string | undefined, type: string, groupId: string | undefined, userId: string) {
   if (!name || !type) {
-    throw new ValidationError('Thiếu tên hoặc loại không gian con');
+    throw new ValidationError('Name or type of space is missing');
   }
 
   if (!['journal', 'collection', 'project'].includes(type)) {
-    throw new ValidationError('Loại không gian con không hợp lệ');
+    throw new ValidationError('Invalid space type');
   }
 
   if (groupId && !isValidUUID(groupId)) {
-    throw new ValidationError('groupId không đúng định dạng UUID');
+    throw new ValidationError('groupId is not in valid UUID format');
   }
 
   if (groupId) {
     const role = await getGroupMemberRole(groupId, userId);
     if (!role) {
-      throw new ForbiddenError('Bạn không phải là thành viên của nhóm này');
+      throw new ForbiddenError('You are not a member of this group');
     }
     if (role !== 'owner' && role !== 'admin') {
-      throw new ForbiddenError('Chỉ chủ sở hữu hoặc quản trị viên nhóm mới được tạo không gian con chung');
+      throw new ForbiddenError('Only the group owner or admins can create a shared space');
     }
 
     const id = crypto.randomUUID();

@@ -5,22 +5,22 @@ import { NotFoundError, ForbiddenError, ValidationError } from '../../lib/errors
 export async function getSpacePosts(spaceId: string, userId: string) {
   const spaceRes = await db.query('SELECT * FROM spaces WHERE id = $1', [spaceId]);
   if (spaceRes.rows.length === 0) {
-    throw new NotFoundError('Không tìm thấy không gian con này');
+    throw new NotFoundError('Space not found');
   }
   const space = spaceRes.rows[0];
 
   if (space.is_deleted) {
-    throw new ValidationError('Không gian con này đã bị xóa tạm thời');
+    throw new ValidationError('This space has been soft deleted');
   }
 
   if (space.group_id) {
     const isMember = await isGroupMember(space.group_id, userId);
     if (!isMember) {
-      throw new ForbiddenError('Bạn không có quyền truy cập không gian con của nhóm này');
+      throw new ForbiddenError('You do not have permission to access the spaces of this group');
     }
   } else {
     if (space.owner_id !== userId) {
-      throw new ForbiddenError('Bạn không có quyền truy cập không gian con này');
+      throw new ForbiddenError('You do not have permission to access this space');
     }
   }
 
@@ -44,7 +44,7 @@ export async function getSpacePosts(spaceId: string, userId: string) {
         id: row.post_id,
         spaceId: row.space_id,
         userId: row.post_user_id,
-        userName: row.post_user_name || 'Người dùng hệ thống',
+        userName: row.post_user_name || 'System User',
         userAvatarUrl: row.post_user_avatar_url,
         caption: row.caption,
         createdAt: row.post_created_at,

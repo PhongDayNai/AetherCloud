@@ -43,7 +43,7 @@ export async function createInvitation(maxUsesInput: any, expiresAtInput: any, e
   }
 
   if (!isUnique) {
-    throw new DomainError('Không thể sinh mã mời độc nhất', 500);
+    throw new DomainError('Cannot generate unique invitation token', 500);
   }
 
   const invitationId = crypto.randomUUID();

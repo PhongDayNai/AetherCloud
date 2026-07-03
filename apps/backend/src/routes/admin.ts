@@ -8,7 +8,7 @@ const router = express.Router();
 // Middleware kiểm tra vai trò admin
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.user?.role !== 'admin') {
-    return res.status(403).json({ message: 'Quyền truy cập bị từ chối: Yêu cầu vai trò Admin' });
+    return res.status(403).json({ message: 'Access denied: Admin role required' });
   }
   next();
 }
@@ -28,7 +28,7 @@ router.post('/invitations', async (req: Request, res: Response) => {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
     }
-    return res.status(500).json({ message: err.message || 'Lỗi máy chủ nội bộ' });
+    return res.status(500).json({ message: err.message || 'Internal server error' });
   }
 });
 
@@ -38,7 +38,7 @@ router.get('/invitations', async (req: Request, res: Response) => {
     const invitations = await adminUsecase.getAllInvitations();
     return res.json({ ok: true, invitations });
   } catch (err: any) {
-    return res.status(500).json({ message: err.message || 'Lỗi máy chủ nội bộ' });
+    return res.status(500).json({ message: err.message || 'Internal server error' });
   }
 });
 
@@ -46,12 +46,12 @@ router.get('/invitations', async (req: Request, res: Response) => {
 router.put('/invitations/:id/deactivate', async (req: Request, res: Response) => {
   try {
     await adminUsecase.deactivateInvitation(req.params.id);
-    return res.json({ ok: true, message: 'Đã vô hiệu hóa mã mời thành công' });
+    return res.json({ ok: true, message: 'Successfully deactivated invitation code' });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
     }
-    return res.status(500).json({ message: err.message || 'Lỗi máy chủ nội bộ' });
+    return res.status(500).json({ message: err.message || 'Internal server error' });
   }
 });
 
@@ -61,12 +61,12 @@ router.post('/users/:id/reset-password', async (req: Request, res: Response) => 
   const { temp_password } = req.body || {};
   try {
     await adminUsecase.resetUserPassword(id, temp_password);
-    return res.json({ ok: true, message: 'Đã đặt lại mật khẩu và thu hồi tất cả phiên đăng nhập của người dùng' });
+    return res.json({ ok: true, message: 'Successfully reset user password and revoked all active sessions' });
   } catch (err: any) {
     if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
     }
-    return res.status(500).json({ message: err.message || 'Lỗi máy chủ nội bộ' });
+    return res.status(500).json({ message: err.message || 'Internal server error' });
   }
 });
 

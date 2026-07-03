@@ -5,7 +5,7 @@ import { NotFoundError, ForbiddenError } from '../../lib/errors';
 export async function purgeSpace(spaceId: string, userId: string) {
   const spaceRes = await db.query('SELECT * FROM spaces WHERE id = $1', [spaceId]);
   if (spaceRes.rows.length === 0) {
-    throw new NotFoundError('Không tìm thấy không gian con này');
+    throw new NotFoundError('Space not found');
   }
   const space = spaceRes.rows[0];
 
@@ -13,11 +13,11 @@ export async function purgeSpace(spaceId: string, userId: string) {
   if (space.group_id) {
     groupRole = await getGroupMemberRole(space.group_id, userId);
     if (!groupRole) {
-      throw new ForbiddenError('Bạn không có quyền truy cập không gian con của nhóm này');
+      throw new ForbiddenError('You do not have permission to access the spaces of this group');
     }
   } else {
     if (space.owner_id !== userId) {
-      throw new ForbiddenError('Bạn không có quyền truy cập không gian con này');
+      throw new ForbiddenError('You do not have permission to access this space');
     }
   }
 
@@ -26,11 +26,11 @@ export async function purgeSpace(spaceId: string, userId: string) {
 
   if (space.group_id) {
     if (!isGroupOwner) {
-      throw new ForbiddenError('Chỉ chủ sở hữu nhóm mới có quyền xóa vĩnh viễn không gian con chung');
+      throw new ForbiddenError('Only the group owner has permission to permanently delete this space');
     }
   } else {
     if (!isSpaceOwner) {
-      throw new ForbiddenError('Bạn không có quyền xóa vĩnh viễn không gian con này');
+      throw new ForbiddenError('You do not have permission to permanently delete this space');
     }
   }
 

@@ -10,26 +10,26 @@ import { ValidationError, ForbiddenError } from '../../lib/errors';
 
 export async function login(email: any, password: any) {
   if (!email || !password) {
-    throw new ValidationError('Thiếu email hoặc mật khẩu');
+    throw new ValidationError('Email or password is missing');
   }
 
   // Tìm kiếm user trong DB
   const userRes = await db.query('SELECT * FROM users WHERE email = $1', [email.trim().toLowerCase()]);
   if (userRes.rows.length === 0) {
-    throw new ValidationError('Tài khoản hoặc mật khẩu không chính xác');
+    throw new ValidationError('Incorrect email or password');
   }
 
   const user = userRes.rows[0];
 
   // Kiểm tra trạng thái tài khoản
   if (!user.is_active) {
-    throw new ForbiddenError('Tài khoản đã bị khóa');
+    throw new ForbiddenError('Account is locked');
   }
 
   // So khớp mật khẩu băm
   const inputHash = hashPassword(password, user.salt);
   if (inputHash !== user.password_hash) {
-    throw new ValidationError('Tài khoản hoặc mật khẩu không chính xác');
+    throw new ValidationError('Incorrect email or password');
   }
 
   // Tạo JWT Tokens

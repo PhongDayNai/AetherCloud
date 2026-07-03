@@ -4,7 +4,7 @@ import { NotFoundError } from '../../lib/errors';
 export async function getMe(userId: string) {
   const userRes = await db.query('SELECT id, email, name, role, must_change_password, avatar_url FROM users WHERE id = $1', [userId]);
   if (userRes.rows.length === 0) {
-    throw new NotFoundError('Người dùng không tồn tại');
+    throw new NotFoundError('User does not exist');
   }
   const user = userRes.rows[0];
   return {
