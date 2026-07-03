@@ -37,8 +37,8 @@ async function createInvite() {
     // 1. Tìm Admin đầu tiên trong database để gán làm người tạo
     const adminRes = await client.query("SELECT id FROM users WHERE role = 'admin' AND is_active = true LIMIT 1");
     if (adminRes.rows.length === 0) {
-      console.error('[Error] Không tìm thấy tài khoản Admin nào hoạt động trong hệ thống.');
-      console.error('Vui lòng chạy script seed để tạo Admin trước: npm run seed:admin (hoặc node src/scripts/seed-admin.js)');
+      console.error('[Error] No active Admin account found in the system.');
+      console.error('Please run seed script first to create Admin: npm run seed:admin (or node src/scripts/seed-admin.js)');
       return;
     }
     const adminId = adminRes.rows[0].id;
@@ -59,7 +59,7 @@ async function createInvite() {
     }
 
     if (!isUnique) {
-      throw new Error('Không thể sinh mã mời độc nhất sau nhiều lần thử.');
+      throw new Error('Cannot generate unique invitation token after multiple attempts.');
     }
 
     // 3. Lưu vào cơ sở dữ liệu
@@ -69,14 +69,14 @@ async function createInvite() {
       VALUES ($1, $2, $3, $4, $5, $6, $7)
     `, [invitationId, token, adminId, maxUses === 0 ? null : maxUses, 0, true, expiresAt]);
 
-    console.log(`\n=== TẠO MÃ MỜI ĐĂNG KÝ THÀNH CÔNG ===`);
-    console.log(`MÃ MỜI: ${token}`);
-    console.log(`Lượt sử dụng tối đa: ${maxUses === 0 ? 'Không giới hạn' : maxUses}`);
-    console.log(`Hạn sử dụng: ${expiresAt ? expiresAt.toLocaleString() : 'Vô thời hạn'}`);
-    console.log(`====================================\n`);
+    console.log(`\n=== REGISTRATION INVITATION CODE CREATED SUCCESSFULLY ===`);
+    console.log(`INVITATION CODE: ${token}`);
+    console.log(`Max Uses: ${maxUses === 0 ? 'Unlimited' : maxUses}`);
+    console.log(`Expires At: ${expiresAt ? expiresAt.toLocaleString() : 'Never expires'}`);
+    console.log(`=========================================================\n`);
 
   } catch (err: any) {
-    console.error('[Error] Lỗi khi tạo mã mời:', err.message);
+    console.error('[Error] Error creating invitation code:', err.message);
   } finally {
     client.release();
     db.pool.end();

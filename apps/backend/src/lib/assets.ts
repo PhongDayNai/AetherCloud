@@ -89,12 +89,12 @@ const activeTranscoders = new Map<string, ChildProcess[]>();
 export function cancelTranscoding(id: string) {
   const processes = activeTranscoders.get(id);
   if (processes) {
-    console.log(`[Transcoder] Hủy tiến trình transcoding cho asset ${id}...`);
+    console.log(`[Transcoder] Cancelling transcoding process for asset ${id}...`);
     for (const child of processes) {
       try {
         child.kill('SIGKILL');
       } catch (err) {
-        console.error(`[Transcoder] Lỗi khi kill process:`, err);
+        console.error(`[Transcoder] Error killing process:`, err);
       }
     }
     activeTranscoders.delete(id);
@@ -106,14 +106,14 @@ export function cancelTranscoding(id: string) {
   if (fs.existsSync(playPath)) {
     try {
       fs.unlinkSync(playPath);
-      console.log(`[Transcoder] Đã xóa file playable tạm thời: ${playPath}`);
+      console.log(`[Transcoder] Deleted temporary playable file: ${playPath}`);
     } catch {}
   }
   const hlsDir = path.join(LIBRARY_PATH, 'derived', 'hls', id);
   if (fs.existsSync(hlsDir)) {
     try {
       fs.rmSync(hlsDir, { recursive: true, force: true });
-      console.log(`[Transcoder] Đã xóa thư mục HLS tạm thời: ${hlsDir}`);
+      console.log(`[Transcoder] Deleted temporary HLS directory: ${hlsDir}`);
     } catch {}
   }
 }
@@ -191,7 +191,7 @@ function buildHlsDirById(id: string): string {
 
 function executeFfmpegAsync(args: string[], strategyName: string, id?: string): Promise<boolean> {
   return new Promise((resolve) => {
-    console.log(`[Transcoder] Bắt đầu transcode bằng ${strategyName}...`);
+    console.log(`[Transcoder] Starting transcode using ${strategyName}...`);
     const child = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
     
     if (id) {
@@ -225,7 +225,7 @@ function executeFfmpegAsync(args: string[], strategyName: string, id?: string): 
         const lines = str.split(/[\r\n]+/);
         const progressLine = lines.reverse().find((line: string) => line.includes('frame=') && line.includes('time='));
         if (progressLine) {
-          console.log(`[Transcoder] Tiến độ [${strategyName}]: ${progressLine.trim()}`);
+          console.log(`[Transcoder] Progress [${strategyName}]: ${progressLine.trim()}`);
           lastLogTime = now;
         }
       }
@@ -234,19 +234,19 @@ function executeFfmpegAsync(args: string[], strategyName: string, id?: string): 
     child.on('close', (code: number | null) => {
       cleanUp();
       if (code === 0) {
-        console.log(`[Transcoder] Transcode bằng ${strategyName} THÀNH CÔNG.`);
+        console.log(`[Transcoder] Transcode using ${strategyName} SUCCESSFUL.`);
         resolve(true);
       } else {
-        console.error(`[Transcoder] Transcode bằng ${strategyName} THẤT BẠI (Mã lỗi: ${code}).`);
+        console.error(`[Transcoder] Transcode using ${strategyName} FAILED (Error code: ${code}).`);
         const lines = stderrData.split('\n').filter(Boolean).slice(-10).join('\n');
-        console.error(`[Transcoder] Chi tiết lỗi ffmpeg:\n${lines}`);
+        console.error(`[Transcoder] ffmpeg error details:\n${lines}`);
         resolve(false);
       }
     });
 
     child.on('error', (err: any) => {
       cleanUp();
-      console.error(`[Transcoder] Không thể khởi chạy ffmpeg cho ${strategyName}:`, err.message);
+      console.error(`[Transcoder] Could not spawn ffmpeg for ${strategyName}:`, err.message);
       resolve(false);
     });
   });
@@ -259,7 +259,7 @@ async function transcodeWithFallback(getArgsFn: (strategy: string) => string[], 
   if (nvencOk && fs.existsSync(outPath)) {
     return true;
   }
-  console.log(`[Transcoder] NVENC kiểm tra thất bại: nvencOk=${nvencOk}, fileExists=${fs.existsSync(outPath)}`);
+  console.log(`[Transcoder] NVENC check failed: nvencOk=${nvencOk}, fileExists=${fs.existsSync(outPath)}`);
   try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
 
   // Strategy 2: VA-API (Generic Intel/AMD iGPU/dGPU on Linux)
@@ -271,7 +271,7 @@ async function transcodeWithFallback(getArgsFn: (strategy: string) => string[], 
     }
     try { if (fs.existsSync(outPath)) fs.unlinkSync(outPath); } catch {}
   } else {
-    console.log('[Transcoder] Bỏ qua VA-API do không tìm thấy thiết bị /dev/dri/renderD128');
+    console.log('[Transcoder] Skipping VA-API: /dev/dri/renderD128 device not found');
   }
 
   // Strategy 3: CPU Fallback (libx264)
@@ -415,7 +415,7 @@ function makeVideoHlsFromPlayable(playableMp4Path: string, id: string): Promise<
         masterPath,
       };
     } catch (err: any) {
-      console.error(`[Transcoder] Không thể ghi file master.m3u8:`, err.message);
+      console.error(`[Transcoder] Could not write master.m3u8 file:`, err.message);
       return null;
     }
   });
@@ -423,12 +423,12 @@ function makeVideoHlsFromPlayable(playableMp4Path: string, id: string): Promise<
 
 async function scheduleVideoDerivatives(id: string, absPath: string): Promise<void> {
   try {
-    console.log(`[Transcoder] Bắt đầu scheduleVideoDerivatives cho ${id}...`);
+    console.log(`[Transcoder] Starting scheduleVideoDerivatives for ${id}...`);
 
     // Check if the asset exists
     const checkItem = await getAsset(id);
     if (!checkItem) {
-      console.log(`[Transcoder] Bỏ qua transcoding vì asset ${id} không tồn tại trong database.`);
+      console.log(`[Transcoder] Skipping transcoding: asset ${id} does not exist in database.`);
       cancelTranscoding(id);
       return;
     }
@@ -436,24 +436,24 @@ async function scheduleVideoDerivatives(id: string, absPath: string): Promise<vo
     // Resolve current path (handles if it was moved to trash)
     const currentAbsPath = path.join(LIBRARY_PATH, checkItem.relPath);
     const playable = await makeVideoPlayable(currentAbsPath, id);
-    console.log(`[Transcoder] Kết quả makeVideoPlayable:`, playable);
+    console.log(`[Transcoder] makeVideoPlayable result:`, playable);
     let hls = null;
     if (playable) {
       // Check again before packaging HLS
       const checkItem2 = await getAsset(id);
       if (!checkItem2) {
-        console.log(`[Transcoder] Bỏ qua HLS Packaging vì asset ${id} không tồn tại trong database.`);
+        console.log(`[Transcoder] Skipping HLS packaging: asset ${id} does not exist in database.`);
         cancelTranscoding(id);
         return;
       }
 
       hls = await makeVideoHlsFromPlayable(playable, id);
-      console.log(`[Transcoder] Kết quả makeVideoHlsFromPlayable:`, hls);
+      console.log(`[Transcoder] makeVideoHlsFromPlayable result:`, hls);
     }
 
     const item = await getAsset(id);
     if (!item) {
-      console.error(`[Transcoder] Không cập nhật database vì asset ${id} không tồn tại trong database.`);
+      console.error(`[Transcoder] Database update skipped: asset ${id} does not exist in database.`);
       cancelTranscoding(id);
       return;
     }
@@ -472,9 +472,9 @@ async function scheduleVideoDerivatives(id: string, absPath: string): Promise<vo
       WHERE id = $5 OR (rel_path = $6 AND processing_status = 'processing')
     `, [playRelPath, hlsRelPath, processingStatus, processingFinishedAt, id, item.relPath]);
 
-    console.log(`[Transcoder] Đã cập nhật database sang trạng thái ready cho ${id}.`);
+    console.log(`[Transcoder] Database updated to ready state for ${id}.`);
   } catch (err) {
-    console.error(`[Transcoder] Lỗi nghiêm trọng trong scheduleVideoDerivatives:`, err);
+    console.error(`[Transcoder] Critical error in scheduleVideoDerivatives:`, err);
   }
 }
 

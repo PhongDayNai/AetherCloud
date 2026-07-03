@@ -13,13 +13,13 @@ async function seedAdmin() {
     const name = 'System Admin';
     const role = 'admin';
 
-    console.log(`[Seed] Đang kiểm tra tài khoản Admin với email/username là "${email}"...`);
+    console.log(`[Seed] Checking Admin account with email/username "${email}"...`);
 
     // 1. Kiểm tra xem tài khoản Admin có trùng email đã tồn tại trong DB chưa
     const adminCheckRes = await client.query('SELECT id FROM users WHERE email = $1', [email]);
     
     if (adminCheckRes.rows.length > 0) {
-      console.log('[Seed] Tài khoản Admin đã tồn tại. Đang đồng bộ cập nhật mật khẩu mới từ tệp .env...');
+      console.log('[Seed] Admin account already exists. Syncing and updating password from .env file...');
       const salt = generateSalt();
       const passwordHash = hashPassword(password, salt);
       
@@ -29,7 +29,7 @@ async function seedAdmin() {
         WHERE email = $5
       `, [passwordHash, salt, name, role, email]);
       
-      console.log('[Seed] Cập nhật và đồng bộ mật khẩu Admin từ .env THÀNH CÔNG.');
+      console.log('[Seed] Updated and synced Admin password from .env SUCCESSFUL.');
       return;
     }
 
@@ -43,12 +43,12 @@ async function seedAdmin() {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `, [id, email, passwordHash, salt, name, role, false, true]);
 
-    console.log(`[Seed] Đã tạo mới tài khoản Admin thành công!`);
+    console.log(`[Seed] Successfully created new Admin account!`);
     console.log(`- Username/Email: ${email}`);
     console.log(`- Role: ${role}`);
-    console.log(`- Mật khẩu: (Lấy từ cấu hình AUTH_ADMIN_PASSWORD trong file .env)`);
+    console.log(`- Password: (Retrieved from AUTH_ADMIN_PASSWORD inside .env file)`);
   } catch (err: any) {
-    console.error('[Seed] Lỗi khi seed tài khoản Admin:', err.message);
+    console.error('[Seed] Error seeding Admin account:', err.message);
   } finally {
     client.release();
     db.pool.end();

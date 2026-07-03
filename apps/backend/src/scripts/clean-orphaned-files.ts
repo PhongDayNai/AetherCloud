@@ -6,7 +6,7 @@ async function main() {
   try {
     await runOrphanedCleanup(isDryRun);
   } catch (err) {
-    console.error('[Script] Lỗi khi dọn dẹp:', err);
+    console.error('[Script] Error running cleanup:', err);
     process.exit(1);
   } finally {
     await db.pool.end();

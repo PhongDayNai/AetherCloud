@@ -48,9 +48,9 @@ function cleanEmptyDirs(dir: string): void {
 }
 
 export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: number; removed: number; size: number }> {
-  console.log(`[Cleaner] Bắt đầu quét và dọn dẹp tệp tin mồ côi...`);
+  console.log(`[Cleaner] Starting scan and cleanup of orphaned files...`);
   if (isDryRun) {
-    console.log(`[Cleaner] CHẾ ĐỘ THỬ NGHIỆM (DRY RUN) - Sẽ không có tệp nào thực sự bị xóa.`);
+    console.log(`[Cleaner] DRY RUN MODE - No files will actually be deleted.`);
   }
 
   const client = await db.pool.connect();
@@ -66,7 +66,7 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
         AND id NOT IN (SELECT asset_id FROM post_assets)
       `);
       if (delRes.rowCount && delRes.rowCount > 0) {
-        console.log(`[Cleaner] Đã dọn dẹp ${delRes.rowCount} bản ghi asset mồ côi trong database.`);
+        console.log(`[Cleaner] Cleaned up ${delRes.rowCount} orphaned asset records in database.`);
       }
     }
 
@@ -76,9 +76,9 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
       if (row.play_rel_path) dbActivePaths.add(row.play_rel_path.replaceAll('\\', '/'));
       if (row.hls_rel_path) dbActivePaths.add(row.hls_rel_path.replaceAll('\\', '/'));
     }
-    console.log(`[Cleaner] Đã lấy ${dbActivePaths.size} đường dẫn active tham chiếu từ database.`);
+    console.log(`[Cleaner] Fetched ${dbActivePaths.size} active reference paths from database.`);
   } catch (err: any) {
-    console.error('[Cleaner] Lỗi truy vấn database:', err.message);
+    console.error('[Cleaner] Database query error:', err.message);
     client.release();
     throw err;
   } finally {
@@ -102,7 +102,7 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
           try {
             const stat = fs.statSync(file);
             spaceReclaimed += stat.size;
-            console.log(`[Mồ côi] [Original] ${relPath} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
+            console.log(`[Orphaned] [Original] ${relPath} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
             if (!isDryRun) {
               fs.unlinkSync(file);
             }
@@ -125,7 +125,7 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
           try {
             const stat = fs.statSync(file);
             spaceReclaimed += stat.size;
-            console.log(`[Mồ côi] [Trash] ${relPath} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
+            console.log(`[Orphaned] [Trash] ${relPath} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
             if (!isDryRun) {
               fs.unlinkSync(file);
             }
@@ -149,7 +149,7 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
           try {
             const stat = fs.statSync(file);
             spaceReclaimed += stat.size;
-            console.log(`[Mồ côi] [Play-Derived] ${relPath} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
+            console.log(`[Orphaned] [Play-Derived] ${relPath} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
             if (!isDryRun) {
               fs.unlinkSync(file);
             }
@@ -182,7 +182,7 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
               }
               orphanedCount++;
               spaceReclaimed += dirSize;
-              console.log(`[Mồ côi] [HLS-Derived] ${relPath}/ (${(dirSize / 1024 / 1024).toFixed(2)} MB)`);
+              console.log(`[Orphaned] [HLS-Derived] ${relPath}/ (${(dirSize / 1024 / 1024).toFixed(2)} MB)`);
               if (!isDryRun) {
                 fs.rmSync(fullPath, { recursive: true, force: true });
               }
@@ -199,10 +199,10 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
     cleanEmptyDirs(TRASH_ROOT);
   }
 
-  console.log(`[Cleaner] Kết quả dọn dẹp:`);
-  console.log(`  - Đã quét: ${totalScanned} tệp/thư mục`);
-  console.log(`  - Phát hiện mồ côi: ${orphanedCount}`);
-  console.log(`  - Giải phóng: ${(spaceReclaimed / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`[Cleaner] Cleanup results:`);
+  console.log(`  - Scanned: ${totalScanned} files/folders`);
+  console.log(`  - Detected orphaned: ${orphanedCount}`);
+  console.log(`  - Reclaimed space: ${(spaceReclaimed / 1024 / 1024).toFixed(2)} MB`);
 
   return {
     scanned: totalScanned,

@@ -223,7 +223,7 @@ async function seedAdmin() {
     const adminCheckRes = await query('SELECT id FROM users WHERE email = $1', [email]);
     
     if (adminCheckRes.rows.length > 0) {
-      console.log('[Database/Seed] Tài khoản Admin đã tồn tại. Đang đồng bộ cập nhật mật khẩu mới từ tệp .env...');
+      console.log('[Database/Seed] Admin account already exists. Syncing and updating password from .env file...');
       const salt = generateSalt();
       const passwordHash = hashPassword(password, salt);
       
@@ -233,7 +233,7 @@ async function seedAdmin() {
         WHERE email = $5
       `, [passwordHash, salt, name, role, email]);
       
-      console.log('[Database/Seed] Cập nhật và đồng bộ mật khẩu Admin từ .env THÀNH CÔNG.');
+      console.log('[Database/Seed] Updated and synced Admin password from .env SUCCESSFUL.');
       return;
     }
 
@@ -247,9 +247,9 @@ async function seedAdmin() {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `, [id, email, passwordHash, salt, name, role, false, true]);
 
-    console.log(`[Database/Seed] Đã tạo mới tài khoản Admin tự động thành công: ${email}`);
+    console.log(`[Database/Seed] Successfully created new Admin account: ${email}`);
   } catch (err: any) {
-    console.error('[Database/Seed] Lỗi khi tự động seed tài khoản Admin:', err.message);
+    console.error('[Database/Seed] Error auto-seeding Admin account:', err.message);
   }
 }
 

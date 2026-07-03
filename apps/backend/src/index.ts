@@ -71,6 +71,6 @@ app.listen(port, () => {
   
   // Chạy tự động dọn dẹp file mồ côi (thực hiện xóa thật) khi khởi động server
   runOrphanedCleanup(false).catch((err) => {
-    console.error('[Startup] Lỗi khi chạy tự động dọn dẹp file mồ côi:', err.message);
+    console.error('[Startup] Error running automatic orphaned files cleanup:', err.message);
   });
 });
