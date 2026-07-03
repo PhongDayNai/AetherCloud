@@ -1071,9 +1071,21 @@ export async function purgeDeleted(ids: string[] = []): Promise<{ removed: numbe
 }
 
 export async function getUnifiedStats(ownerId: string, storage: any, groupId: string | null = null): Promise<any> {
-  // 1. Chạy SQL đếm số lượng tệp theo loại
   const whereClause = groupId ? 'group_id = $1' : 'owner_id = $1 AND group_id IS NULL';
   const queryParams = groupId ? [groupId] : [ownerId];
+
+  // Đếm số lượng tệp đang xử lý riêng cho user hiện tại (luôn lọc theo ownerId của người upload)
+  const procRes = await db.query(`
+    SELECT COUNT(*)::int AS count 
+    FROM assets 
+    WHERE processing_status = 'processing' AND is_deleted = false AND owner_id = $1
+  `, [ownerId]);
+  const userProcessingCount = procRes.rows[0]?.count || 0;
+
+  const storageWithFilteredProcessing = {
+    ...storage,
+    processingCount: userProcessingCount
+  };
 
   const countRes = await db.query(`
     SELECT 
@@ -1193,7 +1205,7 @@ export async function getUnifiedStats(ownerId: string, storage: any, groupId: st
 
   return {
     counts,
-    storage,
+    storage: storageWithFilteredProcessing,
     docCategoryCounts,
     tags,
     albums,

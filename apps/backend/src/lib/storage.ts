@@ -54,7 +54,31 @@ function dirSizeBytes(dirPath: string): number {
 
 export async function getStorageUsage(): Promise<any> {
   const now = Date.now();
-  if (cache.value && now - cache.at < cache.ttlMs) return cache.value;
+
+  // Đếm số lượng video đang xử lý trực tiếp từ DB trước khi kiểm tra cache
+  const procRes = await db.query(
+    "SELECT COUNT(*)::int AS count FROM assets WHERE processing_status = 'processing' AND is_deleted = false"
+  );
+  const processingCount = procRes.rows[0]?.count || 0;
+
+  // Nếu đang có tiến trình xử lý và đã có dữ liệu cache cũ, trả về cache kèm số lượng mới nhất
+  // để tránh việc chạy tính toán dung lượng thư mục nặng nề
+  if (processingCount > 0 && cache.value) {
+    return {
+      ...cache.value,
+      processingCount,
+      updatedAt: cache.value.updatedAt,
+      note: 'usage frozen while processing media',
+    };
+  }
+
+  // Nếu không có tiến trình xử lý, kiểm tra xem cache đã hết hạn chưa
+  if (cache.value && now - cache.at < cache.ttlMs) {
+    return {
+      ...cache.value,
+      processingCount, // Đảm bảo luôn cập nhật chính xác số lượng
+    };
+  }
 
   const mountPoint = resolveStoragePath(process.env.MEDIA_MOUNT_POINT || '/data');
   const library = resolveStoragePath(process.env.MEDIA_LIBRARY_PATH || '/data/library');
@@ -72,21 +96,6 @@ export async function getStorageUsage(): Promise<any> {
   const originalsBytes = dirSizeBytes(originals);
   const derivedBytes = dirSizeBytes(derived);
   const trashBytes = dirSizeBytes(trash);
-
-  // Đếm số lượng video đang xử lý trực tiếp từ DB để tối ưu hóa hiệu năng và bộ nhớ
-  const procRes = await db.query(
-    "SELECT COUNT(*)::int AS count FROM assets WHERE processing_status = 'processing' AND is_deleted = false"
-  );
-  const processingCount = procRes.rows[0]?.count || 0;
-
-  if (processingCount > 0 && cache.value) {
-    return {
-      ...cache.value,
-      processingCount,
-      updatedAt: cache.value.updatedAt,
-      note: 'usage frozen while processing media',
-    };
-  }
 
   const usage = {
     mountPoint,
