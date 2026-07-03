@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS assets (
   mime VARCHAR(100) NOT NULL,
   size BIGINT NOT NULL,
   owner VARCHAR(100),
-  owner_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
   group_id UUID,
   uploaded_at TIMESTAMPTZ NOT NULL,
   taken_at TIMESTAMPTZ NOT NULL,
@@ -200,6 +200,15 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_spaces_is_deleted ON spaces(is_deleted);
+
+-- Nâng cấp khóa ngoại owner_id của assets thành ON DELETE SET NULL để bảo toàn dữ liệu nhóm
+DO $$ 
+BEGIN 
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'assets_owner_id_fkey') THEN
+    ALTER TABLE assets DROP CONSTRAINT assets_owner_id_fkey;
+  END IF;
+  ALTER TABLE assets ADD CONSTRAINT assets_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL;
+END $$;
 `;
 
 
