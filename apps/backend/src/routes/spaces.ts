@@ -28,9 +28,24 @@ async function checkSpaceOwnership(req: Request, res: Response, next: NextFuncti
       return res.status(404).json({ message: 'Không tìm thấy không gian con này' });
     }
     const space = result.rows[0];
-    if (space.owner_id !== req.user.sub) {
-      return res.status(403).json({ message: 'Bạn không có quyền truy cập không gian con này' });
+    
+    if (space.group_id) {
+      // Kiểm tra xem user có phải thành viên nhóm không
+      const memberRes = await db.query(
+        'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
+        [space.group_id, req.user.sub]
+      );
+      if (memberRes.rows.length === 0) {
+        return res.status(403).json({ message: 'Bạn không có quyền truy cập không gian con của nhóm này' });
+      }
+      req.groupRole = memberRes.rows[0].role; // Lưu lại vai trò
+    } else {
+      // Kiểm tra sở hữu cá nhân
+      if (space.owner_id !== req.user.sub) {
+        return res.status(403).json({ message: 'Bạn không có quyền truy cập không gian con này' });
+      }
     }
+    
     req.space = space; // Lưu lại để dùng sau
     next();
   } catch (err: any) {
@@ -41,12 +56,29 @@ async function checkSpaceOwnership(req: Request, res: Response, next: NextFuncti
 // 1. GET danh sách không gian con
 router.get('/', requireAuth, async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+  const groupId = req.query.groupId ? String(req.query.groupId) : undefined;
   try {
-    const result = await db.query(
-      'SELECT * FROM spaces WHERE owner_id = $1 ORDER BY created_at DESC',
-      [req.user.sub]
-    );
-    return res.json({ ok: true, spaces: result.rows });
+    if (groupId) {
+      // Xác minh quyền thành viên nhóm
+      const memberRes = await db.query(
+        'SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, req.user.sub]
+      );
+      if (memberRes.rows.length === 0) {
+        return res.status(403).json({ message: 'Bạn không có quyền truy cập không gian con của nhóm này' });
+      }
+      const result = await db.query(
+        'SELECT * FROM spaces WHERE group_id = $1 ORDER BY created_at DESC',
+        [groupId]
+      );
+      return res.json({ ok: true, spaces: result.rows });
+    } else {
+      const result = await db.query(
+        'SELECT * FROM spaces WHERE owner_id = $1 AND group_id IS NULL ORDER BY created_at DESC',
+        [req.user.sub]
+      );
+      return res.json({ ok: true, spaces: result.rows });
+    }
   } catch (err: any) {
     return res.status(500).json({ message: err.message });
   }
@@ -55,7 +87,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
 // 2. POST tạo mới không gian con
 router.post('/', requireAuth, async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
-  const { name, description, type } = req.body || {};
+  const { name, description, type, groupId } = req.body || {};
   if (!name || !type) {
     return res.status(400).json({ message: 'Thiếu tên hoặc loại không gian con' });
   }
@@ -65,13 +97,36 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
   }
 
   try {
-    const id = crypto.randomUUID();
-    const result = await db.query(
-      `INSERT INTO spaces (id, name, description, type, owner_id)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [id, name.trim(), description ? description.trim() : null, type, req.user.sub]
-    );
-    return res.json({ ok: true, space: result.rows[0] });
+    if (groupId) {
+      // Xác minh quyền Admin/Owner của nhóm để tạo Space nhóm
+      const memberRes = await db.query(
+        'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, req.user.sub]
+      );
+      if (memberRes.rows.length === 0) {
+        return res.status(403).json({ message: 'Bạn không phải là thành viên của nhóm này' });
+      }
+      const role = memberRes.rows[0].role;
+      if (role !== 'owner' && role !== 'admin') {
+        return res.status(403).json({ message: 'Chỉ chủ sở hữu hoặc quản trị viên nhóm mới được tạo không gian con chung' });
+      }
+
+      const id = crypto.randomUUID();
+      const result = await db.query(
+        `INSERT INTO spaces (id, name, description, type, owner_id, group_id)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [id, name.trim(), description ? description.trim() : null, type, req.user.sub, groupId]
+      );
+      return res.json({ ok: true, space: result.rows[0] });
+    } else {
+      const id = crypto.randomUUID();
+      const result = await db.query(
+        `INSERT INTO spaces (id, name, description, type, owner_id)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [id, name.trim(), description ? description.trim() : null, type, req.user.sub]
+      );
+      return res.json({ ok: true, space: result.rows[0] });
+    }
   } catch (err: any) {
     return res.status(500).json({ message: err.message });
   }
@@ -90,17 +145,24 @@ router.put('/:spaceId', requireAuth, checkSpaceOwnership, async (req: Request, r
     return res.status(400).json({ message: 'Loại không gian con không hợp lệ' });
   }
 
+  // Chỉ người tạo ra Space hoặc chủ sở hữu nhóm mới có quyền thay đổi thông tin Space
+  const isSpaceOwner = req.space.owner_id === req.user?.sub;
+  const isGroupOwner = req.space.group_id && req.groupRole === 'owner';
+  if (!isSpaceOwner && !isGroupOwner) {
+    return res.status(403).json({ message: 'Chỉ người tạo không gian con hoặc chủ sở hữu nhóm mới có quyền thay đổi' });
+  }
+
   try {
     const result = await db.query(
       `UPDATE spaces 
        SET name = $1, description = $2, type = $3
-       WHERE id = $4 AND owner_id = $5 
+       WHERE id = $4
        RETURNING *`,
-      [name.trim(), description ? description.trim() : null, type, spaceId, req.user?.sub]
+      [name.trim(), description ? description.trim() : null, type, spaceId]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy không gian con này hoặc bạn không có quyền chỉnh sửa' });
+      return res.status(404).json({ message: 'Không tìm thấy không gian con này' });
     }
 
     return res.json({ ok: true, space: result.rows[0] });
@@ -218,22 +280,52 @@ router.post('/:spaceId/posts', requireAuth, checkSpaceOwnership, upload.array('f
 
     // C. Upload file mới và tự động đính kèm vào bài đăng
     const files = (req.files as Express.Multer.File[]) || [];
+    const groupId = req.space?.group_id || null;
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const fileLastModified = lastModifiedsArray[i] || null;
 
-      const savedAsset = await saveUploadedFile(
-        { ...file, lastModified: fileLastModified },
-        req.user,
-        null,
-        isSaveToPersonal
-      );
+      if (groupId) {
+        // Đăng bài nhóm:
+        // 1. Tạo asset chính gắn vào nhóm (is_library = true)
+        const savedAsset = await saveUploadedFile(
+          { ...file, lastModified: fileLastModified },
+          req.user,
+          groupId,
+          true
+        );
 
-      await client.query(
-        'INSERT INTO post_assets (post_id, asset_id) VALUES ($1, $2)',
-        [postId, savedAsset.id]
-      );
-      linkedAssetIds.push(savedAsset.id);
+        await client.query(
+          'INSERT INTO post_assets (post_id, asset_id) VALUES ($1, $2)',
+          [postId, savedAsset.id]
+        );
+        linkedAssetIds.push(savedAsset.id);
+
+        // 2. Nếu tích chọn "Đồng thời lưu cá nhân": Nhân bản thêm asset cá nhân trỏ chung file vật lý
+        if (isSaveToPersonal) {
+          await saveUploadedFile(
+            { ...file, lastModified: fileLastModified },
+            req.user,
+            null,
+            true
+          );
+        }
+      } else {
+        // Đăng bài cá nhân:
+        const savedAsset = await saveUploadedFile(
+          { ...file, lastModified: fileLastModified },
+          req.user,
+          null,
+          isSaveToPersonal
+        );
+
+        await client.query(
+          'INSERT INTO post_assets (post_id, asset_id) VALUES ($1, $2)',
+          [postId, savedAsset.id]
+        );
+        linkedAssetIds.push(savedAsset.id);
+      }
     }
 
     await client.query('COMMIT');
