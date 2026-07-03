@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { listAssets, resolveStoragePath } from './assets';
+import * as db from './db';
+import { resolveStoragePath } from './assets';
 
 interface StorageCache {
   at: number;
@@ -72,8 +73,11 @@ export async function getStorageUsage(): Promise<any> {
   const derivedBytes = dirSizeBytes(derived);
   const trashBytes = dirSizeBytes(trash);
 
-  const assets = await listAssets(5000, { includeTrash: true });
-  const processingCount = assets.filter((x) => x.processingStatus === 'processing' && !x.isDeleted).length;
+  // Đếm số lượng video đang xử lý trực tiếp từ DB để tối ưu hóa hiệu năng và bộ nhớ
+  const procRes = await db.query(
+    "SELECT COUNT(*)::int AS count FROM assets WHERE processing_status = 'processing' AND is_deleted = false"
+  );
+  const processingCount = procRes.rows[0]?.count || 0;
 
   if (processingCount > 0 && cache.value) {
     return {

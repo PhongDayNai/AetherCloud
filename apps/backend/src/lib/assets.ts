@@ -393,8 +393,8 @@ async function scheduleVideoDerivatives(id: string, absPath: string): Promise<vo
           hls_rel_path = COALESCE($2, hls_rel_path), 
           processing_status = $3, 
           processing_finished_at = $4 
-      WHERE id = $5
-    `, [playRelPath, hlsRelPath, processingStatus, processingFinishedAt, id]);
+      WHERE id = $5 OR (rel_path = $6 AND processing_status = 'processing')
+    `, [playRelPath, hlsRelPath, processingStatus, processingFinishedAt, id, item.relPath]);
 
     console.log(`[Transcoder] Đã cập nhật database sang trạng thái ready cho ${id}.`);
   } catch (err) {
@@ -681,31 +681,35 @@ export function getHlsDirAbsPathFromAsset(asset: Asset): string | null {
   return path.dirname(hls);
 }
 
-export async function listAlbums(owner: string): Promise<any[]> {
+export async function listAlbums(owner: string, groupId: string | null = null): Promise<any[]> {
+  const whereClause = groupId ? 'group_id = $2' : 'owner_id = $1 AND group_id IS NULL';
+  const params = groupId ? [owner, groupId] : [owner];
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
       SELECT unnest(album_names) AS name 
       FROM assets 
-      WHERE is_deleted = false AND owner_id = $1
+      WHERE is_deleted = false AND ${whereClause}
     ) sub 
     GROUP BY name 
     ORDER BY name
-  `, [owner]);
+  `, params);
   return res.rows;
 }
 
-export async function listTags(owner: string): Promise<any[]> {
+export async function listTags(owner: string, groupId: string | null = null): Promise<any[]> {
+  const whereClause = groupId ? 'group_id = $2' : 'owner_id = $1 AND group_id IS NULL';
+  const params = groupId ? [owner, groupId] : [owner];
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
       SELECT unnest(tags) AS name 
       FROM assets 
-      WHERE is_deleted = false AND owner_id = $1
+      WHERE is_deleted = false AND ${whereClause}
     ) sub 
     GROUP BY name 
     ORDER BY name
-  `, [owner]);
+  `, params);
   return res.rows;
 }
 
@@ -765,17 +769,19 @@ export async function setAssetAlbums(id: string, albumNames: string[] = []): Pro
   return { updated: res.rowCount || 0 };
 }
 
-export async function listDocProjects(owner: string): Promise<any[]> {
+export async function listDocProjects(owner: string, groupId: string | null = null): Promise<any[]> {
+  const whereClause = groupId ? 'group_id = $2' : 'owner_id = $1 AND group_id IS NULL';
+  const params = groupId ? [owner, groupId] : [owner];
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
       SELECT unnest(doc_project_names) AS name 
       FROM assets 
-      WHERE is_deleted = false AND type != 'image' AND type != 'video' AND owner_id = $1
+      WHERE is_deleted = false AND type != 'image' AND type != 'video' AND ${whereClause}
     ) sub 
     GROUP BY name 
     ORDER BY name
-  `, [owner]);
+  `, params);
   return res.rows;
 }
 
@@ -935,22 +941,43 @@ export async function purgeDeleted(ids: string[] = []): Promise<{ removed: numbe
     const assetsToPurge = selectRes.rows.map((row: any) => fromDB(row)).filter((x: Asset | null): x is Asset => x !== null);
     
     for (const item of assetsToPurge) {
-      const abs = path.join(LIBRARY_PATH, item.relPath || '');
-      try {
-        if (fs.existsSync(abs)) fs.unlinkSync(abs);
-      } catch {}
-      
-      if (item.playRelPath) {
-        const playAbs = path.join(LIBRARY_PATH, item.playRelPath);
-        try { if (fs.existsSync(playAbs)) fs.unlinkSync(playAbs); } catch {}
+      // 1. Kiểm tra xem còn bản ghi asset nào khác dùng chung file gốc vật lý không
+      const countRes = await client.query(
+        'SELECT COUNT(*)::int AS count FROM assets WHERE rel_path = $1 AND id != $2',
+        [item.relPath, item.id]
+      );
+      if (countRes.rows[0].count === 0) {
+        const abs = path.join(LIBRARY_PATH, item.relPath || '');
+        try {
+          if (fs.existsSync(abs)) fs.unlinkSync(abs);
+        } catch {}
       }
       
+      // 2. Kiểm tra xem còn bản ghi asset nào khác dùng chung video playable không
+      if (item.playRelPath) {
+        const playCountRes = await client.query(
+          'SELECT COUNT(*)::int AS count FROM assets WHERE play_rel_path = $1 AND id != $2',
+          [item.playRelPath, item.id]
+        );
+        if (playCountRes.rows[0].count === 0) {
+          const playAbs = path.join(LIBRARY_PATH, item.playRelPath);
+          try { if (fs.existsSync(playAbs)) fs.unlinkSync(playAbs); } catch {}
+        }
+      }
+      
+      // 3. Kiểm tra xem còn bản ghi asset nào khác dùng chung thư mục HLS không
       if (item.hlsRelPath) {
-        const hlsAbs = path.join(LIBRARY_PATH, item.hlsRelPath);
-        try {
-          const hlsDir = path.dirname(hlsAbs);
-          if (fs.existsSync(hlsDir)) fs.rmSync(hlsDir, { recursive: true, force: true });
-        } catch {}
+        const hlsCountRes = await client.query(
+          'SELECT COUNT(*)::int AS count FROM assets WHERE hls_rel_path = $1 AND id != $2',
+          [item.hlsRelPath, item.id]
+        );
+        if (hlsCountRes.rows[0].count === 0) {
+          const hlsAbs = path.join(LIBRARY_PATH, item.hlsRelPath);
+          try {
+            const hlsDir = path.dirname(hlsAbs);
+            if (fs.existsSync(hlsDir)) fs.rmSync(hlsDir, { recursive: true, force: true });
+          } catch {}
+        }
       }
       
       await client.query('DELETE FROM assets WHERE id = $1', [item.id]);
@@ -966,15 +993,15 @@ export async function purgeDeleted(ids: string[] = []): Promise<{ removed: numbe
 export async function getUnifiedStats(ownerId: string, storage: any, groupId: string | null = null): Promise<any> {
   // 1. Chạy SQL đếm số lượng tệp theo loại
   const whereClause = groupId ? 'group_id = $2' : 'owner_id = $1 AND group_id IS NULL';
-  const queryParams = [ownerId, groupId];
+  const queryParams = groupId ? [ownerId, groupId] : [ownerId];
 
   const countRes = await db.query(`
     SELECT 
-      COUNT(CASE WHEN is_deleted = false AND (type = 'image' OR type = 'video') THEN 1 END)::int AS photos_count,
-      COUNT(CASE WHEN is_deleted = false AND type = 'image' THEN 1 END)::int AS images_count,
-      COUNT(CASE WHEN is_deleted = false AND type = 'video' THEN 1 END)::int AS videos_count,
-      COUNT(CASE WHEN is_deleted = false AND type = 'file' THEN 1 END)::int AS docs_count,
-      COUNT(CASE WHEN is_deleted = true THEN 1 END)::int AS trash_count
+      COUNT(CASE WHEN is_library = true AND is_deleted = false AND (type = 'image' OR type = 'video') THEN 1 END)::int AS photos_count,
+      COUNT(CASE WHEN is_library = true AND is_deleted = false AND type = 'image' THEN 1 END)::int AS images_count,
+      COUNT(CASE WHEN is_library = true AND is_deleted = false AND type = 'video' THEN 1 END)::int AS videos_count,
+      COUNT(CASE WHEN is_library = true AND is_deleted = false AND type = 'file' THEN 1 END)::int AS docs_count,
+      COUNT(CASE WHEN is_library = true AND is_deleted = true THEN 1 END)::int AS trash_count
     FROM assets
     WHERE ${whereClause}
   `, queryParams);
@@ -989,6 +1016,32 @@ export async function getUnifiedStats(ownerId: string, storage: any, groupId: st
 
   // 2. Chạy SQL CTE đếm chi tiết theo category
   const configFilenamesLower = CONFIG_FILENAMES.map(f => f.toLowerCase());
+  const whereClauseCat = groupId ? 'group_id = $20' : 'owner_id = $1 AND group_id IS NULL';
+  const queryParamsCat = [
+    ownerId,
+    configFilenamesLower,
+    CATEGORY_EXTENSIONS.config,
+    CATEGORY_EXTENSIONS.word,
+    CATEGORY_EXTENSIONS.excel,
+    CATEGORY_EXTENSIONS.powerpoint,
+    CATEGORY_EXTENSIONS.markdown,
+    CATEGORY_EXTENSIONS.text,
+    CATEGORY_EXTENSIONS.ebook,
+    CATEGORY_EXTENSIONS.database,
+    CATEGORY_EXTENSIONS.archive,
+    CATEGORY_EXTENSIONS.installer,
+    CATEGORY_EXTENSIONS['disk-image'],
+    CATEGORY_EXTENSIONS.font,
+    CATEGORY_EXTENSIONS.certificate,
+    CATEGORY_EXTENSIONS.design,
+    CATEGORY_EXTENSIONS.cad,
+    CATEGORY_EXTENSIONS.executable,
+    CATEGORY_EXTENSIONS.code
+  ];
+  if (groupId) {
+    queryParamsCat.push(groupId);
+  }
+
   const catRes = await db.query(`
     WITH classified AS (
       SELECT 
@@ -1015,33 +1068,12 @@ export async function getUnifiedStats(ownerId: string, storage: any, groupId: st
           ELSE 'other'
         END AS cat
       FROM assets
-      WHERE ${whereClause} AND is_deleted = false AND type = 'file'
+      WHERE ${whereClauseCat} AND is_library = true AND is_deleted = false AND type = 'file'
     )
     SELECT cat, COUNT(*)::int AS count 
     FROM classified 
     GROUP BY cat
-  `, [
-    ownerId,
-    configFilenamesLower,
-    CATEGORY_EXTENSIONS.config,
-    CATEGORY_EXTENSIONS.word,
-    CATEGORY_EXTENSIONS.excel,
-    CATEGORY_EXTENSIONS.powerpoint,
-    CATEGORY_EXTENSIONS.markdown,
-    CATEGORY_EXTENSIONS.text,
-    CATEGORY_EXTENSIONS.ebook,
-    CATEGORY_EXTENSIONS.database,
-    CATEGORY_EXTENSIONS.archive,
-    CATEGORY_EXTENSIONS.installer,
-    CATEGORY_EXTENSIONS['disk-image'],
-    CATEGORY_EXTENSIONS.font,
-    CATEGORY_EXTENSIONS.certificate,
-    CATEGORY_EXTENSIONS.design,
-    CATEGORY_EXTENSIONS.cad,
-    CATEGORY_EXTENSIONS.executable,
-    CATEGORY_EXTENSIONS.code,
-    groupId
-  ]);
+  `, queryParamsCat);
 
   const docCategoryCounts: Record<string, number> = {};
   for (const key of Object.keys(CATEGORY_EXTENSIONS).concat('other')) {
@@ -1053,9 +1085,9 @@ export async function getUnifiedStats(ownerId: string, storage: any, groupId: st
 
   // 3. Lấy tags, albums, docProjects
   const [tags, albums, docProjects] = await Promise.all([
-    listTags(ownerId),
-    listAlbums(ownerId),
-    listDocProjects(ownerId)
+    listTags(ownerId, groupId),
+    listAlbums(ownerId, groupId),
+    listDocProjects(ownerId, groupId)
   ]);
 
   // 4. Lấy 50 ảnh/video mới nhất

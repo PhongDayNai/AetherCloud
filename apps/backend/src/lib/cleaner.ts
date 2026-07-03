@@ -56,6 +56,20 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
   const client = await db.pool.connect();
   let dbActivePaths = new Set<string>();
   try {
+    // Dọn dẹp các asset mồ côi trong database (các asset đính kèm post nhưng post/space đã bị xóa)
+    if (!isDryRun) {
+      // Chỉ xóa những tệp mồ côi đã được tạo hơn 3 giờ trước để tránh ảnh hưởng đến các phiên upload đang diễn ra
+      const delRes = await client.query(`
+        DELETE FROM assets 
+        WHERE is_library = false 
+        AND created_at < NOW() - INTERVAL '3 hours'
+        AND id NOT IN (SELECT asset_id FROM post_assets)
+      `);
+      if (delRes.rowCount && delRes.rowCount > 0) {
+        console.log(`[Cleaner] Đã dọn dẹp ${delRes.rowCount} bản ghi asset mồ côi trong database.`);
+      }
+    }
+
     const res = await client.query('SELECT rel_path, play_rel_path, hls_rel_path FROM assets');
     for (const row of res.rows) {
       if (row.rel_path) dbActivePaths.add(row.rel_path.replaceAll('\\', '/'));
