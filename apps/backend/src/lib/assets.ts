@@ -511,16 +511,22 @@ export async function listAssets(limit = 200, opts: any = {}): Promise<Asset[]> 
     album,
     tag,
     docProject,
-    includeNonLibrary = false
+    includeNonLibrary = false,
+    groupId
   } = opts;
   const targetOwner = ownerId || owner;
   let queryText = 'SELECT * FROM assets';
   const params: any[] = [];
   const clauses: string[] = [];
 
-  if (targetOwner) {
-    params.push(targetOwner);
-    clauses.push(`owner_id = $${params.length}`);
+  if (groupId) {
+    params.push(groupId);
+    clauses.push(`group_id = $${params.length}`);
+  } else {
+    if (targetOwner) {
+      params.push(targetOwner);
+      clauses.push(`owner_id = $${params.length} AND group_id IS NULL`);
+    }
   }
 
   if (onlyTrash) {
@@ -957,8 +963,11 @@ export async function purgeDeleted(ids: string[] = []): Promise<{ removed: numbe
   return { removed };
 }
 
-export async function getUnifiedStats(ownerId: string, storage: any): Promise<any> {
+export async function getUnifiedStats(ownerId: string, storage: any, groupId: string | null = null): Promise<any> {
   // 1. Chạy SQL đếm số lượng tệp theo loại
+  const whereClause = groupId ? 'group_id = $2' : 'owner_id = $1 AND group_id IS NULL';
+  const queryParams = [ownerId, groupId];
+
   const countRes = await db.query(`
     SELECT 
       COUNT(CASE WHEN is_deleted = false AND (type = 'image' OR type = 'video') THEN 1 END)::int AS photos_count,
@@ -967,8 +976,8 @@ export async function getUnifiedStats(ownerId: string, storage: any): Promise<an
       COUNT(CASE WHEN is_deleted = false AND type = 'file' THEN 1 END)::int AS docs_count,
       COUNT(CASE WHEN is_deleted = true THEN 1 END)::int AS trash_count
     FROM assets
-    WHERE owner_id = $1
-  `, [ownerId]);
+    WHERE ${whereClause}
+  `, queryParams);
   
   const counts = {
     photosCount: countRes.rows[0]?.photos_count || 0,
@@ -1006,7 +1015,7 @@ export async function getUnifiedStats(ownerId: string, storage: any): Promise<an
           ELSE 'other'
         END AS cat
       FROM assets
-      WHERE owner_id = $1 AND is_deleted = false AND type = 'file'
+      WHERE ${whereClause} AND is_deleted = false AND type = 'file'
     )
     SELECT cat, COUNT(*)::int AS count 
     FROM classified 
@@ -1030,7 +1039,8 @@ export async function getUnifiedStats(ownerId: string, storage: any): Promise<an
     CATEGORY_EXTENSIONS.design,
     CATEGORY_EXTENSIONS.cad,
     CATEGORY_EXTENSIONS.executable,
-    CATEGORY_EXTENSIONS.code
+    CATEGORY_EXTENSIONS.code,
+    groupId
   ]);
 
   const docCategoryCounts: Record<string, number> = {};
@@ -1050,7 +1060,8 @@ export async function getUnifiedStats(ownerId: string, storage: any): Promise<an
 
   // 4. Lấy 50 ảnh/video mới nhất
   const recentPhotos = await listAssets(50, {
-    ownerId,
+    ownerId: groupId ? undefined : ownerId,
+    groupId: groupId || undefined,
     type: 'photos',
     includeTrash: false
   });
@@ -1064,7 +1075,8 @@ export async function getUnifiedStats(ownerId: string, storage: any): Promise<an
   
   await Promise.all(activeCategories.map(async (cat) => {
     recentDocs[cat] = await listAssets(15, {
-      ownerId,
+      ownerId: groupId ? undefined : ownerId,
+      groupId: groupId || undefined,
       category: cat,
       includeTrash: false
     });

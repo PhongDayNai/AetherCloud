@@ -58,9 +58,24 @@ async function checkAssetOwnership(req: Request, res: Response, next: NextFuncti
   try {
     const asset = await getAsset(id);
     if (!asset) return res.status(404).json({ message: 'Không tìm thấy tệp tin' });
-    if (!req.user || asset.ownerId !== req.user.sub) {
-      return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin này' });
+    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+
+    if (asset.groupId) {
+      // Kiểm tra quyền thành viên nhóm
+      const memberRes = await db.query(
+        'SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2',
+        [asset.groupId, req.user.sub]
+      );
+      if (memberRes.rows.length === 0) {
+        return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin thuộc nhóm này' });
+      }
+    } else {
+      // Kiểm tra sở hữu cá nhân
+      if (asset.ownerId !== req.user.sub) {
+        return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin này' });
+      }
     }
+
     req.asset = asset; // Truyền asset đã query sang handler kế tiếp để tái sử dụng
     next();
   } catch (e: any) {
@@ -74,12 +89,18 @@ async function checkBulkOwnership(req: Request, res: Response, next: NextFunctio
   if (!ids.length) return res.status(400).json({ message: 'Danh sách ids là bắt buộc' });
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   try {
+    // Cho phép thao tác nếu là owner cá nhân hoặc là thành viên của nhóm chứa tệp tin đó
     const checkRes = await db.query(
-      'SELECT COUNT(*)::int AS count FROM assets WHERE id = ANY($1) AND owner_id = $2',
+      `SELECT COUNT(*)::int AS count FROM assets 
+       WHERE id = ANY($1) 
+       AND (
+         owner_id = $2 OR 
+         group_id IN (SELECT group_id FROM group_members WHERE user_id = $2)
+       )`,
       [ids, req.user.sub]
     );
     if (checkRes.rows[0].count !== ids.length) {
-      return res.status(403).json({ message: 'Bạn không có quyền thao tác trên một số tệp tin' });
+      return res.status(403).json({ message: 'Bạn không có quyền thao tác trên một số tệp tin đã chọn' });
     }
     next();
   } catch (e: any) {
@@ -101,8 +122,20 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
   const album = req.query.album ? String(req.query.album) : undefined;
   const tag = req.query.tag ? String(req.query.tag) : undefined;
   const docProject = req.query.docProject ? String(req.query.docProject) : undefined;
+  const groupId = req.query.groupId ? String(req.query.groupId) : undefined;
 
   try {
+    // Nếu lọc theo nhóm, xác minh quyền thành viên nhóm của user hiện tại
+    if (groupId) {
+      const memberRes = await db.query(
+        'SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2',
+        [groupId, req.user.sub]
+      );
+      if (memberRes.rows.length === 0) {
+        return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin của nhóm này' });
+      }
+    }
+
     const items = await listAssets(limit, { 
       includeTrash, 
       onlyTrash, 
@@ -113,7 +146,8 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       category,
       album,
       tag,
-      docProject
+      docProject,
+      groupId
     });
     
     let nextCursor: string | null = null;
@@ -427,12 +461,79 @@ router.put('/:id/tags', requireAuth, checkAssetOwnership, async (req: Request, r
   }
 });
 
-// 19b. GET thống kê hợp nhất cho Dashboard
+// 19b. POST chia sẻ tệp tin hàng loạt vào nhóm (Nhân bản metadata)
+router.post('/bulk/share', requireAuth, checkBulkOwnership, async (req: Request, res: Response) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  const { groupId } = req.body || {};
+  if (!groupId) return res.status(400).json({ message: 'groupId là bắt buộc' });
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+
+  try {
+    // Kiểm tra quyền thành viên nhóm nhận chia sẻ
+    const memberRes = await db.query(
+      'SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2',
+      [groupId, req.user.sub]
+    );
+    if (memberRes.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không phải là thành viên của nhóm nhận chia sẻ' });
+    }
+
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+      let sharedCount = 0;
+
+      for (const aid of ids) {
+        // Lấy asset gốc
+        const assetRes = await client.query('SELECT * FROM assets WHERE id = $1', [aid]);
+        if (assetRes.rows.length === 0) continue;
+        const original = assetRes.rows[0];
+
+        // Kiểm tra xem tệp tin này đã được chia sẻ vào nhóm đó chưa (tránh trùng lặp)
+        const dupRes = await client.query(
+          'SELECT 1 FROM assets WHERE group_id = $1 AND rel_path = $2 AND is_deleted = false LIMIT 1',
+          [groupId, original.rel_path]
+        );
+        if (dupRes.rows.length > 0) continue; // Bỏ qua nếu đã chia sẻ
+
+        // Tạo asset mới chia sẻ vào nhóm
+        const newId = crypto.randomUUID();
+        await client.query(`
+          INSERT INTO assets (
+            id, original_name, mime, size, owner_id, group_id, uploaded_at, taken_at, rel_path,
+            play_rel_path, hls_rel_path, processing_status, processing_started_at,
+            processing_finished_at, ext, album_name, album_names, doc_project_name,
+            doc_project_names, tags, is_deleted, deleted_at, is_library, type
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+        `, [
+          newId, original.original_name, original.mime, original.size, req.user.sub, groupId,
+          new Date().toISOString(), original.taken_at, original.rel_path, original.play_rel_path, original.hls_rel_path,
+          original.processing_status, original.processing_started_at, original.processing_finished_at,
+          original.ext, null, '{}', null, '{}', '{}', false, null, true, original.type
+        ]);
+        sharedCount++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ ok: true, sharedCount });
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (e: any) {
+    return res.status(500).json({ message: e.message });
+  }
+});
+
+// 19c. GET thống kê hợp nhất cho Dashboard
 router.get('/stats', requireAuth, async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+  const groupId = req.query.groupId ? String(req.query.groupId) : undefined;
   try {
     const storage = await getStorageUsage();
-    const stats = await getUnifiedStats(req.user.sub, storage);
+    const stats = await getUnifiedStats(req.user.sub, storage, groupId || null);
     return res.json(stats);
   } catch (e: any) {
     return res.status(500).json({ message: e.message });
