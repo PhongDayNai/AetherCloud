@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import exifr from 'exifr';
-import { spawnSync, spawn } from 'child_process';
+import { spawnSync, spawn, ChildProcess } from 'child_process';
 import * as db from './db';
 
 export interface Asset {
@@ -84,6 +84,40 @@ const ORIGINALS_ROOT = path.resolve(LIBRARY_PATH, 'originals');
 const TRASH_ROOT = resolveStoragePath(process.env.MEDIA_TRASH_PATH || path.join(LIBRARY_PATH, 'trash'));
 const INDEX_DIR = path.resolve(LIBRARY_PATH, 'index');
 
+const activeTranscoders = new Map<string, ChildProcess[]>();
+
+export function cancelTranscoding(id: string) {
+  const processes = activeTranscoders.get(id);
+  if (processes) {
+    console.log(`[Transcoder] Hủy tiến trình transcoding cho asset ${id}...`);
+    for (const child of processes) {
+      try {
+        child.kill('SIGKILL');
+      } catch (err) {
+        console.error(`[Transcoder] Lỗi khi kill process:`, err);
+      }
+    }
+    activeTranscoders.delete(id);
+  }
+
+  // Clean up partial files from disk
+  const playDir = path.join(LIBRARY_PATH, 'derived', 'play');
+  const playPath = path.join(playDir, `${id}.mp4`);
+  if (fs.existsSync(playPath)) {
+    try {
+      fs.unlinkSync(playPath);
+      console.log(`[Transcoder] Đã xóa file playable tạm thời: ${playPath}`);
+    } catch {}
+  }
+  const hlsDir = path.join(LIBRARY_PATH, 'derived', 'hls', id);
+  if (fs.existsSync(hlsDir)) {
+    try {
+      fs.rmSync(hlsDir, { recursive: true, force: true });
+      console.log(`[Transcoder] Đã xóa thư mục HLS tạm thời: ${hlsDir}`);
+    } catch {}
+  }
+}
+
 function ensureDirs() {
   fs.mkdirSync(ORIGINALS_ROOT, { recursive: true });
   fs.mkdirSync(TRASH_ROOT, { recursive: true });
@@ -155,10 +189,30 @@ function buildHlsDirById(id: string): string {
   return hlsDir;
 }
 
-function executeFfmpegAsync(args: string[], strategyName: string): Promise<boolean> {
+function executeFfmpegAsync(args: string[], strategyName: string, id?: string): Promise<boolean> {
   return new Promise((resolve) => {
     console.log(`[Transcoder] Bắt đầu transcode bằng ${strategyName}...`);
     const child = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    
+    if (id) {
+      const list = activeTranscoders.get(id) || [];
+      list.push(child);
+      activeTranscoders.set(id, list);
+    }
+
+    const cleanUp = () => {
+      if (id) {
+        const list = activeTranscoders.get(id);
+        if (list) {
+          const filtered = list.filter(c => c !== child);
+          if (filtered.length === 0) {
+            activeTranscoders.delete(id);
+          } else {
+            activeTranscoders.set(id, filtered);
+          }
+        }
+      }
+    };
     let stderrData = '';
     let lastLogTime = 0;
 
@@ -178,6 +232,7 @@ function executeFfmpegAsync(args: string[], strategyName: string): Promise<boole
     });
 
     child.on('close', (code: number | null) => {
+      cleanUp();
       if (code === 0) {
         console.log(`[Transcoder] Transcode bằng ${strategyName} THÀNH CÔNG.`);
         resolve(true);
@@ -190,16 +245,17 @@ function executeFfmpegAsync(args: string[], strategyName: string): Promise<boole
     });
 
     child.on('error', (err: any) => {
+      cleanUp();
       console.error(`[Transcoder] Không thể khởi chạy ffmpeg cho ${strategyName}:`, err.message);
       resolve(false);
     });
   });
 }
 
-async function transcodeWithFallback(getArgsFn: (strategy: string) => string[], outPath: string): Promise<boolean> {
+async function transcodeWithFallback(getArgsFn: (strategy: string) => string[], outPath: string, id: string): Promise<boolean> {
   // Strategy 1: Nvidia NVENC (dGPU)
   const nvencArgs = getArgsFn('nvenc');
-  const nvencOk = await executeFfmpegAsync(nvencArgs, 'Nvidia NVENC');
+  const nvencOk = await executeFfmpegAsync(nvencArgs, 'Nvidia NVENC', id);
   if (nvencOk && fs.existsSync(outPath)) {
     return true;
   }
@@ -209,7 +265,7 @@ async function transcodeWithFallback(getArgsFn: (strategy: string) => string[], 
   // Strategy 2: VA-API (Generic Intel/AMD iGPU/dGPU on Linux)
   if (fs.existsSync('/dev/dri/renderD128')) {
     const vaapiArgs = getArgsFn('vaapi');
-    const vaapiOk = await executeFfmpegAsync(vaapiArgs, 'Intel/AMD VA-API');
+    const vaapiOk = await executeFfmpegAsync(vaapiArgs, 'Intel/AMD VA-API', id);
     if (vaapiOk && fs.existsSync(outPath)) {
       return true;
     }
@@ -220,7 +276,7 @@ async function transcodeWithFallback(getArgsFn: (strategy: string) => string[], 
 
   // Strategy 3: CPU Fallback (libx264)
   const cpuArgs = getArgsFn('cpu');
-  const cpuOk = await executeFfmpegAsync(cpuArgs, 'CPU (libx264)');
+  const cpuOk = await executeFfmpegAsync(cpuArgs, 'CPU (libx264)', id);
   if (cpuOk && fs.existsSync(outPath)) {
     return true;
   }
@@ -299,7 +355,7 @@ function makeVideoPlayable(absPath: string, id: string): Promise<string | null> 
     ];
   };
 
-  return transcodeWithFallback(getArgs, out).then((ok) => (ok ? out : null));
+  return transcodeWithFallback(getArgs, out, id).then((ok) => (ok ? out : null));
 }
 
 function probeVideoSize(absPath: string): { w: number; h: number } | null {
@@ -338,7 +394,7 @@ function makeVideoHlsFromPlayable(playableMp4Path: string, id: string): Promise<
     streamPath,
   ];
 
-  return executeFfmpegAsync(args, 'HLS Packaging').then((ok) => {
+  return executeFfmpegAsync(args, 'HLS Packaging', id).then((ok) => {
     if (!ok) return null;
 
     const size = probeVideoSize(streamPath) || probeVideoSize(playableMp4Path);
@@ -368,17 +424,37 @@ function makeVideoHlsFromPlayable(playableMp4Path: string, id: string): Promise<
 async function scheduleVideoDerivatives(id: string, absPath: string): Promise<void> {
   try {
     console.log(`[Transcoder] Bắt đầu scheduleVideoDerivatives cho ${id}...`);
-    const playable = await makeVideoPlayable(absPath, id);
+
+    // Check if the asset exists
+    const checkItem = await getAsset(id);
+    if (!checkItem) {
+      console.log(`[Transcoder] Bỏ qua transcoding vì asset ${id} không tồn tại trong database.`);
+      cancelTranscoding(id);
+      return;
+    }
+
+    // Resolve current path (handles if it was moved to trash)
+    const currentAbsPath = path.join(LIBRARY_PATH, checkItem.relPath);
+    const playable = await makeVideoPlayable(currentAbsPath, id);
     console.log(`[Transcoder] Kết quả makeVideoPlayable:`, playable);
     let hls = null;
     if (playable) {
+      // Check again before packaging HLS
+      const checkItem2 = await getAsset(id);
+      if (!checkItem2) {
+        console.log(`[Transcoder] Bỏ qua HLS Packaging vì asset ${id} không tồn tại trong database.`);
+        cancelTranscoding(id);
+        return;
+      }
+
       hls = await makeVideoHlsFromPlayable(playable, id);
       console.log(`[Transcoder] Kết quả makeVideoHlsFromPlayable:`, hls);
     }
 
     const item = await getAsset(id);
     if (!item) {
-      console.error(`[Transcoder] Không tìm thấy item ${id} trong database.`);
+      console.error(`[Transcoder] Không cập nhật database vì asset ${id} không tồn tại trong database.`);
+      cancelTranscoding(id);
       return;
     }
 
@@ -682,8 +758,8 @@ export function getHlsDirAbsPathFromAsset(asset: Asset): string | null {
 }
 
 export async function listAlbums(owner: string, groupId: string | null = null): Promise<any[]> {
-  const whereClause = groupId ? 'group_id = $2' : 'owner_id = $1 AND group_id IS NULL';
-  const params = groupId ? [owner, groupId] : [owner];
+  const whereClause = groupId ? 'group_id = $1' : 'owner_id = $1 AND group_id IS NULL';
+  const params = groupId ? [groupId] : [owner];
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
@@ -698,8 +774,8 @@ export async function listAlbums(owner: string, groupId: string | null = null): 
 }
 
 export async function listTags(owner: string, groupId: string | null = null): Promise<any[]> {
-  const whereClause = groupId ? 'group_id = $2' : 'owner_id = $1 AND group_id IS NULL';
-  const params = groupId ? [owner, groupId] : [owner];
+  const whereClause = groupId ? 'group_id = $1' : 'owner_id = $1 AND group_id IS NULL';
+  const params = groupId ? [groupId] : [owner];
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
@@ -770,8 +846,8 @@ export async function setAssetAlbums(id: string, albumNames: string[] = []): Pro
 }
 
 export async function listDocProjects(owner: string, groupId: string | null = null): Promise<any[]> {
-  const whereClause = groupId ? 'group_id = $2' : 'owner_id = $1 AND group_id IS NULL';
-  const params = groupId ? [owner, groupId] : [owner];
+  const whereClause = groupId ? 'group_id = $1' : 'owner_id = $1 AND group_id IS NULL';
+  const params = groupId ? [groupId] : [owner];
   const res = await db.query(`
     SELECT name, COUNT(*)::int AS count 
     FROM (
@@ -941,6 +1017,7 @@ export async function purgeDeleted(ids: string[] = []): Promise<{ removed: numbe
     const assetsToPurge = selectRes.rows.map((row: any) => fromDB(row)).filter((x: Asset | null): x is Asset => x !== null);
     
     for (const item of assetsToPurge) {
+      cancelTranscoding(item.id);
       // 1. Kiểm tra xem còn bản ghi asset nào khác dùng chung file gốc vật lý không
       const countRes = await client.query(
         'SELECT COUNT(*)::int AS count FROM assets WHERE rel_path = $1 AND id != $2',
@@ -995,8 +1072,8 @@ export async function purgeDeleted(ids: string[] = []): Promise<{ removed: numbe
 
 export async function getUnifiedStats(ownerId: string, storage: any, groupId: string | null = null): Promise<any> {
   // 1. Chạy SQL đếm số lượng tệp theo loại
-  const whereClause = groupId ? 'group_id = $2' : 'owner_id = $1 AND group_id IS NULL';
-  const queryParams = groupId ? [ownerId, groupId] : [ownerId];
+  const whereClause = groupId ? 'group_id = $1' : 'owner_id = $1 AND group_id IS NULL';
+  const queryParams = groupId ? [groupId] : [ownerId];
 
   const countRes = await db.query(`
     SELECT 
@@ -1019,9 +1096,9 @@ export async function getUnifiedStats(ownerId: string, storage: any, groupId: st
 
   // 2. Chạy SQL CTE đếm chi tiết theo category
   const configFilenamesLower = CONFIG_FILENAMES.map(f => f.toLowerCase());
-  const whereClauseCat = groupId ? 'group_id = $20' : 'owner_id = $1 AND group_id IS NULL';
+  const whereClauseCat = groupId ? 'group_id = $1' : 'owner_id = $1 AND group_id IS NULL';
   const queryParamsCat = [
-    ownerId,
+    groupId || ownerId,
     configFilenamesLower,
     CATEGORY_EXTENSIONS.config,
     CATEGORY_EXTENSIONS.word,
@@ -1041,9 +1118,6 @@ export async function getUnifiedStats(ownerId: string, storage: any, groupId: st
     CATEGORY_EXTENSIONS.executable,
     CATEGORY_EXTENSIONS.code
   ];
-  if (groupId) {
-    queryParamsCat.push(groupId);
-  }
 
   const catRes = await db.query(`
     WITH classified AS (
