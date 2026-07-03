@@ -7,7 +7,7 @@ import AssetGrid from '../../../components/AssetGrid';
 import DocView from '../../../components/DocView';
 import SmartVideo from '../../../components/SmartVideo';
 import { Asset } from '../../../types';
-import { fmtBytes, docCategoryOf } from '../../../lib/utils';
+import { fmtBytes, docCategoryOf, formatDateTime } from '../../../lib/utils';
 import * as Icons from '../../../components/Icons';
 import CustomSelect from '../../../components/CustomSelect';
 
@@ -1258,7 +1258,7 @@ export default function DashboardPage(): React.JSX.Element {
                     <span className="avatarCircle">{user ? user.name.charAt(0).toUpperCase() : 'U'}</span>
                     <span className="authorName">{user ? user.name : 'Unknown'}</span>
                   </div>
-                  <span className="postTime">{new Date(post.createdAt).toLocaleString(language === 'vi' ? 'vi-VN' : 'en-US')}</span>
+                  <span className="postTime">{formatDateTime(post.createdAt, language)}</span>
                 </div>
                 {post.caption && <div className="postCaption">{post.caption}</div>}
                 {post.assets && post.assets.length > 0 && (

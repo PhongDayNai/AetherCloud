@@ -2,7 +2,7 @@
 // Refactored MediaViewer component
 
 import { Asset, Album, Tag, DocProject } from '../types';
-import { fmtBytes, docCategoryOf } from '../lib/utils';
+import { fmtBytes, docCategoryOf, formatDateTime } from '../lib/utils';
 import SmartVideo from './SmartVideo';
 import * as Icons from './Icons';
 import { useCloud } from '../context/CloudContext';
@@ -100,7 +100,7 @@ export default function MediaViewer({
 }: MediaViewerProps): React.JSX.Element | null {
   if (!active) return null;
 
-  const { activeWorkspace, groups } = useCloud();
+  const { activeWorkspace, groups, language } = useCloud();
   
   let userRole: string | null = null;
   if (activeWorkspace?.type === 'group') {
@@ -112,6 +112,8 @@ export default function MediaViewer({
   const isReadOnly = (activeWorkspace?.type === 'group' || (activeWorkspace?.type === 'space' && activeWorkspace?.groupId)) && userRole === 'member';
 
   const currentList = tab === 'photos' ? albumFilteredPhotos : docsFiltered;
+
+
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -240,10 +242,10 @@ export default function MediaViewer({
       {showInfo && (
         <div className="infoPanel" onClick={(e) => e.stopPropagation()}>
           <div><b>{active.originalName}</b></div>
-          <div>{t('details.format')}: {active.mime}</div>
+          <div>{t('details.format')}: {active.mime ? (active.originalName.includes('.') ? active.originalName.split('.').pop()?.toUpperCase() : active.mime.split('/').pop()?.toUpperCase()) : '-'}</div>
           <div>{t('details.size')}: {fmtBytes(active.size)}</div>
-          <div>{t('details.createdAt')}: {active.takenAt || '-'}</div>
-          <div>Upload: {active.uploadedAt || '-'}</div>
+          <div>{t('details.createdAt')}: {formatDateTime(active.takenAt, language)}</div>
+          <div>Upload: {formatDateTime(active.uploadedAt, language)}</div>
           {active.type !== 'file' ? (
             <div>Album: {(active.albumNames || []).join(', ') || '-'}</div>
           ) : (
@@ -493,6 +495,7 @@ export default function MediaViewer({
           color: #a1a1aa;
           animation: panelEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           transform-origin: top right;
+          z-index: 10;
         }
         .infoPanel b {
           color: #ffffff;
@@ -515,6 +518,7 @@ export default function MediaViewer({
           backdrop-filter: blur(12px);
           animation: panelEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           transform-origin: top right;
+          z-index: 10;
         }
         .albumPanel * {
           box-sizing: border-box;
@@ -662,6 +666,7 @@ export default function MediaViewer({
           backdrop-filter: blur(12px);
           animation: panelEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           transform-origin: top right;
+          z-index: 10;
         }
         .tagSearch {
           width: 100%;

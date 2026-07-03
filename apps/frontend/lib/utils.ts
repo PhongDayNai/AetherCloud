@@ -167,3 +167,14 @@ export function docIconOf(item: Asset): string {
   return '📄';
 }
 
+export function formatDateTime(dateStr: string | null | undefined, lang: string): string {
+  if (!dateStr) return '-';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US');
+  } catch {
+    return dateStr;
+  }
+}
+
