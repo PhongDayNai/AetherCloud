@@ -33,7 +33,18 @@ const allowedOrigins = new Set([
   process.env.MEDIA_TRASH_PATH || '/data/library/trash',
 ].forEach((p) => fs.mkdirSync(resolveStoragePath(p), { recursive: true }));
 
-app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+    frameguard: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        frameAncestors: ["'self'", ...Array.from(allowedOrigins)],
+      },
+    },
+  })
+);
 app.use(
   cors({
     origin(origin, callback) {
