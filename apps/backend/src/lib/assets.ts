@@ -984,6 +984,9 @@ export async function purgeDeleted(ids: string[] = []): Promise<{ removed: numbe
       removed++;
     }
     await client.query('COMMIT');
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    throw err;
   } finally {
     client.release();
   }
