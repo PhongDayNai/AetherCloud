@@ -4,6 +4,26 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Asset, User, DocProject, Tag } from '../types';
 import { fmtBytes } from '../lib/utils';
+import { useCloud } from '../context/CloudContext';
+
+export const translateSpace = (sp: any, t: any) => {
+  if (!sp) return sp;
+  const isGeneral = 
+    sp.name === 'General' && 
+    sp.type === 'journal' && 
+    (sp.description === 'General discussion space for the group' || sp.description === 'Write journal entries with attachments.');
+  if (isGeneral) {
+    const isAlt = sp.description === 'Write journal entries with attachments.';
+    return {
+      ...sp,
+      name: t('spaces.generalName') || sp.name,
+      description: isAlt 
+        ? (t('spaces.generalDescAlternative') || sp.description)
+        : (t('spaces.generalDesc') || sp.description)
+    };
+  }
+  return sp;
+};
 
 interface SidebarProps {
   tab: 'photos' | 'docs' | 'dashboard' | 'space' | 'space-all' | 'spaces';
@@ -47,7 +67,7 @@ interface SidebarProps {
   setShowSettingsModal: (show: boolean) => void;
   handleLogout: () => void;
   t: (key: string, replacements?: Record<string, string | number>) => string;
-  activeWorkspace: { type: 'personal' } | { type: 'space'; id: string; name: string; spaceType: string };
+  activeWorkspace: any;
   setActiveWorkspace: (ws: any) => void;
   spaces: any[];
   photosCount?: number;
@@ -106,27 +126,174 @@ export default function Sidebar({
   docsCount
 }: SidebarProps): React.JSX.Element {
   const router = useRouter();
+  const { 
+    groups, 
+    loadData,
+    setShowCreateGroupModal,
+    setShowGroupSettingsModal
+  } = useCloud();
+  const [showWsDropdown, setShowWsDropdown] = useState(false);
+
+  // Lắng nghe click toàn cục để tự động collapse bộ chọn workspace và profile menu khi click ra ngoài
+  React.useEffect(() => {
+    if (!showWsDropdown && !showProfileMenu) return;
+    const handleGlobalClick = (e: MouseEvent) => {
+      if (showWsDropdown) {
+        const wrapper = document.querySelector('.workspaceSwitcherWrapper');
+        if (wrapper && !wrapper.contains(e.target as Node)) {
+          setShowWsDropdown(false);
+        }
+      }
+      if (showProfileMenu) {
+        const wrapper = document.querySelector('.profileSwitcherWrapper');
+        if (wrapper && !wrapper.contains(e.target as Node)) {
+          setShowProfileMenu(false);
+        }
+      }
+    };
+    document.addEventListener('click', handleGlobalClick);
+    return () => document.removeEventListener('click', handleGlobalClick);
+  }, [showWsDropdown, showProfileMenu]);
+
+  const getPath = (targetTab: string) => {
+    let gId: string | null = null;
+    if (activeWorkspace.type === 'group') {
+      gId = activeWorkspace.id;
+    } else if (activeWorkspace.type === 'space' && activeWorkspace.groupId) {
+      gId = activeWorkspace.groupId;
+    }
+    return gId ? `/cloud/group/${gId}/${targetTab}` : `/cloud/${targetTab}`;
+  };
 
   return (
     <aside className="sidebar" onClick={() => { setShowProfileMenu(false); }}>
-      <div className="sidebarMenu">
-        <div className="logo">AetherCloud</div>
+      <div className="logo">AetherCloud</div>
 
+      {/* Giao diện Workspace Switcher thiết kế theo yêu cầu */}
+      <div className="workspaceSwitcherWrapper">
+        <div 
+          className={`workspaceSwitcherContainer ${showWsDropdown ? 'expanded' : 'collapsed'}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {!showWsDropdown ? (
+            <button className="wsBtn" onClick={() => setShowWsDropdown(true)}>
+              <span className="wsIcon">
+                {activeWorkspace.type === 'personal' || (activeWorkspace.type === 'space' && !activeWorkspace.groupId) ? <Icons.User /> : <Icons.Group />}
+              </span>
+              <span className="wsName">
+                {activeWorkspace.type === 'personal' || (activeWorkspace.type === 'space' && !activeWorkspace.groupId)
+                  ? t('sidebar.personalCloud') || 'Không gian cá nhân'
+                  : activeWorkspace.type === 'group'
+                  ? activeWorkspace.name
+                  : (groups.find(g => g.id === activeWorkspace.groupId)?.name || 'Loading group...')}
+              </span>
+              <span className="wsChangeIcon">
+                <Icons.Change size={14} />
+              </span>
+            </button>
+          ) : (
+            <div className="wsExpandedContent">
+              <div className="wsDropdownTitle">{t('sidebar.workspace') || 'Workspace'}</div>
+              
+              {/* 1. Trên cùng: Tạo nhóm mới */}
+              <button 
+                className="wsDropdownItem" 
+                onClick={() => {
+                  setShowWsDropdown(false);
+                  setShowCreateGroupModal(true);
+                }}
+                style={{ color: 'var(--text-accent)', fontWeight: 600 }}
+              >
+                <span className="icon"><Icons.Plus /></span>
+                <span>{t('sidebar.createGroup') || 'Tạo nhóm mới'}</span>
+              </button>
+
+              <div className="navDivider" style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0', opacity: 0.5 }} />
+
+              {/* 2. Thứ hai: Không gian cá nhân */}
+              <button 
+                className={`wsDropdownItem ${activeWorkspace.type === 'personal' || (activeWorkspace.type === 'space' && !activeWorkspace.groupId) ? 'active' : ''}`}
+                onClick={() => {
+                  setShowWsDropdown(false);
+                  router.push('/cloud/dashboard');
+                }}
+              >
+                <span className="icon"><Icons.User /></span>
+                <span className="name">{t('sidebar.personalCloud') || 'Không gian cá nhân'}</span>
+                {(activeWorkspace.type === 'personal' || (activeWorkspace.type === 'space' && !activeWorkspace.groupId)) && <span className="activeDot" />}
+              </button>
+              
+              <div className="navDivider" style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0', opacity: 0.5 }} />
+              
+              {/* 3. Thứ ba trở đi: Danh sách nhóm */}
+              {groups.map((group) => {
+                const isCurrentActiveGroup = (activeWorkspace.type === 'group' && activeWorkspace.id === group.id) || (activeWorkspace.type === 'space' && activeWorkspace.groupId === group.id);
+                return (
+                  <div 
+                    key={group.id} 
+                    className={`wsDropdownItemWrap ${isCurrentActiveGroup ? 'active' : ''}`}
+                    style={{ display: 'flex', alignItems: 'center', width: '100%', borderRadius: '8px' }}
+                  >
+                    <button
+                      className={`wsDropdownItem ${isCurrentActiveGroup ? 'active' : ''}`}
+                      onClick={() => {
+                        setShowWsDropdown(false);
+                        router.push(`/cloud/group/${group.id}/dashboard`);
+                      }}
+                      style={{ flex: 1, border: 0, background: 'transparent' }}
+                    >
+                      <span className="icon"><Icons.Group /></span>
+                      <span className="name">{group.name}</span>
+                      {isCurrentActiveGroup && <span className="activeDot" />}
+                    </button>
+                    
+                    {isCurrentActiveGroup && (
+                      <button 
+                        className="wsItemSettingsBtn" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowWsDropdown(false);
+                          setShowGroupSettingsModal(true);
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 0,
+                          padding: '6px',
+                          cursor: 'pointer',
+                          color: 'var(--text-muted)',
+                          marginRight: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <Icons.Settings size={13} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="sidebarMenu">
         {/* Main Navigation */}
         <div className="mainNav">
-          <button className={`navItem ${tab === 'dashboard' ? 'active' : ''}`} onClick={() => { router.push('/cloud/dashboard'); }}>
+          <button className={`navItem ${tab === 'dashboard' ? 'active' : ''}`} onClick={() => { router.push(getPath('dashboard')); }}>
             <span className="ico"><Icons.Dashboard /></span><span>{t('sidebar.dashboard') || 'Tổng quan'}</span>
           </button>
 
-          <button className={`navItem ${tab === 'photos' ? 'active' : ''}`} onClick={() => { setCollectionView('all'); setSelectedAlbum('all'); router.push('/cloud/photos'); }}>
+          <button className={`navItem ${tab === 'photos' ? 'active' : ''}`} onClick={() => { setCollectionView('all'); setSelectedAlbum('all'); router.push(getPath('photos')); }}>
             <span className="ico"><Icons.Photos /></span><span>{t('sidebar.allPhotosVideos')}</span><span className="count">{photosCount ?? 0}</span>
           </button>
 
-          <button className={`navItem ${tab === 'docs' ? 'active' : ''}`} onClick={() => { setDocCollectionView('all'); setDocCategoryFilter('all'); setSelectedDocProject('all'); router.push('/cloud/docs'); }}>
+          <button className={`navItem ${tab === 'docs' ? 'active' : ''}`} onClick={() => { setDocCollectionView('all'); setDocCategoryFilter('all'); setSelectedDocProject('all'); router.push(getPath('docs')); }}>
             <span className="ico"><Icons.Documents /></span><span>{t('sidebar.documents')}</span><span className="count">{docsCount ?? 0}</span>
           </button>
 
-          <button className={`navItem ${tab === 'spaces' || tab === 'space' || tab === 'space-all' ? 'active' : ''}`} onClick={() => { router.push('/cloud/spaces'); }}>
+          <button className={`navItem ${tab === 'spaces' || tab === 'space' || tab === 'space-all' ? 'active' : ''}`} onClick={() => { router.push(getPath('spaces')); }}>
             <span className="ico"><Icons.Spaces /></span><span>{t('sidebar.spaces') || 'Không gian con'}</span><span className="count">{spaces.length}</span>
           </button>
         </div>
@@ -138,12 +305,12 @@ export default function Sidebar({
           {tab === 'photos' && (
             <div className="sectionBody sectionIn">
               <div className="subList">
-                <button className={`subItem ${selectedAlbum === 'all' ? 'active' : ''}`} onClick={() => { setCollectionView('all'); setSelectedAlbum('all'); router.push('/cloud/photos'); }}>
+                <button className={`subItem ${selectedAlbum === 'all' ? 'active' : ''}`} onClick={() => { setCollectionView('all'); setSelectedAlbum('all'); router.push(getPath('photos')); }}>
                   <span className="ico" style={{ marginRight: '6px', display: 'inline-flex', alignItems: 'center' }}><Icons.Folder /></span>
                   {t('sidebar.all')}
                 </button>
                 {availableAlbums.map(([name, count]) => (
-                  <button key={name} className={`subItem ${selectedAlbum === name ? 'active' : ''}`} onClick={() => { setCollectionView('all'); setSelectedAlbum(name); router.push('/cloud/photos'); }}>
+                  <button key={name} className={`subItem ${selectedAlbum === name ? 'active' : ''}`} onClick={() => { setCollectionView('all'); setSelectedAlbum(name); router.push(getPath('photos')); }}>
                     <span className="ico" style={{ marginRight: '6px', display: 'inline-flex', alignItems: 'center' }}><Icons.Folder /></span>
                     {name} ({count})
                   </button>
@@ -172,20 +339,24 @@ export default function Sidebar({
           {(tab === 'spaces' || tab === 'space' || tab === 'space-all') && (
             <div className="sectionBody sectionIn">
               <div className="subList">
-                {spaces.map((sp) => (
-                  <button 
-                    key={sp.id} 
-                    className={`subItem ${(tab === 'space' || tab === 'space-all') && activeWorkspace.type === 'space' && activeWorkspace.id === sp.id ? 'active' : ''}`} 
-                    onClick={() => { 
-                      router.push(`/cloud/space/${sp.id}`);
-                    }}
-                  >
-                    <span className="ico" style={{ marginRight: '6px', display: 'inline-flex', alignItems: 'center' }}>
-                      {sp.type === 'journal' ? <Icons.Journal /> : sp.type === 'collection' ? <Icons.Collection /> : <Icons.Project />}
-                    </span>
-                    <span>{sp.name}</span>
-                  </button>
-                ))}
+                {spaces.map((rawSp) => {
+                  const sp = translateSpace(rawSp, t);
+                  return (
+                    <button 
+                      key={sp.id} 
+                      className={`subItem ${(tab === 'space' || tab === 'space-all') && activeWorkspace.type === 'space' && activeWorkspace.id === sp.id ? 'active' : ''}`} 
+                      onClick={() => { 
+                        const gId = sp.groupId || sp.group_id;
+                        router.push(gId ? `/cloud/group/${gId}/space/${sp.id}` : `/cloud/space/${sp.id}`);
+                      }}
+                    >
+                      <span className="ico" style={{ marginRight: '6px', display: 'inline-flex', alignItems: 'center' }}>
+                        {sp.type === 'journal' ? <Icons.Journal /> : sp.type === 'collection' ? <Icons.Collection /> : <Icons.Project />}
+                      </span>
+                      <span>{sp.name}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -216,6 +387,8 @@ export default function Sidebar({
         </div>
       </div>
 
+
+
       <div className="storageCard">
         <div className="label">{t('sidebar.storageTitle')}</div>
         {usage ? (
@@ -237,45 +410,56 @@ export default function Sidebar({
         ) : <small>{t('sidebar.loading')}</small>}
       </div>
 
-      <div className="profileSection" onClick={(e) => e.stopPropagation()}>
-        <div className="profileBtn" onClick={(e) => { e.stopPropagation(); setShowProfileMenu(!showProfileMenu); }}>
-          <div className="profileAvatar">
-            {user ? user.name.charAt(0).toUpperCase() : 'U'}
-          </div>
-          <div className="profileMeta">
-            <div className="profileName">{user ? (user.role === 'admin' ? user.name : t('profile.hello', { name: user.name })) : t('sidebar.loading')}</div>
-            <div className="profileRole">{user ? (user.role === 'admin' ? t('profile.admin') : t('profile.member')) : ''}</div>
-          </div>
-          <div className="profileChevron">▾</div>
-        </div>
-        
-        {showProfileMenu && user && (
-          <div className="profilePopover" onClick={(e) => e.stopPropagation()}>
-            <div className="popoverUserHeader">
-              <div className="popoverUserEmail">{user.email}</div>
-              <div className="popoverUserAvatar">
-                {user.avatarUrl ? (
-                  <img src={user.avatarUrl} alt={user.name} className="avatarImg" />
-                ) : (
-                  user.name.charAt(0).toUpperCase()
-                )}
+      <div className="profileSwitcherWrapper">
+        <div 
+          className={`profileSwitcherContainer ${showProfileMenu ? 'expanded' : 'collapsed'}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {!showProfileMenu ? (
+            <div className="profileBtn" onClick={(e) => { e.stopPropagation(); setShowProfileMenu(true); }}>
+              <div className="profileAvatar">
+                {user ? user.name.charAt(0).toUpperCase() : 'U'}
               </div>
-              <div className="popoverUserName">{user.role === 'admin' ? user.name : t('profile.hello', { name: user.name })}</div>
-              <div className="popoverUserBadge">
-                {user.role === 'admin' ? t('profile.admin') : t('profile.member')}
+              <div className="profileMeta">
+                <div className="profileName">{user ? (user.role === 'admin' ? user.name : t('profile.hello', { name: user.name })) : t('sidebar.loading')}</div>
+                <div className="profileRole">{user ? (user.role === 'admin' ? t('profile.admin') : t('profile.member')) : ''}</div>
+              </div>
+              <div className="profileSettingsIcon">
+                <Icons.Settings size={14} />
               </div>
             </div>
-            <hr className="popoverDivider" />
-            <button className="popoverItem" onClick={() => { setShowSettingsModal(true); setShowProfileMenu(false); }}>
-              <span className="popoverIcon"><Icons.Settings /></span>
-              <span>{t('profile.settings')}</span>
-            </button>
-            <button className="popoverItem" onClick={() => { handleLogout(); setShowProfileMenu(false); }}>
-              <span className="popoverIcon"><Icons.LogOut /></span>
-              <span>{t('profile.logout')}</span>
-            </button>
-          </div>
-        )}
+          ) : (
+            user && (
+              <div className="profileExpandedContent">
+                <div className="popoverUserHeader">
+                  <div className="popoverUserEmail">{user.email}</div>
+                  <div className="popoverUserAvatar">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.name} className="avatarImg" />
+                    ) : (
+                      user.name.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <div className="popoverUserName">{user.role === 'admin' ? user.name : t('profile.hello', { name: user.name })}</div>
+                  <div className="popoverUserBadge">
+                    {user.role === 'admin' ? t('profile.admin') : t('profile.member')}
+                  </div>
+                </div>
+                
+                <div className="navDivider" style={{ height: '1px', background: 'var(--border-color)', margin: '8px 0', opacity: 0.5, width: '100%' }} />
+                
+                <button className="popoverItem" onClick={() => { setShowSettingsModal(true); setShowProfileMenu(false); }}>
+                  <span className="popoverIcon"><Icons.Settings size={14} /></span>
+                  <span>{t('profile.settings')}</span>
+                </button>
+                <button className="popoverItem" onClick={() => { handleLogout(); setShowProfileMenu(false); }}>
+                  <span className="popoverIcon"><Icons.LogOut size={14} /></span>
+                  <span>{t('profile.logout')}</span>
+                </button>
+              </div>
+            )
+          )}
+        </div>
       </div>
 
       <style jsx>{`
@@ -430,11 +614,36 @@ export default function Sidebar({
           padding: 14px;
           margin-bottom: 12px;
         }
-        .profileSection {
+        .profileSwitcherWrapper {
+          position: relative;
+          width: 100%;
+          height: 52px;
           margin-top: auto;
           border-top: 1px solid var(--border-color);
-          position: relative;
           padding-top: 12px;
+        }
+        .profileSwitcherContainer {
+          position: absolute;
+          bottom: 12px;
+          left: 0;
+          width: 100%;
+          z-index: 1000;
+          background: transparent;
+          border-radius: 12px;
+          overflow: hidden;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .profileSwitcherContainer.collapsed {
+          height: 52px;
+        }
+        .profileSwitcherContainer.expanded {
+          background: var(--bg-popover);
+          border: 1px solid var(--border-strong);
+          border-radius: 14px;
+          padding: 16px 12px 12px 12px;
+          box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.3);
+          transform-origin: bottom center;
+          animation: profileExpandAnim 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
         .profileBtn {
           display: flex;
@@ -444,9 +653,32 @@ export default function Sidebar({
           padding: 8px;
           border-radius: 8px;
           transition: background 0.2s ease;
+          width: 100%;
+          box-sizing: border-box;
+          height: 52px;
         }
         .profileBtn:hover {
           background: var(--bg-item-hover);
+        }
+        .profileSettingsIcon {
+          display: flex;
+          align-items: center;
+          color: var(--text-muted);
+          transition: all 0.25s ease;
+        }
+        .profileBtn:hover .profileSettingsIcon {
+          color: var(--text-primary);
+          transform: rotate(90deg);
+        }
+        @keyframes profileExpandAnim {
+          from {
+            opacity: 0;
+            transform: scaleY(0.9) translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: scaleY(1) translateY(0);
+          }
         }
         .profileAvatar {
           width: 36px;
@@ -476,26 +708,6 @@ export default function Sidebar({
           font-size: 11px;
           color: var(--text-muted);
           margin-top: 2px;
-        }
-        .profileChevron {
-          color: var(--text-muted);
-          font-size: 12px;
-        }
-        .profilePopover {
-          position: absolute;
-          bottom: calc(100% + 8px);
-          left: 0;
-          width: 250px;
-          background: var(--bg-popover);
-          border: 1px solid var(--border-color);
-          border-radius: 14px;
-          box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.4);
-          z-index: 100;
-          padding: 20px 16px 12px 16px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          box-sizing: border-box;
         }
         .popoverUserHeader {
           display: flex;
@@ -699,20 +911,46 @@ export default function Sidebar({
           color: #ffffff;
         }
 
-        .workspaceSwitcher {
-          margin-bottom: 20px;
+        .workspaceSwitcherWrapper {
           position: relative;
           width: 100%;
+          height: 40px;
+          margin-bottom: 16px;
         }
-        .wsBtn {
+        .workspaceSwitcherContainer {
+          position: absolute;
+          top: 0;
+          left: 0;
           width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 10px;
+          z-index: 1000;
           background: var(--bg-input);
           border: 1px solid var(--border-color);
           border-radius: 12px;
-          padding: 10px 14px;
+          overflow: hidden;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .workspaceSwitcherContainer.collapsed {
+          height: 38px;
+        }
+        .workspaceSwitcherContainer.expanded {
+          background: var(--bg-popover);
+          border-color: var(--border-strong);
+          border-radius: 14px;
+          padding: 8px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+          transform-origin: top center;
+          animation: wsExpand 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        .wsBtn {
+          width: 100%;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          background: transparent;
+          border: none;
+          padding: 0 14px;
           color: var(--text-primary);
           font-family: inherit;
           font-weight: 600;
@@ -720,13 +958,15 @@ export default function Sidebar({
           cursor: pointer;
           transition: all 0.2s ease;
           text-align: left;
+          box-sizing: border-box;
         }
         .wsBtn:hover {
           background: var(--bg-item-hover);
-          border-color: var(--border-input-focus);
         }
         .wsIcon {
           font-size: 16px;
+          display: inline-flex;
+          align-items: center;
         }
         .wsName {
           flex: 1;
@@ -734,25 +974,52 @@ export default function Sidebar({
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .wsChevron {
-          font-size: 12px;
-          opacity: 0.6;
+        .wsChangeIcon {
+          display: flex;
+          align-items: center;
+          color: var(--text-muted);
+          transition: all 0.25s ease;
         }
-        .wsDropdown {
-          position: absolute;
-          top: calc(100% + 6px);
-          left: 0;
-          width: 100%;
-          background: var(--bg-popover);
-          border: 1px solid var(--border-color);
-          border-radius: 12px;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-          z-index: 110;
-          padding: 8px;
-          box-sizing: border-box;
+        .wsBtn:hover .wsChangeIcon {
+          color: var(--text-primary);
+          transform: rotate(180deg);
+        }
+        .wsExpandedContent {
           display: flex;
           flex-direction: column;
           gap: 2px;
+          animation: wsFadeIn 0.2s ease-out forwards;
+        }
+        .wsBackdrop {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 999;
+          background: transparent;
+        }
+        .activeDot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--button-primary-bg);
+          margin-left: auto;
+          box-shadow: 0 0 8px var(--button-primary-bg);
+        }
+        @keyframes wsExpand {
+          from {
+            opacity: 0;
+            transform: scaleY(0.9) translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: scaleY(1) translateY(0);
+          }
+        }
+        @keyframes wsFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         .wsDropdownTitle {
           font-size: 10px;
@@ -761,6 +1028,15 @@ export default function Sidebar({
           text-transform: uppercase;
           padding: 6px 10px;
           letter-spacing: 0.5px;
+        }
+        .wsDropdownItemWrap {
+          transition: all 0.15s ease;
+        }
+        .wsDropdownItemWrap:hover {
+          background: var(--bg-item-hover);
+        }
+        .wsDropdownItemWrap.active {
+          background: var(--bg-item-active);
         }
         .wsDropdownItem {
           width: 100%;
@@ -780,15 +1056,37 @@ export default function Sidebar({
           transition: all 0.15s ease;
         }
         .wsDropdownItem:hover {
-          background: var(--bg-item-hover);
           color: var(--text-primary);
         }
         .wsDropdownItem.active {
-          background: var(--bg-item-active);
           color: var(--text-primary);
         }
         .wsDropdownItem .icon {
           font-size: 15px;
+          display: inline-flex;
+          align-items: center;
+        }
+        .wsItemSettingsBtn:hover {
+          color: var(--text-primary) !important;
+        }
+        
+        @keyframes dropdownSlideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .spinning {
+          animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
         }
       `}</style>
     </aside>

@@ -11,6 +11,25 @@ import { fmtBytes, docCategoryOf } from '../../../lib/utils';
 import * as Icons from '../../../components/Icons';
 import CustomSelect from '../../../components/CustomSelect';
 
+export const translateSpace = (sp: any, t: any) => {
+  if (!sp) return sp;
+  const isGeneral = 
+    sp.name === 'General' && 
+    sp.type === 'journal' && 
+    (sp.description === 'General discussion space for the group' || sp.description === 'Write journal entries with attachments.');
+  if (isGeneral) {
+    const isAlt = sp.description === 'Write journal entries with attachments.';
+    return {
+      ...sp,
+      name: t('spaces.generalName') || sp.name,
+      description: isAlt 
+        ? (t('spaces.generalDescAlternative') || sp.description)
+        : (t('spaces.generalDesc') || sp.description)
+    };
+  }
+  return sp;
+};
+
 function useGridColumns(container: HTMLDivElement | null, minWidth: number, gap: number) {
   const [columns, setColumns] = React.useState(3);
 
@@ -50,7 +69,7 @@ export default function DashboardPage(): React.JSX.Element {
     api, t, language,
     tab, setTab,
     activeWorkspace, setActiveWorkspace, search,
-    spaces,
+    spaces, groups,
     posts, setPosts,
     postCaption, setPostCaption,
     postFiles, setPostFiles,
@@ -58,6 +77,7 @@ export default function DashboardPage(): React.JSX.Element {
     selectedIds, setSelectedIds,
     activeIndex, setActiveIndex,
     collectionView, setCollectionView,
+    spacesSubTab, setSpacesSubTab,
     docTypeFilter, setDocTypeFilter,
     docCategoryFilter, setDocCategoryFilter,
     docCollectionView, setDocCollectionView,
@@ -80,6 +100,10 @@ export default function DashboardPage(): React.JSX.Element {
     // operations
     handleCreatePost,
     loadData,
+    handleDeleteSpace,
+    deleteSelectedSpaces,
+    restoreSelectedSpaces,
+    purgeSelectedSpaces,
     
     // derived memos
     filteredAssets,
@@ -113,6 +137,14 @@ export default function DashboardPage(): React.JSX.Element {
   // Compute dashboard metrics from stats
   const { stats } = useCloud();
 
+  // Derived active space translation
+  const activeSpaceName = React.useMemo(() => {
+    if (activeWorkspace.type !== 'space') return 'name' in activeWorkspace ? activeWorkspace.name : '';
+    const sp = spaces.find(s => s.id === activeWorkspace.id);
+    const trans = translateSpace(sp, t);
+    return trans?.name || ('name' in activeWorkspace ? activeWorkspace.name : '');
+  }, [activeWorkspace, spaces, t]);
+
   const dashboardStats = React.useMemo(() => {
     return {
       photosVideosCount: stats?.counts?.photosCount || 0,
@@ -131,6 +163,8 @@ export default function DashboardPage(): React.JSX.Element {
   const [spaceFileTypeTab, setSpaceFileTypeTab] = React.useState<'all' | 'media' | 'docs'>('all');
   const [spaceSubFormats, setSpaceSubFormats] = React.useState<string[]>(['all']);
   const [spaceSortBy, setSpaceSortBy] = React.useState<string>('newest');
+
+
 
   const getSubFormatLabel = (cat: string) => {
     if (cat === 'all') return t('sidebar.all') || 'All';
@@ -316,6 +350,58 @@ export default function DashboardPage(): React.JSX.Element {
     if (primary === 'dashboard' || primary === 'photos' || primary === 'docs' || primary === 'spaces') {
       setTab(primary);
       setActiveWorkspace((prev) => (prev.type === 'personal' ? prev : { type: 'personal' }));
+    } else if (primary === 'group' && slug[1]) {
+      const groupId = slug[1];
+      const foundGroup = groups.find((g) => g.id === groupId);
+      if (slug[2] === 'space' && slug[3]) {
+        const spaceId = slug[3];
+        const found = spaces.find((s) => s.id === spaceId);
+        const isAll = slug[4] === 'all';
+        setTab(isAll ? 'space-all' : 'space');
+        setActiveWorkspace((prev) => {
+          if (prev.type === 'space' && prev.id === spaceId) {
+            if (found && (prev.name !== found.name || prev.spaceType !== found.type)) {
+              return {
+                type: 'space',
+                id: spaceId,
+                name: found.name,
+                spaceType: found.type,
+                groupId: groupId,
+              };
+            }
+            return prev;
+          }
+          return {
+            type: 'space',
+            id: spaceId,
+            name: found?.name || 'Loading space...',
+            spaceType: found?.type || 'journal',
+            groupId: groupId,
+          };
+        });
+      } else {
+        const subTab = slug[2] || 'dashboard';
+        setTab(subTab as any);
+        setActiveWorkspace((prev) => {
+          if (prev.type === 'group' && prev.id === groupId) {
+            if (foundGroup && prev.name !== foundGroup.name) {
+              return {
+                type: 'group',
+                id: groupId,
+                name: foundGroup.name,
+                role: foundGroup.role,
+              };
+            }
+            return prev;
+          }
+          return {
+            type: 'group',
+            id: groupId,
+            name: foundGroup?.name || 'Loading group...',
+            role: foundGroup?.role || 'member',
+          };
+        });
+      }
     } else if (primary === 'space' && slug[1]) {
       const spaceId = slug[1];
       const found = spaces.find((s) => s.id === spaceId);
@@ -329,6 +415,7 @@ export default function DashboardPage(): React.JSX.Element {
               id: spaceId,
               name: found.name,
               spaceType: found.type,
+              groupId: found.groupId || found.group_id,
             };
           }
           return prev;
@@ -338,17 +425,15 @@ export default function DashboardPage(): React.JSX.Element {
           id: spaceId,
           name: found?.name || 'Loading space...',
           spaceType: found?.type || 'journal',
+          groupId: found?.groupId || found?.group_id,
         };
       });
     }
     setSelectionMode(false);
     setSelectedIds([]);
-  }, [slug, router, spaces, setTab, setActiveWorkspace, setSelectionMode, setSelectedIds]);
+  }, [slug, router, spaces, groups, setTab, setActiveWorkspace, setSelectionMode, setSelectedIds]);
 
-  // Background fetch to update data silently when tab changes
-  useEffect(() => {
-    loadData(true);
-  }, [slug]);
+
 
   // Helpers copied/adapted from original component
   function openPhoto(id: string) {
@@ -401,6 +486,28 @@ export default function DashboardPage(): React.JSX.Element {
 
   function endLongPress() {
     clearLongPress();
+  }
+
+  function spaceCardHandlers(spaceId: string, onNormalClick?: () => void) {
+    return {
+      onMouseDown: () => beginLongPress(spaceId),
+      onMouseUp: endLongPress,
+      onMouseLeave: endLongPress,
+      onTouchStart: () => beginLongPress(spaceId),
+      onTouchEnd: endLongPress,
+      onClick: () => {
+        if (suppressClickRef.current === spaceId) {
+          suppressClickRef.current = null;
+          return;
+        }
+        if (selectionMode || spacesSubTab === 'trash') {
+          if (!selectionMode) setSelectionMode(true);
+          togglePick(spaceId);
+        } else {
+          onNormalClick?.();
+        }
+      },
+    };
   }
 
   function cardHandlers(item: Asset, onNormalClick?: () => void) {
@@ -526,14 +633,7 @@ export default function DashboardPage(): React.JSX.Element {
 
           {/* Dashboard Section */}
           <div className="dashboardSection">
-            {usage?.processingCount > 0 && (
-              <div className="processingBanner">
-                <span className="spinningIcon"><Icons.Flash size={16} /></span>
-                <span>
-                  {t('dashboard.processingFiles', { count: usage.processingCount })}
-                </span>
-              </div>
-            )}
+
 
             <div className="dashboardGrid">
               {/* Storage Usage Card */}
@@ -586,7 +686,7 @@ export default function DashboardPage(): React.JSX.Element {
               {/* Quick Actions & Quick Stats Grid */}
               <div className="statsGrid">
                 {/* Photos & Videos Card */}
-                <div className="statCard clickableCard" onClick={() => { setTab('photos'); router.push('/cloud/photos'); }}>
+                <div className="statCard clickableCard" onClick={() => { setTab('photos'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/photos` : '/cloud/photos'); }}>
                   <div className="statIcon iconPhotos">
                     <Icons.Photos size={20} />
                   </div>
@@ -598,7 +698,7 @@ export default function DashboardPage(): React.JSX.Element {
                 </div>
 
                 {/* Documents Card */}
-                <div className="statCard clickableCard" onClick={() => { setTab('docs'); router.push('/cloud/docs'); }}>
+                <div className="statCard clickableCard" onClick={() => { setTab('docs'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/docs` : '/cloud/docs'); }}>
                   <div className="statIcon iconDocs">
                     <Icons.Documents size={20} />
                   </div>
@@ -610,7 +710,7 @@ export default function DashboardPage(): React.JSX.Element {
                 </div>
 
                 {/* Spaces Card */}
-                <div className="statCard clickableCard" onClick={() => { setTab('spaces'); router.push('/cloud/spaces'); }}>
+                <div className="statCard clickableCard" onClick={() => { setTab('spaces'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/spaces` : '/cloud/spaces'); }}>
                   <div className="statIcon iconSpaces">
                     <Icons.Spaces size={20} />
                   </div>
@@ -622,7 +722,7 @@ export default function DashboardPage(): React.JSX.Element {
                 </div>
 
                 {/* Trash Card */}
-                <div className="statCard clickableCard" onClick={() => { setTab('photos'); setCollectionView('trash'); router.push('/cloud/photos'); }}>
+                <div className="statCard clickableCard" onClick={() => { setTab('photos'); setCollectionView('trash'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/photos` : '/cloud/photos'); }}>
                   <div className="statIcon iconTrash">
                     <Icons.Trash size={20} />
                   </div>
@@ -651,12 +751,22 @@ export default function DashboardPage(): React.JSX.Element {
                     const srcPlay = `${api}/api/assets/_media/play/${a.id}`;
                     const picked = selectedIds.includes(a.id);
                     return (
-                      <div key={a.id} data-id={a.id} className={`tile ${picked ? 'picked' : ''}`} {...cardHandlers(a, () => openAll(a.id))}>
+                      <div key={a.id} data-id={a.id} className={`tile ${picked ? 'picked' : ''} ${a.processingStatus === 'processing' ? 'tileProcessing' : ''}`} {...cardHandlers(a, () => openAll(a.id))}>
                         {a.type === 'image' ? (
                           <img src={srcOriginal} alt={a.originalName} className="thumb" loading="lazy" />
-                        ) : (
-                          <video src={srcPlay} className="thumb" muted preload="none" />
-                        )}
+                        ) : a.type === 'video' ? (
+                          a.processingStatus === 'processing' ? (
+                            <div className="processingPlaceholder">
+                              <div className="doubleRingLoader">
+                                <div className="ring1" />
+                                <div className="ring2" />
+                              </div>
+                              <span className="processingText">{t('buttons.processing') || 'Đang xử lý...'}</span>
+                            </div>
+                          ) : (
+                            <video src={srcPlay} className="thumb" muted preload="none" />
+                          )
+                        ) : null}
                         <div className="caption">{a.originalName}</div>
                         {picked && <div className="badge">✓</div>}
                       </div>
@@ -664,7 +774,7 @@ export default function DashboardPage(): React.JSX.Element {
                   })}
                 </div>
                 <div className="sectionFooter">
-                  <button className="viewAllBtn" onClick={() => { setTab('photos'); router.push('/cloud/photos'); }}>
+                  <button className="viewAllBtn" onClick={() => { setTab('photos'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/photos` : '/cloud/photos'); }}>
                     {t('dashboard.viewAllPhotosVideos')} &rarr;
                   </button>
                 </div>
@@ -710,7 +820,7 @@ export default function DashboardPage(): React.JSX.Element {
                         onClick={() => {
                           setTab('docs');
                           setDocCategoryFilter(category);
-                          router.push('/cloud/docs');
+                          router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/docs` : '/cloud/docs');
                         }}
                       >
                         <div className="viewAllDocContent">
@@ -724,7 +834,7 @@ export default function DashboardPage(): React.JSX.Element {
                   </div>
                 ))}
                 <div className="sectionFooter">
-                  <button className="viewAllBtn" onClick={() => { setTab('docs'); setDocCategoryFilter('all'); router.push('/cloud/docs'); }}>
+                  <button className="viewAllBtn" onClick={() => { setTab('docs'); setDocCategoryFilter('all'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/docs` : '/cloud/docs'); }}>
                     {t('dashboard.viewAllDocs')} &rarr;
                   </button>
                 </div>
@@ -734,56 +844,134 @@ export default function DashboardPage(): React.JSX.Element {
         </div>
       )}
 
-      {tab === 'spaces' && (
-        <div className="spacesDirectory">
-          <div className="pageHeader">
-            <h1>{t('spaces.title') || 'Không gian con cá nhân'}</h1>
-            <p>{t('spaces.subtitle') || 'Quản lý các nhật ký, bộ sưu tập tệp tin và dự án tài liệu riêng tư của bạn.'}</p>
-          </div>
-          
-          <div className="spacesGrid">
-            <div className="spaceCard createCard" onClick={() => setShowCreateSpaceModal(true)}>
-              <div className="createIcon"><Icons.Plus size={28} /></div>
-              <div className="createLabel">{t('spaces.create') || 'Tạo không gian con'}</div>
-              <div className="createSub">{t('spaces.createTypes')}</div>
+      {tab === 'spaces' && (() => {
+        const isGroup = activeWorkspace.type === 'group';
+        const myGroupRole = isGroup ? activeWorkspace.role : null;
+        const canCreateSpace = !isGroup || myGroupRole === 'owner' || myGroupRole === 'admin';
+
+        const activeSpaces = spaces.filter(sp => !sp.is_deleted && !sp.isDeleted);
+        const trashedSpaces = spaces.filter(sp => sp.is_deleted || sp.isDeleted);
+        const spacesToRender = spacesSubTab === 'active' ? activeSpaces : trashedSpaces;
+
+        return (
+          <div className="spacesDirectory">
+            <div className="pageHeader flexHeader">
+              <div className="headerText">
+                <h1>{isGroup ? t('spaces.groupTitle') : (t('spaces.title') || 'Không gian con cá nhân')}</h1>
+                <p>{isGroup ? (t('spaces.groupSubtitle') || 'Quản lý các nhật ký, bộ sưu tập tệp tin và dự án tài liệu chia sẻ trong nhóm.') : (t('spaces.subtitle') || 'Quản lý các nhật ký, bộ sưu tập tệp tin và dự án tài liệu riêng tư của bạn.')}</p>
+              </div>
             </div>
 
-            {spaces.map((sp) => (
-              <div 
-                key={sp.id} 
-                className="spaceCard"
-                onClick={() => {
-                  router.push(`/cloud/space/${sp.id}`);
+            {/* Selector tab Hoạt động / Thùng rác */}
+            <div className="spacesSubTabs" style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+              <button 
+                className={`spacesTabBtn ${spacesSubTab === 'active' ? 'active' : ''}`}
+                onClick={() => { setSpacesSubTab('active'); setSelectedIds([]); setSelectionMode(false); }}
+                style={{
+                  background: spacesSubTab === 'active' ? 'var(--bg-item-active)' : 'transparent',
+                  border: 0,
+                  color: spacesSubTab === 'active' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '13.5px',
+                  transition: 'all 0.2s'
                 }}
               >
-                <div className="spaceCardHeader">
-                  <span className="spaceTypeIcon" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                    {sp.type === 'journal' ? <Icons.Journal size={24} /> : sp.type === 'collection' ? <Icons.Collection size={24} /> : <Icons.Project size={24} />}
-                  </span>
-                  <span className="spaceBadge">
-                    {sp.type === 'journal' ? (t('spaces.journal') || 'Nhật ký') : sp.type === 'collection' ? (t('spaces.collection') || 'Bộ sưu tập') : (t('spaces.project') || 'Dự án')}
-                  </span>
+                {t('spaces.activeTab') || 'Đang hoạt động'} ({activeSpaces.length})
+              </button>
+              <button 
+                className={`spacesTabBtn ${spacesSubTab === 'trash' ? 'active' : ''}`}
+                onClick={() => { setSpacesSubTab('trash'); setSelectedIds([]); setSelectionMode(false); }}
+                style={{
+                  background: spacesSubTab === 'trash' ? 'var(--bg-item-active)' : 'transparent',
+                  border: 0,
+                  color: spacesSubTab === 'trash' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '13.5px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {t('spaces.trashTab') || 'Thùng rác'} ({trashedSpaces.length})
+              </button>
+            </div>
+
+            <div className="spacesGrid">
+              {/* Card tạo mới: chỉ hiển thị ở tab Active và khi người dùng có quyền */}
+              {spacesSubTab === 'active' && canCreateSpace && (
+                <div className="spaceCard createCard" onClick={() => setShowCreateSpaceModal(true)}>
+                  <div className="createIcon"><Icons.Plus size={28} /></div>
+                  <div className="createLabel">{t('spaces.create') || 'Tạo không gian con'}</div>
+                  <div className="createSub">{t('spaces.createTypes')}</div>
                 </div>
-                <h3 className="spaceCardName">{sp.name}</h3>
-                <p className="spaceCardDesc">{sp.description || t('spaces.noDescription')}</p>
-                <div className="spaceCardFooter">
-                  <span>{t('spaces.createdLabel') || 'Đã tạo'}: {new Date(sp.createdAt).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US')}</span>
-                </div>
-              </div>
-            ))}
+              )}
+
+              {spacesToRender.map((rawSp) => {
+                const sp = translateSpace(rawSp, t);
+                const isSelected = selectedIds.includes(sp.id);
+                return (
+                  <div 
+                    key={sp.id} 
+                    className={`spaceCard ${isSelected ? 'picked' : ''}`}
+                    {...spaceCardHandlers(sp.id, () => {
+                      const gId = sp.groupId || sp.group_id;
+                      router.push(gId ? `/cloud/group/${gId}/space/${sp.id}` : `/cloud/space/${sp.id}`);
+                    })}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      if (spacesSubTab === 'trash') return;
+                      setSelectionMode(true);
+                      togglePick(sp.id);
+                    }}
+                  >
+                    <div className="spaceCardHeader">
+                      <span className="spaceTypeIcon" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        {sp.type === 'journal' ? <Icons.Journal size={24} /> : sp.type === 'collection' ? <Icons.Collection size={24} /> : <Icons.Project size={24} />}
+                      </span>
+                      <span className="spaceBadge">
+                        {sp.type === 'journal' ? (t('spaces.journal') || 'Nhật ký') : sp.type === 'collection' ? (t('spaces.collection') || 'Bộ sưu tập') : (t('spaces.project') || 'Dự án')}
+                      </span>
+                    </div>
+                    <h3 className="spaceCardName">{sp.name}</h3>
+                    <p className="spaceCardDesc">{sp.description || t('spaces.noDescription')}</p>
+                    <div className="spaceCardFooter">
+                      <span>{t('spaces.createdLabel') || 'Đã tạo'}: {new Date(sp.createdAt || sp.created_at).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US')}</span>
+                    </div>
+
+                    {isSelected && <div className="badge">✓</div>}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {tab === 'space' && activeWorkspace.type === 'space' && activeWorkspace.spaceType === 'project' && (
         <>
           <div className="pageHeader flexHeader">
             <div className="headerText">
-              <h1>{activeWorkspace.name}</h1>
-              <p style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <Icons.Project size={14} />
-                <span>{t('spaces.project') || 'Không gian Dự án'} · {t('spaces.projectDesc') || 'Quản lý tài liệu dự án'}</span>
-              </p>
+              <h1>{activeSpaceName}</h1>
+              <div className="spaceMetaInfo" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                <span className="spaceTypeRow" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                  <Icons.Project size={14} />
+                  <span>{t('spaces.project') || 'Dự án'}</span>
+                </span>
+                {(() => {
+                  const sp = spaces.find(s => s.id === activeWorkspace.id);
+                  const trans = translateSpace(sp, t);
+                  const desc = trans?.description || t('spaces.projectDesc') || 'Quản lý tài liệu dự án';
+                  return (
+                    <span className="spaceDescRow" style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                      {desc}
+                    </span>
+                  );
+                })()}
+              </div>
             </div>
             <div className="headerActions">
               <button className="actionBtn editBtn" onClick={() => {
@@ -796,8 +984,55 @@ export default function DashboardPage(): React.JSX.Element {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 <span>{t('spaces.editSpace')}</span>
               </button>
+              
+              {(!groups.find(g => g.id === activeWorkspace.groupId) || 
+                ['owner', 'admin'].includes(groups.find(g => g.id === activeWorkspace.groupId)?.role)) && (
+                <button 
+                  className="actionBtn deleteBtn danger" 
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    color: '#fca5a5',
+                    borderRadius: '12px',
+                    padding: '8px 14px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onClick={async () => {
+                    if (window.confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?')) {
+                      const success = await handleDeleteSpace(activeWorkspace.id);
+                      if (success) {
+                        if (activeWorkspace.groupId) {
+                          router.push(`/cloud/group/${activeWorkspace.groupId}/spaces`);
+                        } else {
+                          router.push('/cloud/spaces');
+                        }
+                      }
+                    }
+                  }}
+                  onMouseEnter={(e: any) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+                    e.currentTarget.style.color = '#ffffff';
+                  }}
+                  onMouseLeave={(e: any) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                    e.currentTarget.style.color = '#fca5a5';
+                  }}
+                >
+                  <Icons.Trash size={14} />
+                  <span>{t('spaces.deleteSpace') || 'Xóa không gian'}</span>
+                </button>
+              )}
+
               <button className="actionBtn viewAllBtn" onClick={() => {
-                router.push(`/cloud/space/${activeWorkspace.id}/all`);
+                router.push(activeWorkspace.type === 'space' && activeWorkspace.groupId ? `/cloud/group/${activeWorkspace.groupId}/space/${activeWorkspace.id}/all` : `/cloud/space/${activeWorkspace.id}/all`);
               }}>
                 <Icons.AllFiles size={14} />
                 <span>{t('spaces.viewAllFiles')}</span>
@@ -829,20 +1064,32 @@ export default function DashboardPage(): React.JSX.Element {
         <div className="spaceTimelineView">
           <div className="pageHeader flexHeader">
             <div className="headerText">
-              <h1>{activeWorkspace.name}</h1>
-              <p style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                {activeWorkspace.spaceType === 'journal' ? (
-                  <>
-                    <Icons.Journal size={14} />
-                    <span>{t('spaces.journal') || 'Không gian Nhật ký'} · {t('spaces.journalDesc') || 'Ghi chép câu chuyện'}</span>
-                  </>
-                ) : (
-                  <>
-                    <Icons.Collection size={14} />
-                    <span>{t('spaces.collection') || 'Không gian Bộ sưu tập'} · {t('spaces.collectionDesc') || 'Lưu trữ file'}</span>
-                  </>
-                )}
-              </p>
+              <h1>{activeSpaceName}</h1>
+              <div className="spaceMetaInfo" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                <span className="spaceTypeRow" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                  {activeWorkspace.spaceType === 'journal' ? (
+                    <>
+                      <Icons.Journal size={14} />
+                      <span>{t('spaces.journal') || 'Nhật ký'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icons.Collection size={14} />
+                      <span>{t('spaces.collection') || 'Bộ sưu tập'}</span>
+                    </>
+                  )}
+                </span>
+                {(() => {
+                  const sp = spaces.find(s => s.id === activeWorkspace.id);
+                  const trans = translateSpace(sp, t);
+                  const desc = trans?.description || (activeWorkspace.spaceType === 'journal' ? t('spaces.journalDesc') : t('spaces.collectionDesc')) || '';
+                  return (
+                    <span className="spaceDescRow" style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                      {desc}
+                    </span>
+                  );
+                })()}
+              </div>
             </div>
             <div className="headerActions">
               <button className="actionBtn editBtn" onClick={() => {
@@ -855,8 +1102,55 @@ export default function DashboardPage(): React.JSX.Element {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 <span>{t('spaces.editSpace')}</span>
               </button>
+              
+              {(!groups.find(g => g.id === activeWorkspace.groupId) || 
+                ['owner', 'admin'].includes(groups.find(g => g.id === activeWorkspace.groupId)?.role)) && (
+                <button 
+                  className="actionBtn deleteBtn danger" 
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    color: '#fca5a5',
+                    borderRadius: '12px',
+                    padding: '8px 14px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onClick={async () => {
+                    if (window.confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?')) {
+                      const success = await handleDeleteSpace(activeWorkspace.id);
+                      if (success) {
+                        if (activeWorkspace.groupId) {
+                          router.push(`/cloud/group/${activeWorkspace.groupId}/spaces`);
+                        } else {
+                          router.push('/cloud/spaces');
+                        }
+                      }
+                    }
+                  }}
+                  onMouseEnter={(e: any) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+                    e.currentTarget.style.color = '#ffffff';
+                  }}
+                  onMouseLeave={(e: any) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                    e.currentTarget.style.color = '#fca5a5';
+                  }}
+                >
+                  <Icons.Trash size={14} />
+                  <span>{t('spaces.deleteSpace') || 'Xóa không gian'}</span>
+                </button>
+              )}
+
               <button className="actionBtn viewAllBtn" onClick={() => {
-                router.push(`/cloud/space/${activeWorkspace.id}/all`);
+                router.push(activeWorkspace.type === 'space' && activeWorkspace.groupId ? `/cloud/group/${activeWorkspace.groupId}/space/${activeWorkspace.id}/all` : `/cloud/space/${activeWorkspace.id}/all`);
               }}>
                 <Icons.AllFiles size={14} />
                 <span>{t('spaces.viewAllFiles')}</span>
@@ -948,14 +1242,24 @@ export default function DashboardPage(): React.JSX.Element {
                       return (
                         <div key={asset.id} className="postAssetCard" onClick={() => openSpaceAsset(asset.id)}>
                           {isImg && <img src={src} alt={asset.originalName} />}
-                          {isVid && (
-                            <div className="postVideoThumb">
-                              <SmartVideo 
-                                hlsSrc={asset.hlsRelPath ? `${api}/api/assets/_media/hls/${asset.id}/master.m3u8` : undefined} 
-                                mp4Src={asset.playRelPath ? `${api}/api/assets/_media/play/${asset.id}` : `${api}/api/assets/_media/original/${asset.id}`} 
-                                controls 
-                              />
-                            </div>
+                           {isVid && (
+                            asset.processingStatus === 'processing' ? (
+                              <div className="postVideoProcessingPlaceholder" onClick={(e) => e.stopPropagation()}>
+                                <div className="doubleRingLoader">
+                                  <div className="ring1" />
+                                  <div className="ring2" />
+                                </div>
+                                <span className="processingText">{t('buttons.processing') || 'Đang xử lý...'}</span>
+                              </div>
+                            ) : (
+                              <div className="postVideoThumb">
+                                <SmartVideo 
+                                  hlsSrc={asset.hlsRelPath ? `${api}/api/assets/_media/hls/${asset.id}/master.m3u8` : undefined} 
+                                  mp4Src={asset.playRelPath ? `${api}/api/assets/_media/play/${asset.id}` : `${api}/api/assets/_media/original/${asset.id}`} 
+                                  controls 
+                                />
+                              </div>
+                            )
                           )}
                           {!isImg && !isVid && (
                             <div className="postFileThumb">
@@ -983,7 +1287,7 @@ export default function DashboardPage(): React.JSX.Element {
               <div className="spaceBreadcrumb" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                 <span 
                   className="breadcrumbBack" 
-                  onClick={() => router.push(`/cloud/space/${activeWorkspace.id}`)}
+                  onClick={() => router.push(activeWorkspace.type === 'space' && activeWorkspace.groupId ? `/cloud/group/${activeWorkspace.groupId}/space/${activeWorkspace.id}` : `/cloud/space/${activeWorkspace.id}`)}
                   style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px', fontWeight: '600', transition: 'color 0.15s ease', display: 'inline-flex', alignItems: 'center' }}
                   onMouseEnter={(e: any) => e.currentTarget.style.color = 'var(--text-primary)'}
                   onMouseLeave={(e: any) => e.currentTarget.style.color = 'var(--text-muted)'}
@@ -997,7 +1301,7 @@ export default function DashboardPage(): React.JSX.Element {
                 </span>
               </div>
               <h1 style={{ fontSize: '26px', fontWeight: '800', margin: '4px 0 6px 0', letterSpacing: '-0.5px' }}>
-                {activeWorkspace.name}
+                {activeSpaceName}
               </h1>
               <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
                 {t('spaces.totalFilesSummary', { total: spaceAssets.length, filtered: processedSpaceAssets.length })}
@@ -1014,6 +1318,52 @@ export default function DashboardPage(): React.JSX.Element {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 <span>{t('spaces.editSpace')}</span>
               </button>
+
+              {(!groups.find(g => g.id === activeWorkspace.groupId) || 
+                ['owner', 'admin'].includes(groups.find(g => g.id === activeWorkspace.groupId)?.role)) && (
+                <button 
+                  className="actionBtn deleteBtn danger" 
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    color: '#fca5a5',
+                    borderRadius: '12px',
+                    padding: '8px 14px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onClick={async () => {
+                    if (window.confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?')) {
+                      const success = await handleDeleteSpace(activeWorkspace.id);
+                      if (success) {
+                        if (activeWorkspace.groupId) {
+                          router.push(`/cloud/group/${activeWorkspace.groupId}/spaces`);
+                        } else {
+                          router.push('/cloud/spaces');
+                        }
+                      }
+                    }
+                  }}
+                  onMouseEnter={(e: any) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+                    e.currentTarget.style.color = '#ffffff';
+                  }}
+                  onMouseLeave={(e: any) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                    e.currentTarget.style.color = '#fca5a5';
+                  }}
+                >
+                  <Icons.Trash size={14} />
+                  <span>{t('spaces.deleteSpace') || 'Xóa không gian'}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1154,16 +1504,26 @@ export default function DashboardPage(): React.JSX.Element {
                       </div>
                     )}
                     {isVid && (
-                      <div className="mediaWrapper">
-                        <video src={srcPlay} className="thumb" muted preload="none" />
-                        <div className="videoPlayIcon">
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      item.processingStatus === 'processing' ? (
+                        <div className="processingPlaceholder">
+                          <div className="doubleRingLoader">
+                            <div className="ring1" />
+                            <div className="ring2" />
+                          </div>
+                          <span className="processingText">{t('buttons.processing') || 'Đang xử lý...'}</span>
                         </div>
-                        <div className="mediaHoverOverlay">
-                          <span className="fileNameOverlay">{item.originalName}</span>
-                          <span className="fileSizeOverlay">{fmtBytes(item.size)}</span>
+                      ) : (
+                        <div className="mediaWrapper">
+                          <video src={srcPlay} className="thumb" muted preload="none" />
+                          <div className="videoPlayIcon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                          </div>
+                          <div className="mediaHoverOverlay">
+                            <span className="fileNameOverlay">{item.originalName}</span>
+                            <span className="fileSizeOverlay">{fmtBytes(item.size)}</span>
+                          </div>
                         </div>
-                      </div>
+                      )
                     )}
                     {!isImg && !isVid && (
                       <div className="docCardContent">
@@ -1325,6 +1685,65 @@ export default function DashboardPage(): React.JSX.Element {
           grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
           gap: 16px;
         }
+        .doubleRingLoader {
+          position: relative;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .doubleRingLoader .ring1 {
+          position: absolute;
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: #eab308;
+          animation: ring1Pulse 1.6s ease-in-out infinite;
+        }
+        .doubleRingLoader .ring2 {
+          position: absolute;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          border: 2px solid rgba(234, 179, 8, 0.4);
+          animation: ring2Pulse 1.6s ease-in-out infinite;
+        }
+        @keyframes ring1Pulse {
+          0% { transform: scale(0.8); opacity: 0.5; }
+          50% { transform: scale(1.2); opacity: 1; }
+          100% { transform: scale(0.8); opacity: 0.5; }
+        }
+        @keyframes ring2Pulse {
+          0% { transform: scale(1.2); opacity: 1; border-color: rgba(234, 179, 8, 0.4); }
+          50% { transform: scale(0.8); opacity: 0.2; border-color: rgba(234, 179, 8, 0.1); }
+          100% { transform: scale(1.2); opacity: 1; border-color: rgba(234, 179, 8, 0.4); }
+        }
+        .processingPlaceholder {
+          height: 160px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-input);
+          gap: 12px;
+        }
+        .processingText {
+          font-size: 11px;
+          color: var(--text-muted);
+          font-weight: 600;
+        }
+        .postVideoProcessingPlaceholder {
+          height: 200px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-input);
+          border-radius: 12px;
+          gap: 12px;
+          width: 100%;
+        }
         .recentDocsGrid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1440,6 +1859,27 @@ export default function DashboardPage(): React.JSX.Element {
           transform: translateY(-2px);
           border-color: var(--border-tile-hover);
           box-shadow: var(--card-shadow-hover);
+        }
+        .tile.picked, .docCard.picked, .spaceCard.picked {
+          border-color: var(--button-primary-bg) !important;
+          box-shadow: 0 0 0 1px var(--button-primary-bg), 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+        }
+        .tile .badge, .docCard .badge, .spaceCard .badge {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          background: var(--button-primary-bg);
+          color: var(--button-primary-text);
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: bold;
+          z-index: 2;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         }
         .docName {
           font-weight: 600;
