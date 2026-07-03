@@ -28,6 +28,12 @@ async function checkSpaceOwnership(req: Request, res: Response, next: NextFuncti
       return res.status(404).json({ message: 'Không tìm thấy không gian con này' });
     }
     const space = result.rows[0];
+
+    // Kiểm tra Soft Delete: Chỉ cho phép đi qua ở API restore và API purge
+    const isTrashAction = req.path.endsWith('/restore') || req.path.endsWith('/purge');
+    if (space.is_deleted && !isTrashAction) {
+      return res.status(404).json({ message: 'Không gian con này đã bị xóa tạm thời' });
+    }
     
     if (space.group_id) {
       // Kiểm tra xem user có phải thành viên nhóm không
@@ -57,24 +63,42 @@ async function checkSpaceOwnership(req: Request, res: Response, next: NextFuncti
 router.get('/', requireAuth, async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   const groupId = req.query.groupId ? String(req.query.groupId) : undefined;
+  const includeTrash = String(req.query.includeTrash || 'false') === 'true';
+  const onlyTrash = String(req.query.onlyTrash || 'false') === 'true';
+
+  let sqlCondition = 'AND is_deleted = false';
+  if (onlyTrash) {
+    sqlCondition = 'AND is_deleted = true';
+  } else if (includeTrash) {
+    sqlCondition = '';
+  }
+
   try {
     if (groupId) {
       // Xác minh quyền thành viên nhóm
       const memberRes = await db.query(
-        'SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2',
+        'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
         [groupId, req.user.sub]
       );
       if (memberRes.rows.length === 0) {
         return res.status(403).json({ message: 'Bạn không có quyền truy cập không gian con của nhóm này' });
       }
+      const role = memberRes.rows[0].role;
+
+      // Thành viên thường (member) không được xem các Space trong thùng rác của nhóm
+      let actualCondition = sqlCondition;
+      if (role === 'member' && (onlyTrash || includeTrash)) {
+        actualCondition = 'AND is_deleted = false';
+      }
+
       const result = await db.query(
-        'SELECT * FROM spaces WHERE group_id = $1 ORDER BY created_at DESC',
+        `SELECT * FROM spaces WHERE group_id = $1 ${actualCondition} ORDER BY created_at DESC`,
         [groupId]
       );
       return res.json({ ok: true, spaces: result.rows });
     } else {
       const result = await db.query(
-        'SELECT * FROM spaces WHERE owner_id = $1 AND group_id IS NULL ORDER BY created_at DESC',
+        `SELECT * FROM spaces WHERE owner_id = $1 AND group_id IS NULL ${sqlCondition} ORDER BY created_at DESC`,
         [req.user.sub]
       );
       return res.json({ ok: true, spaces: result.rows });
@@ -171,26 +195,79 @@ router.put('/:spaceId', requireAuth, checkSpaceOwnership, async (req: Request, r
   }
 });
 
-// 2c. DELETE xóa không gian con (Space)
+// 2c. DELETE đưa không gian con vào thùng rác (Soft Delete)
 router.delete('/:spaceId', requireAuth, checkSpaceOwnership, async (req: Request, res: Response) => {
   const { spaceId } = req.params;
 
-  // Chỉ người tạo Space hoặc chủ sở hữu nhóm mới có quyền xóa Space
+  // Quyền xóa tạm thời: Người tạo Space hoặc Admin/Owner của nhóm
+  const isSpaceOwner = req.space.owner_id === req.user?.sub;
+  const isGroupOwnerOrAdmin = req.space.group_id && (req.groupRole === 'owner' || req.groupRole === 'admin');
+  if (!isSpaceOwner && !isGroupOwnerOrAdmin) {
+    return res.status(403).json({ message: 'Chỉ người tạo không gian con hoặc quản trị viên nhóm mới có quyền xóa tạm thời' });
+  }
+
+  try {
+    await db.query(
+      'UPDATE spaces SET is_deleted = true, deleted_at = NOW() WHERE id = $1',
+      [spaceId]
+    );
+    return res.json({ ok: true, message: 'Đã đưa không gian con vào thùng rác thành công' });
+  } catch (err: any) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// 2d. POST khôi phục không gian con từ thùng rác
+router.post('/:spaceId/restore', requireAuth, checkSpaceOwnership, async (req: Request, res: Response) => {
+  const { spaceId } = req.params;
+
+  // Quyền khôi phục: Người tạo Space hoặc Admin/Owner của nhóm
+  const isSpaceOwner = req.space.owner_id === req.user?.sub;
+  const isGroupOwnerOrAdmin = req.space.group_id && (req.groupRole === 'owner' || req.groupRole === 'admin');
+  if (!isSpaceOwner && !isGroupOwnerOrAdmin) {
+    return res.status(403).json({ message: 'Chỉ người tạo không gian con hoặc quản trị viên nhóm mới có quyền khôi phục' });
+  }
+
+  try {
+    await db.query(
+      'UPDATE spaces SET is_deleted = false, deleted_at = null WHERE id = $1',
+      [spaceId]
+    );
+    return res.json({ ok: true, message: 'Khôi phục không gian con thành công' });
+  } catch (err: any) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// 2e. DELETE xóa vĩnh viễn không gian con (Purge)
+router.delete('/:spaceId/purge', requireAuth, checkSpaceOwnership, async (req: Request, res: Response) => {
+  const { spaceId } = req.params;
+
+  // Quyền xóa vĩnh viễn (Purge): 
+  // - Space cá nhân: Chỉ chủ sở hữu Space.
+  // - Space nhóm: Chỉ duy nhất Owner của nhóm (để quản lý dung lượng chung).
   const isSpaceOwner = req.space.owner_id === req.user?.sub;
   const isGroupOwner = req.space.group_id && req.groupRole === 'owner';
-  if (!isSpaceOwner && !isGroupOwner) {
-    return res.status(403).json({ message: 'Chỉ người tạo không gian con hoặc chủ sở hữu nhóm mới có quyền xóa' });
+
+  if (req.space.group_id) {
+    if (!isGroupOwner) {
+      return res.status(403).json({ message: 'Chỉ chủ sở hữu nhóm mới có quyền xóa vĩnh viễn không gian con chung' });
+    }
+  } else {
+    if (!isSpaceOwner) {
+      return res.status(403).json({ message: 'Bạn không có quyền xóa vĩnh viễn không gian con này' });
+    }
   }
 
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Xóa không gian con (sẽ tự động CASCADE xóa posts và post_assets liên quan trong DB)
+    // Xóa cứng không gian con khỏi DB (CASCADE sẽ tự động xóa posts và post_assets liên quan trong DB)
     await client.query('DELETE FROM spaces WHERE id = $1', [spaceId]);
 
     await client.query('COMMIT');
-    return res.json({ ok: true, message: 'Đã xóa không gian con thành công' });
+    return res.json({ ok: true, message: 'Đã xóa vĩnh viễn không gian con thành công. Các tệp đính kèm mồ côi sẽ tự động được dọn dẹp.' });
   } catch (err: any) {
     await client.query('ROLLBACK');
     return res.status(500).json({ message: err.message });

@@ -187,6 +187,19 @@ CREATE TABLE IF NOT EXISTS post_assets (
   asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
   PRIMARY KEY (post_id, asset_id)
 );
+
+-- Hỗ trợ thùng rác cho Space con (Spaces)
+DO $$ 
+BEGIN 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'spaces' AND column_name = 'is_deleted') THEN
+    ALTER TABLE spaces ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'spaces' AND column_name = 'deleted_at') THEN
+    ALTER TABLE spaces ADD COLUMN deleted_at TIMESTAMPTZ;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_spaces_is_deleted ON spaces(is_deleted);
 `;
 
 
