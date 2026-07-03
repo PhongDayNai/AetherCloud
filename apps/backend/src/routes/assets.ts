@@ -48,6 +48,8 @@ interface ChunkSession {
   chunkDir: string;
   createdAt: number;
   lastModified: number | null;
+  groupId: string | null;
+  saveToPersonal: boolean;
 }
 
 const chunkSessions = new Map<string, ChunkSession>();
@@ -63,16 +65,33 @@ async function checkAssetOwnership(req: Request, res: Response, next: NextFuncti
     if (asset.groupId) {
       // Kiểm tra quyền thành viên nhóm
       const memberRes = await db.query(
-        'SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2',
+        'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
         [asset.groupId, req.user.sub]
       );
       if (memberRes.rows.length === 0) {
         return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin thuộc nhóm này' });
       }
+      req.groupRole = memberRes.rows[0].role;
     } else {
       // Kiểm tra sở hữu cá nhân
       if (asset.ownerId !== req.user.sub) {
         return res.status(403).json({ message: 'Bạn không có quyền truy cập tệp tin này' });
+      }
+    }
+
+    // Nếu là thao tác chỉnh sửa/xóa (PUT/DELETE/PATCH)
+    const isWrite = ['PUT', 'DELETE', 'PATCH'].includes(req.method);
+    if (isWrite) {
+      if (asset.groupId) {
+        const isCreator = asset.ownerId === req.user.sub;
+        const isManager = req.groupRole === 'owner' || req.groupRole === 'admin';
+        if (!isCreator && !isManager) {
+          return res.status(403).json({ message: 'Chỉ người đóng góp hoặc quản trị viên nhóm mới có quyền thay đổi tệp tin này' });
+        }
+      } else {
+        if (asset.ownerId !== req.user.sub) {
+          return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa tệp tin này' });
+        }
       }
     }
 
@@ -83,25 +102,50 @@ async function checkAssetOwnership(req: Request, res: Response, next: NextFuncti
   }
 }
 
-// Middleware kiểm tra quyền sở hữu đối với danh sách bulk assets
+// Middleware kiểm tra quyền sở hữu đối với danh sách bulk assets (Chỉnh sửa/Xóa tạm thời/Khôi phục)
 async function checkBulkOwnership(req: Request, res: Response, next: NextFunction) {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
   if (!ids.length) return res.status(400).json({ message: 'Danh sách ids là bắt buộc' });
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   try {
-    // Cho phép thao tác nếu là owner cá nhân hoặc là thành viên của nhóm chứa tệp tin đó
-    const checkRes = await db.query(
-      `SELECT COUNT(*)::int AS count FROM assets 
-       WHERE id = ANY($1) 
-       AND (
-         owner_id = $2 OR 
-         group_id IN (SELECT group_id FROM group_members WHERE user_id = $2)
-       )`,
-      [ids, req.user.sub]
+    const assetsRes = await db.query(
+      'SELECT id, owner_id, group_id, is_deleted FROM assets WHERE id = ANY($1)',
+      [ids]
     );
-    if (checkRes.rows[0].count !== ids.length) {
-      return res.status(403).json({ message: 'Bạn không có quyền thao tác trên một số tệp tin đã chọn' });
+    if (assetsRes.rows.length !== ids.length) {
+      return res.status(404).json({ message: 'Một số tệp tin không tồn tại' });
     }
+
+    const verifiedAssets: any[] = [];
+    for (const asset of assetsRes.rows) {
+      let role: string | null = null;
+      if (asset.group_id) {
+        const memberRes = await db.query(
+          'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
+          [asset.group_id, req.user.sub]
+        );
+        if (memberRes.rows.length === 0) {
+          return res.status(403).json({ message: 'Bạn không có quyền thao tác trên một số tệp tin của nhóm' });
+        }
+        role = memberRes.rows[0].role;
+        const isCreator = asset.owner_id === req.user.sub;
+        const isManager = role === 'owner' || role === 'admin';
+        if (!isCreator && isManager) {
+          verifiedAssets.push({ ...asset, groupRole: role });
+          continue; // Người quản trị nhóm có quyền thao tác trên tệp tin của thành viên khác
+        }
+        if (!isCreator && !isManager) {
+          return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa hoặc xóa tệp tin của thành viên khác' });
+        }
+      } else {
+        if (asset.owner_id !== req.user.sub) {
+          return res.status(403).json({ message: 'Bạn không có quyền thao tác trên một số tệp tin cá nhân của người khác' });
+        }
+      }
+      verifiedAssets.push({ ...asset, groupRole: role });
+    }
+    
+    req.bulkAssets = verifiedAssets; // Cache lại danh sách để router kế tiếp dùng trực tiếp không cần query lại
     next();
   } catch (e: any) {
     return res.status(500).json({ message: e.message });
@@ -165,7 +209,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
 
 // 2. POST khởi tạo session upload chunk
 router.post('/upload-chunk/init', requireAuth, (req: Request, res: Response) => {
-  const { fileName, mime, totalSize, lastModified } = req.body || {};
+  const { fileName, mime, totalSize, lastModified, groupId, saveToPersonal } = req.body || {};
   if (!fileName || !mime) return res.status(400).json({ message: 'fileName and mime are required' });
 
   const uploadId = crypto.randomUUID();
@@ -179,6 +223,8 @@ router.post('/upload-chunk/init', requireAuth, (req: Request, res: Response) => 
     chunkDir,
     createdAt: Date.now(),
     lastModified: lastModified ? Number(lastModified) : null,
+    groupId: groupId || null,
+    saveToPersonal: String(saveToPersonal) === 'true',
   });
 
   return res.json({ ok: true, uploadId });
@@ -218,16 +264,27 @@ router.post('/upload-chunk/:uploadId/complete', requireAuth, async (req: Request
 
   try {
     const stat = fs.statSync(merged);
-    const saved = await saveUploadedFile(
-      {
-        path: merged,
-        originalname: session.fileName,
-        mimetype: session.mime,
-        size: stat.size,
-        lastModified: session.lastModified,
-      },
-      req.user
-    );
+    const fileData = {
+      path: merged,
+      originalname: session.fileName,
+      mimetype: session.mime,
+      size: stat.size,
+      lastModified: session.lastModified,
+    };
+
+    let saved: Asset;
+    if (session.groupId) {
+      // 1. Tải lên nhóm
+      saved = await saveUploadedFile(fileData, req.user, session.groupId, true);
+
+      // 2. Nhân bản sang cá nhân nếu tích chọn
+      if (session.saveToPersonal) {
+        await saveUploadedFile(fileData, req.user, null, true);
+      }
+    } else {
+      // Tải lên cá nhân
+      saved = await saveUploadedFile(fileData, req.user, null, true);
+    }
 
     try { fs.rmSync(session.chunkDir, { recursive: true, force: true }); } catch {}
     chunkSessions.delete(req.params.uploadId);
@@ -243,8 +300,28 @@ router.post('/upload-chunk/:uploadId/complete', requireAuth, async (req: Request
 router.post('/upload', requireAuth, upload.array('files', 50), async (req: Request, res: Response) => {
   const files = (req.files as Express.Multer.File[]) || [];
   const lastModified = req.body.lastModified ? Number(req.body.lastModified) : null;
+  const groupId = req.body.groupId || null;
+  const saveToPersonal = String(req.body.saveToPersonal) === 'true';
+
   try {
-    const saved = await Promise.all(files.map((f) => saveUploadedFile({ ...f, lastModified }, req.user)));
+    const saved: Asset[] = [];
+    for (const f of files) {
+      const fileData = { ...f, lastModified };
+      if (groupId) {
+        // 1. Tải lên nhóm
+        const savedAsset = await saveUploadedFile(fileData, req.user, groupId, true);
+        saved.push(savedAsset);
+
+        // 2. Nhân bản sang cá nhân nếu tích chọn
+        if (saveToPersonal) {
+          await saveUploadedFile(fileData, req.user, null, true);
+        }
+      } else {
+        // Tải lên cá nhân
+        const savedAsset = await saveUploadedFile(fileData, req.user, null, true);
+        saved.push(savedAsset);
+      }
+    }
     return res.json({ ok: true, count: saved.length, items: saved });
   } catch (e: any) {
     return res.status(500).json({ message: e.message });
@@ -254,8 +331,9 @@ router.post('/upload', requireAuth, upload.array('files', 50), async (req: Reque
 // 6. GET danh sách albums
 router.get('/albums', requireAuth, async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+  const groupId = req.query.groupId ? String(req.query.groupId) : undefined;
   try {
-    const items = await listAlbums(req.user.sub);
+    const items = await listAlbums(req.user.sub, groupId || null);
     return res.json({ items });
   } catch (e: any) {
     return res.status(500).json({ message: e.message });
@@ -265,8 +343,9 @@ router.get('/albums', requireAuth, async (req: Request, res: Response) => {
 // 7. GET danh sách project tài liệu
 router.get('/doc-projects', requireAuth, async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+  const groupId = req.query.groupId ? String(req.query.groupId) : undefined;
   try {
-    const items = await listDocProjects(req.user.sub);
+    const items = await listDocProjects(req.user.sub, groupId || null);
     return res.json({ items });
   } catch (e: any) {
     return res.status(500).json({ message: e.message });
@@ -326,7 +405,23 @@ router.post('/bulk/restore', requireAuth, checkBulkOwnership, async (req: Reques
 // 12. POST xóa vĩnh viễn hàng loạt (Bulk)
 router.post('/bulk/purge', requireAuth, checkBulkOwnership, async (req: Request, res: Response) => {
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+
   try {
+    // Tái sử dụng danh sách assets đã được checkBulkOwnership xác thực và gán vai trò nhóm
+    const assets = req.bulkAssets || [];
+    for (const asset of assets) {
+      if (asset.group_id) {
+        if (asset.groupRole !== 'owner') {
+          return res.status(403).json({ message: 'Chỉ chủ sở hữu nhóm mới có quyền xóa vĩnh viễn các tệp tin trong nhóm' });
+        }
+      } else {
+        if (asset.owner_id !== req.user.sub) {
+          return res.status(403).json({ message: 'Bạn không có quyền xóa vĩnh viễn tệp tin cá nhân của người khác' });
+        }
+      }
+    }
+
     const result = await purgeDeleted(ids);
     return res.json({ ok: true, ...result });
   } catch (e: any) {
@@ -441,8 +536,9 @@ router.put('/:id/doc-projects', requireAuth, checkAssetOwnership, async (req: Re
 // 18. GET danh sách nhãn (Tags)
 router.get('/tags', requireAuth, async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+  const groupId = req.query.groupId ? String(req.query.groupId) : undefined;
   try {
-    const items = await listTags(req.user.sub);
+    const items = await listTags(req.user.sub, groupId || null);
     return res.json({ ok: true, items });
   } catch (e: any) {
     return res.status(500).json({ message: e.message });
@@ -484,8 +580,8 @@ router.post('/bulk/share', requireAuth, checkBulkOwnership, async (req: Request,
       let sharedCount = 0;
 
       for (const aid of ids) {
-        // Lấy asset gốc
-        const assetRes = await client.query('SELECT * FROM assets WHERE id = $1', [aid]);
+        // Lấy asset gốc (chỉ cho phép các tệp tin đang hoạt động, không nằm trong thùng rác)
+        const assetRes = await client.query('SELECT * FROM assets WHERE id = $1 AND is_deleted = false', [aid]);
         if (assetRes.rows.length === 0) continue;
         const original = assetRes.rows[0];
 
@@ -509,7 +605,7 @@ router.post('/bulk/share', requireAuth, checkBulkOwnership, async (req: Request,
           newId, original.original_name, original.mime, original.size, req.user.sub, groupId,
           new Date().toISOString(), original.taken_at, original.rel_path, original.play_rel_path, original.hls_rel_path,
           original.processing_status, original.processing_started_at, original.processing_finished_at,
-          original.ext, null, '{}', null, '{}', '{}', false, null, true, original.type
+          original.ext, null, '{}', null, '{}', original.tags, false, null, true, original.type
         ]);
         sharedCount++;
       }

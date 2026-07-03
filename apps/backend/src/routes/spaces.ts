@@ -171,14 +171,44 @@ router.put('/:spaceId', requireAuth, checkSpaceOwnership, async (req: Request, r
   }
 });
 
+// 2c. DELETE xóa không gian con (Space)
+router.delete('/:spaceId', requireAuth, checkSpaceOwnership, async (req: Request, res: Response) => {
+  const { spaceId } = req.params;
+
+  // Chỉ người tạo Space hoặc chủ sở hữu nhóm mới có quyền xóa Space
+  const isSpaceOwner = req.space.owner_id === req.user?.sub;
+  const isGroupOwner = req.space.group_id && req.groupRole === 'owner';
+  if (!isSpaceOwner && !isGroupOwner) {
+    return res.status(403).json({ message: 'Chỉ người tạo không gian con hoặc chủ sở hữu nhóm mới có quyền xóa' });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Xóa không gian con (sẽ tự động CASCADE xóa posts và post_assets liên quan trong DB)
+    await client.query('DELETE FROM spaces WHERE id = $1', [spaceId]);
+
+    await client.query('COMMIT');
+    return res.json({ ok: true, message: 'Đã xóa không gian con thành công' });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    return res.status(500).json({ message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 // 3. GET danh sách bài đăng thuộc không gian con
 router.get('/:spaceId/posts', requireAuth, checkSpaceOwnership, async (req: Request, res: Response) => {
   const { spaceId } = req.params;
   try {
     const sql = `
       SELECT p.id AS post_id, p.space_id, p.caption, p.created_at AS post_created_at, p.user_id AS post_user_id,
+             u.name AS post_user_name, u.avatar_url AS post_user_avatar_url,
              a.id AS asset_id, a.original_name, a.mime, a.size, a.rel_path, a.play_rel_path, a.hls_rel_path, a.processing_status, a.type AS asset_type, a.ext
       FROM posts p
+      LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN post_assets pa ON p.id = pa.post_id
       LEFT JOIN assets a ON pa.asset_id = a.id
       WHERE p.space_id = $1
@@ -193,6 +223,8 @@ router.get('/:spaceId/posts', requireAuth, checkSpaceOwnership, async (req: Requ
           id: row.post_id,
           spaceId: row.space_id,
           userId: row.post_user_id,
+          userName: row.post_user_name || 'Người dùng hệ thống',
+          userAvatarUrl: row.post_user_avatar_url,
           caption: row.caption,
           createdAt: row.post_created_at,
           assets: []
@@ -260,27 +292,84 @@ router.post('/:spaceId/posts', requireAuth, checkSpaceOwnership, upload.array('f
     );
 
     const linkedAssetIds: string[] = [];
+    const groupId = req.space?.group_id || null;
 
-    // B. Đính kèm các asset_ids có sẵn (phải thuộc quyền sở hữu của user)
+    // B. Đính kèm các asset_ids có sẵn (phải thuộc quyền sở hữu của user hoặc thuộc về nhóm chứa space)
     if (Array.isArray(assetIdsInput) && assetIdsInput.length > 0) {
-      const checkRes = await client.query(
-        'SELECT id FROM assets WHERE id = ANY($1) AND owner_id = $2',
-        [assetIdsInput, req.user?.sub]
-      );
-      const validIds = checkRes.rows.map(r => r.id);
-      
-      for (const aid of validIds) {
-        await client.query(
-          'INSERT INTO post_assets (post_id, asset_id) VALUES ($1, $2)',
-          [postId, aid]
+      let checkRes;
+      if (groupId) {
+        // Lấy tất cả tệp tin hợp lệ và đang hoạt động (do user sở hữu hoặc thuộc nhóm này)
+        checkRes = await client.query(
+          `SELECT * FROM assets 
+           WHERE id = ANY($1) 
+           AND is_deleted = false
+           AND (
+             owner_id = $2 OR 
+             group_id = $3
+           )`,
+          [assetIdsInput, req.user?.sub, groupId]
         );
-        linkedAssetIds.push(aid);
+        
+        for (const original of checkRes.rows) {
+          if (original.group_id === groupId) {
+            // Tệp đã thuộc về nhóm, đính kèm trực tiếp
+            await client.query(
+              'INSERT INTO post_assets (post_id, asset_id) VALUES ($1, $2)',
+              [postId, original.id]
+            );
+            linkedAssetIds.push(original.id);
+          } else {
+            // Tệp ban đầu là cá nhân, cần nhân bản metadata cho nhóm để phân quyền an toàn
+            // Kiểm tra xem đã được nhân bản vào nhóm trước đó chưa (tránh trùng lặp)
+            const dupRes = await client.query(
+              'SELECT id FROM assets WHERE group_id = $1 AND rel_path = $2 AND is_deleted = false LIMIT 1',
+              [groupId, original.rel_path]
+            );
+            let targetAssetId = dupRes.rows[0]?.id;
+
+            if (!targetAssetId) {
+              targetAssetId = crypto.randomUUID();
+              await client.query(`
+                INSERT INTO assets (
+                  id, original_name, mime, size, owner_id, group_id, uploaded_at, taken_at, rel_path,
+                  play_rel_path, hls_rel_path, processing_status, processing_started_at,
+                  processing_finished_at, ext, album_name, album_names, doc_project_name,
+                  doc_project_names, tags, is_deleted, deleted_at, is_library, type
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+              `, [
+                targetAssetId, original.original_name, original.mime, original.size, req.user?.sub, groupId,
+                new Date().toISOString(), original.taken_at, original.rel_path, original.play_rel_path, original.hls_rel_path,
+                original.processing_status, original.processing_started_at, original.processing_finished_at,
+                original.ext, null, '{}', null, '{}', original.tags, false, null, false, original.type
+              ]);
+            }
+
+            await client.query(
+              'INSERT INTO post_assets (post_id, asset_id) VALUES ($1, $2)',
+              [postId, targetAssetId]
+            );
+            linkedAssetIds.push(targetAssetId);
+          }
+        }
+      } else {
+        // Space cá nhân, đính kèm trực tiếp tệp cá nhân của user đang hoạt động
+        checkRes = await client.query(
+          'SELECT id FROM assets WHERE id = ANY($1) AND is_deleted = false AND owner_id = $2 AND group_id IS NULL',
+          [assetIdsInput, req.user?.sub]
+        );
+        const validIds = checkRes.rows.map(r => r.id);
+        for (const aid of validIds) {
+          await client.query(
+            'INSERT INTO post_assets (post_id, asset_id) VALUES ($1, $2)',
+            [postId, aid]
+          );
+          linkedAssetIds.push(aid);
+        }
       }
     }
 
     // C. Upload file mới và tự động đính kèm vào bài đăng
     const files = (req.files as Express.Multer.File[]) || [];
-    const groupId = req.space?.group_id || null;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
