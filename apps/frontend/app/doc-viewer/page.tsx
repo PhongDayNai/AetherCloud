@@ -10,6 +10,7 @@ import { Asset } from '../../types';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 import mermaid from 'mermaid';
+import DOMPurify from 'isomorphic-dompurify';
 import * as Icons from '../../components/Icons';
 
 import './docViewer.css';
@@ -139,12 +140,17 @@ function DocViewerContent() {
   const leftPaneRef = useRef<HTMLTextAreaElement>(null);
   const rightPaneRef = useRef<HTMLDivElement>(null);
   const activeScrollRef = useRef<'left' | 'right' | null>(null);
+  const scrollSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isScrollingFast, setIsScrollingFast] = useState<boolean>(false);
+  const lastScrollTop = useRef<number>(0);
+  const lastScrollTime = useRef<number>(Date.now());
+  const scrollDebounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize marked parser with custom code renderer
   const markedRenderer = new marked.Renderer();
   markedRenderer.code = (code: string, language?: string) => {
     if (language === 'mermaid') {
-      return `<div class="mermaid">${code}</div>`;
+      return `<div class="mermaid" data-code="${encodeURIComponent(code)}"></div>`;
     }
     const validLang = language && hljs.getLanguage(language) ? language : null;
     const highlighted = validLang
@@ -170,8 +176,18 @@ function DocViewerContent() {
   }, []);
 
   // Sync scroll handlers
+  const resetActiveScroll = () => {
+    if (scrollSyncTimeoutRef.current) clearTimeout(scrollSyncTimeoutRef.current);
+    scrollSyncTimeoutRef.current = setTimeout(() => {
+      activeScrollRef.current = null;
+    }, 50);
+  };
+
   const handleLeftScroll = () => {
-    if (activeScrollRef.current !== 'left') return;
+    if (activeScrollRef.current === 'right') return;
+    activeScrollRef.current = 'left';
+    resetActiveScroll();
+
     const left = leftPaneRef.current;
     const right = rightPaneRef.current;
     if (left && right) {
@@ -182,7 +198,10 @@ function DocViewerContent() {
 
   // Sync right scroll
   const handleRightScroll = () => {
-    if (activeScrollRef.current !== 'right') return;
+    if (activeScrollRef.current === 'left') return;
+    activeScrollRef.current = 'right';
+    resetActiveScroll();
+
     const left = leftPaneRef.current;
     const right = rightPaneRef.current;
     if (left && right) {
@@ -309,8 +328,34 @@ function DocViewerContent() {
   // Scroll handler to progressively render more code lines
   const handleCodeScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
+    const now = Date.now();
+    const currentScrollTop = target.scrollTop;
+    const timeDelta = now - lastScrollTime.current;
+    const scrollDelta = Math.abs(currentScrollTop - lastScrollTop.current);
+
+    if (timeDelta > 0) {
+      const velocity = scrollDelta / timeDelta; // px/ms
+      if (velocity > 2.5) {
+        if (!isScrollingFast) {
+          setIsScrollingFast(true);
+        }
+      }
+    }
+
+    lastScrollTime.current = now;
+    lastScrollTop.current = currentScrollTop;
+
+    // Reset isScrollingFast after 150ms of no scrolling (debounce)
+    if (scrollDebounceTimer.current) {
+      clearTimeout(scrollDebounceTimer.current);
+    }
+    scrollDebounceTimer.current = setTimeout(() => {
+      setIsScrollingFast(false);
+    }, 150);
+
+    // Only load more lines when NOT scrolling extremely fast to prevent frame drops
     if (target.scrollHeight - target.scrollTop - target.clientHeight < 200) {
-      if (visibleLinesCount < highlightedLines.length) {
+      if (visibleLinesCount < highlightedLines.length && !isScrollingFast) {
         setVisibleLinesCount(prev => Math.min(prev + 2000, highlightedLines.length));
       }
     }
@@ -367,8 +412,6 @@ function DocViewerContent() {
           if (category === 'markdown') {
             setMarkdownText(text);
             setOriginalMarkdown(text);
-            const html = marked.parse(text);
-            setPreviewHtml(html as string);
           } else {
             setCodeText(text);
           }
@@ -383,24 +426,93 @@ function DocViewerContent() {
     loadData();
   }, [id]);
 
-  // Sync Markdown Live Preview
+  // Sync Markdown Live Preview with 150ms debounce to prevent editor lag
   useEffect(() => {
-    if (markdownText) {
+    if (!markdownText) return;
+
+    const timer = setTimeout(() => {
       const html = marked.parse(markdownText);
-      setPreviewHtml(html as string);
-    }
+      const cleanHtml = DOMPurify.sanitize(html as string);
+      setPreviewHtml(cleanHtml);
+    }, 150);
+
+    return () => clearTimeout(timer);
   }, [markdownText]);
 
-  // Run mermaid render whenever HTML preview changes
+  // Run mermaid render whenever HTML preview changes, validating syntax to prevent crashes
   useEffect(() => {
-    if (previewHtml) {
-      try {
-        mermaid.run({ querySelector: '.mermaid' });
-      } catch (err) {
-        console.error('Mermaid render error:', err);
+    if (!previewHtml) return;
+
+    const renderMermaid = async () => {
+      const elements = document.querySelectorAll('.mermaid');
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i] as HTMLElement;
+        const encodedCode = el.getAttribute('data-code');
+        if (!encodedCode) continue;
+
+        // Skip rendering if it is already processed with the exact same code
+        if (el.getAttribute('data-rendered-code') === encodedCode) {
+          continue;
+        }
+
+        try {
+          const code = decodeURIComponent(encodedCode);
+          // Clear any style overrides from previous errors
+          el.style.border = 'none';
+          el.style.background = 'transparent';
+
+          // Validate syntax using mermaid.parse
+          await mermaid.parse(code);
+
+          // Render graph SVG
+          const id = `mermaid-svg-${i}-${Math.random().toString(36).substring(2, 9)}`;
+          const { svg } = await mermaid.render(id, code);
+          el.innerHTML = svg;
+          el.setAttribute('data-rendered-code', encodedCode);
+        } catch (err: any) {
+          console.error('Mermaid parsing failed:', err);
+          // Render a beautiful, premium inline warning card instead of crashing
+          el.innerHTML = `
+            <div style="
+              border: 1px solid #f87171;
+              background-color: rgba(239, 68, 68, 0.08);
+              color: #f87171;
+              padding: 12px 16px;
+              border-radius: 8px;
+              font-family: 'Fira Code', monospace;
+              font-size: 12.5px;
+              margin: 12px 0;
+              text-align: left;
+              white-space: pre-wrap;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            ">
+              <strong style="display: flex; align-items: center; gap: 6px;">
+                ⚠️ Mermaid Diagram Syntax Error
+              </strong>
+              <div style="margin-top: 6px; font-size: 11.5px; color: #fca5a5; opacity: 0.95; line-height: 1.5;">
+                ${err.message || err}
+              </div>
+            </div>
+          `;
+        }
       }
-    }
+    };
+
+    renderMermaid();
   }, [previewHtml]);
+
+  // Prompt user on unsaved changes before tab close / reload
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (markdownText !== originalMarkdown) {
+        e.preventDefault();
+        e.returnValue = ''; // Standard trigger for modern browsers
+        return '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [markdownText, originalMarkdown]);
 
   // Copy helper
   const handleCopy = async (text: string) => {
@@ -608,7 +720,7 @@ function DocViewerContent() {
               return (
                 <div 
                   key={file.id} 
-                  className={`fileItem ${file.id === asset.id ? 'active' : ''}`}
+                  className={`fileItem ${file.id === asset?.id ? 'active' : ''}`}
                   onClick={() => handleSidebarItemClick(file.id)}
                   title={file.originalName}
                 >
@@ -671,16 +783,12 @@ function DocViewerContent() {
                         value={markdownText}
                         onChange={(e) => setMarkdownText(e.target.value)}
                         onScroll={handleLeftScroll}
-                        onMouseEnter={() => { activeScrollRef.current = 'left'; }}
-                        onMouseLeave={() => { activeScrollRef.current = null; }}
                       />
                     </div>
                     <div 
                       ref={rightPaneRef}
                       className="rightPane"
                       onScroll={handleRightScroll}
-                      onMouseEnter={() => { activeScrollRef.current = 'right'; }}
-                      onMouseLeave={() => { activeScrollRef.current = null; }}
                     >
                       <div 
                         className="previewContainer markdown-body" 
@@ -716,7 +824,14 @@ function DocViewerContent() {
                       </div>
                       {highlightedLines.length > visibleLinesCount && (
                         <div style={{ padding: '12px 16px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)', color: '#71717a', fontSize: '12px' }} className="no-print">
-                          {t('viewer.loadingMoreLines') || 'Đang tải thêm...'}
+                          {isScrollingFast ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                              <div className="skeleton-line" style={{ width: '80%', height: '12px', background: 'var(--border-color, rgba(255,255,255,0.1))', borderRadius: '4px', animation: 'pulse 1.5s infinite ease-in-out' }} />
+                              <div className="skeleton-line" style={{ width: '60%', height: '12px', background: 'var(--border-color, rgba(255,255,255,0.1))', borderRadius: '4px', animation: 'pulse 1.5s infinite ease-in-out' }} />
+                            </div>
+                          ) : (
+                            t('viewer.loadingMoreLines') || 'Đang tải thêm...'
+                          )}
                         </div>
                       )}
                     </div>
