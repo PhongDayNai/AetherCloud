@@ -14,6 +14,7 @@ declare global {
       asset?: Asset;
       space?: any;
       groupRole?: string;
+      bulkAssets?: any[];
     }
   }
 }

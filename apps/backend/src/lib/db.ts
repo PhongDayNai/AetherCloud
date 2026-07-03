@@ -105,6 +105,11 @@ BEGIN
   END IF;
   -- Giữ nguyên owner_id của space là NOT NULL để xác định rõ người tạo
   ALTER TABLE spaces ALTER COLUMN owner_id SET NOT NULL;
+
+  -- Thêm khóa ngoại cho group_id trong bảng assets trỏ đến groups(id) ON DELETE CASCADE
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_assets_group') THEN
+    ALTER TABLE assets ADD CONSTRAINT fk_assets_group FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE;
+  END IF;
 END $$;
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (

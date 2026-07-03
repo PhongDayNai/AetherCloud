@@ -47,6 +47,25 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// 1b. GET chi tiết nhóm (yêu cầu là thành viên)
+router.get('/:groupId', requireAuth, requireGroupMember, async (req: Request, res: Response) => {
+  const { groupId } = req.params;
+  try {
+    const result = await db.query(
+      `SELECT id, name, owner_id, created_at 
+       FROM groups 
+       WHERE id = $1`,
+      [groupId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy nhóm này' });
+    }
+    return res.json({ ok: true, group: { ...result.rows[0], role: req.groupRole } });
+  } catch (err: any) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
 // 2. POST tạo nhóm mới
 router.post('/', requireAuth, async (req: Request, res: Response) => {
   const { name } = req.body || {};
@@ -69,6 +88,14 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     await client.query(
       'INSERT INTO group_members (group_id, user_id, role) VALUES ($1, $2, $3)',
       [groupId, req.user?.sub, 'owner']
+    );
+
+    // Tự động tạo một không gian thảo luận chung mặc định cho nhóm mới
+    const defaultSpaceId = crypto.randomUUID();
+    await client.query(
+      `INSERT INTO spaces (id, name, description, type, owner_id, group_id) 
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [defaultSpaceId, 'Chung', 'Không gian thảo luận chung của nhóm', 'journal', req.user?.sub, groupId]
     );
 
     await client.query('COMMIT');
@@ -122,14 +149,27 @@ router.post('/:groupId/members', requireAuth, requireGroupMember, async (req: Re
     return res.status(400).json({ message: 'Email thành viên không được để trống' });
   }
 
+  // Ràng buộc bảo mật vai trò khi thêm
+  if (role === 'owner') {
+    return res.status(400).json({ message: 'Không thể thêm trực tiếp thành viên với vai trò chủ sở hữu' });
+  }
+  if (role !== 'admin' && role !== 'member') {
+    return res.status(400).json({ message: 'Vai trò không hợp lệ (admin hoặc member)' });
+  }
+
   // Chỉ owner hoặc admin mới được add thêm thành viên
   if (req.groupRole !== 'owner' && req.groupRole !== 'admin') {
     return res.status(403).json({ message: 'Chỉ chủ sở hữu hoặc quản trị viên mới được thêm thành viên' });
   }
 
+  // Chỉ owner mới được thêm vai trò admin
+  if (role === 'admin' && req.groupRole !== 'owner') {
+    return res.status(403).json({ message: 'Chỉ chủ sở hữu nhóm mới có quyền chỉ định quản trị viên mới' });
+  }
+
   try {
-    // Tìm user theo email
-    const userRes = await db.query('SELECT id FROM users WHERE email = $1 AND is_active = true LIMIT 1', [email.trim()]);
+    // Tìm user theo email (chuẩn hóa chữ thường)
+    const userRes = await db.query('SELECT id FROM users WHERE email = $1 AND is_active = true LIMIT 1', [email.trim().toLowerCase()]);
     if (userRes.rows.length === 0) {
       return res.status(404).json({ message: 'Không tìm thấy người dùng hoạt động với email này' });
     }
@@ -194,6 +234,65 @@ router.put('/:groupId/members/:userId', requireAuth, requireGroupMember, async (
   }
 });
 
+// 5b. POST nhượng quyền sở hữu nhóm (Transfer Group Ownership)
+router.post('/:groupId/owner', requireAuth, requireGroupMember, async (req: Request, res: Response) => {
+  const { groupId } = req.params;
+  const { targetUserId } = req.body || {};
+
+  if (!targetUserId) {
+    return res.status(400).json({ message: 'targetUserId là bắt buộc' });
+  }
+
+  // Chỉ owner nhóm hiện tại mới được chuyển nhượng quyền sở hữu
+  if (req.groupRole !== 'owner') {
+    return res.status(403).json({ message: 'Chỉ chủ sở hữu nhóm hiện tại mới có quyền chuyển nhượng nhóm' });
+  }
+
+  if (targetUserId === req.user?.sub) {
+    return res.status(400).json({ message: 'Bạn đã là chủ sở hữu của nhóm này' });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Xác minh người nhận chuyển nhượng có phải thành viên nhóm không
+    const checkRes = await client.query(
+      'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
+      [groupId, targetUserId]
+    );
+    if (checkRes.rows.length === 0) {
+      return res.status(400).json({ message: 'Người nhận chuyển nhượng phải là thành viên của nhóm' });
+    }
+
+    // 1. Cập nhật owner_id trong bảng groups
+    await client.query(
+      'UPDATE groups SET owner_id = $1 WHERE id = $2',
+      [targetUserId, groupId]
+    );
+
+    // 2. Nâng cấp người nhận thành 'owner' trong group_members
+    await client.query(
+      "UPDATE group_members SET role = 'owner' WHERE group_id = $1 AND user_id = $2",
+      [groupId, targetUserId]
+    );
+
+    // 3. Hạ cấp owner cũ (user hiện tại) xuống thành 'admin'
+    await client.query(
+      "UPDATE group_members SET role = 'admin' WHERE group_id = $1 AND user_id = $2",
+      [groupId, req.user?.sub]
+    );
+
+    await client.query('COMMIT');
+    return res.json({ ok: true, message: 'Chuyển nhượng quyền sở hữu nhóm thành công. Vai trò mới của bạn là Quản trị viên.' });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    return res.status(500).json({ message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 // 6. DELETE xóa thành viên hoặc tự rời nhóm
 router.delete('/:groupId/members/:userId', requireAuth, requireGroupMember, async (req: Request, res: Response) => {
   const { groupId, userId } = req.params;
@@ -235,6 +334,33 @@ router.delete('/:groupId/members/:userId', requireAuth, requireGroupMember, asyn
     return res.json({ ok: true, message: 'Đã trục xuất thành viên thành công' });
   } catch (err: any) {
     return res.status(500).json({ message: err.message });
+  }
+});
+
+// 7. DELETE xóa nhóm (chỉ Owner nhóm mới được xóa)
+router.delete('/:groupId', requireAuth, requireGroupMember, async (req: Request, res: Response) => {
+  const { groupId } = req.params;
+  if (req.groupRole !== 'owner') {
+    return res.status(403).json({ message: 'Chỉ chủ sở hữu nhóm mới có quyền xóa nhóm' });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Xóa tất cả assets thuộc nhóm (sau đó cleaner sẽ dọn dẹp file vật lý mồ côi)
+    await client.query('DELETE FROM assets WHERE group_id = $1', [groupId]);
+
+    // Xóa nhóm (sẽ tự động CASCADE xóa group_members và spaces của nhóm)
+    await client.query('DELETE FROM groups WHERE id = $1', [groupId]);
+
+    await client.query('COMMIT');
+    return res.json({ ok: true, message: 'Đã xóa nhóm thành công' });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    return res.status(500).json({ message: err.message });
+  } finally {
+    client.release();
   }
 });
 
