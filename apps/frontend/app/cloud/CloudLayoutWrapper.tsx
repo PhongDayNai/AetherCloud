@@ -100,7 +100,7 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
     groupByTimeEnabled, setGroupByTimeEnabled, groupMode, setGroupMode,
     showCreateSpaceModal, setShowCreateSpaceModal, handleCreateSpace,
     showEditSpaceModal, setShowEditSpaceModal, editingSpace, setEditingSpace, handleUpdateSpace,
-    allActiveAssets, spaceAssets, stats,
+    allActiveAssets, spaceAssets, spaceAssetsFiltered, stats,
     showScrollAnchorBtn, scrollToAnchor,
     groups, handleCreateGroup,
     showCreateGroupModal, setShowCreateGroupModal,
@@ -227,8 +227,8 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
       <MediaViewer
         active={active}
         tab={tab}
-        albumFilteredPhotos={tab === 'dashboard' ? allActiveAssets : (tab === 'space' || tab === 'space-all') ? spaceAssets : albumFilteredPhotos}
-        docsFiltered={tab === 'dashboard' ? allActiveAssets : (tab === 'space' || tab === 'space-all') ? spaceAssets : docsFiltered}
+        albumFilteredPhotos={tab === 'dashboard' ? allActiveAssets : (tab === 'space' || tab === 'space-all') ? (spaceAssetsFiltered.length > 0 ? spaceAssetsFiltered : spaceAssets) : albumFilteredPhotos}
+        docsFiltered={tab === 'dashboard' ? allActiveAssets : (tab === 'space' || tab === 'space-all') ? (spaceAssetsFiltered.length > 0 ? spaceAssetsFiltered : spaceAssets) : docsFiltered}
         activeIndex={activeIndex}
         setActiveIndex={setActiveIndex}
         showInfo={showInfo}

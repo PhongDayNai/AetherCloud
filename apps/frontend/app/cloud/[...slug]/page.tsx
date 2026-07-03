@@ -76,6 +76,7 @@ export default function DashboardPage(): React.JSX.Element {
     selectionMode, setSelectionMode,
     selectedIds, setSelectedIds,
     activeIndex, setActiveIndex,
+    setSpaceAssetsFiltered,
     collectionView, setCollectionView,
     spacesSubTab, setSpacesSubTab,
     docTypeFilter, setDocTypeFilter,
@@ -285,6 +286,14 @@ export default function DashboardPage(): React.JSX.Element {
       return 0;
     });
   }, [spaceAssets, search, spaceFileTypeTab, spaceSubFormats, spaceSortBy, availableSubFormats]);
+
+  React.useEffect(() => {
+    if (tab === 'space-all') {
+      setSpaceAssetsFiltered(processedSpaceAssets);
+    } else {
+      setSpaceAssetsFiltered([]);
+    }
+  }, [processedSpaceAssets, tab, setSpaceAssetsFiltered]);
 
   const recentPhotos = React.useMemo(() => {
     if (!stats?.recentPhotos) return [];
@@ -1513,7 +1522,7 @@ export default function DashboardPage(): React.JSX.Element {
                     className={`assetCard ${picked ? 'picked' : ''} ${!isImg && !isVid ? 'docCardStyle' : 'mediaCardStyle'}`}
                     style={{ animationDelay: `${(idx % 24) * 0.02}s` }}
                     {...cardHandlers(item, () => {
-                      const idx = spaceAssets.findIndex((x) => x.id === item.id);
+                      const idx = processedSpaceAssets.findIndex((x) => x.id === item.id);
                       if (idx >= 0) setActiveIndex(idx);
                     })}
                   >

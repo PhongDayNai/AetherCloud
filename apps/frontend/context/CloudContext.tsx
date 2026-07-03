@@ -55,6 +55,8 @@ interface CloudContextType {
   setSpaces: React.Dispatch<React.SetStateAction<any[]>>;
   posts: any[];
   setPosts: React.Dispatch<React.SetStateAction<any[]>>;
+  spaceAssetsFiltered: Asset[];
+  setSpaceAssetsFiltered: React.Dispatch<React.SetStateAction<Asset[]>>;
   postCaption: string;
   setPostCaption: React.Dispatch<React.SetStateAction<string>>;
   postFiles: File[];
@@ -303,6 +305,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const [activeWorkspace, setActiveWorkspace] = useState<{ type: 'personal' } | { type: 'group'; id: string; name: string; role: 'owner' | 'admin' | 'member' } | { type: 'space'; id: string; name: string; spaceType: string; groupId?: string }>({ type: 'personal' });
   const [spaces, setSpaces] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
+  const [spaceAssetsFiltered, setSpaceAssetsFiltered] = useState<Asset[]>([]);
   const [postCaption, setPostCaption] = useState<string>('');
   const [postFiles, setPostFiles] = useState<File[]>([]);
   
@@ -645,7 +648,9 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
           ? allActiveAssets[activeIndex]
           : tab === 'space'
             ? spaceAssets[activeIndex]
-            : docsFiltered[activeIndex])
+            : tab === 'space-all'
+              ? (spaceAssetsFiltered.length > 0 ? spaceAssetsFiltered[activeIndex] : spaceAssets[activeIndex])
+              : docsFiltered[activeIndex])
     : null;
 
   async function handleLogout() {
@@ -1813,6 +1818,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       activeWorkspace, setActiveWorkspace,
       spaces, setSpaces,
       posts, setPosts,
+      spaceAssetsFiltered, setSpaceAssetsFiltered,
       postCaption, setPostCaption,
       postFiles, setPostFiles,
       saveToPersonalPost, setSaveToPersonalPost,
