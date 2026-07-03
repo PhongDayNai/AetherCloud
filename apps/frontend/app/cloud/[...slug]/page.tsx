@@ -145,6 +145,17 @@ export default function DashboardPage(): React.JSX.Element {
     return trans?.name || ('name' in activeWorkspace ? activeWorkspace.name : '');
   }, [activeWorkspace, spaces, t]);
 
+  const isGeneralSpace = React.useMemo(() => {
+    if (activeWorkspace.type !== 'space') return false;
+    const sp = spaces.find(s => s.id === activeWorkspace.id);
+    if (!sp) return false;
+    return (
+      sp.name === 'General' &&
+      sp.type === 'journal' &&
+      (sp.description === 'General discussion space for the group' || sp.description === 'Write journal entries with attachments.')
+    );
+  }, [activeWorkspace, spaces]);
+
   const dashboardStats = React.useMemo(() => {
     return {
       photosVideosCount: stats?.counts?.photosCount || 0,
@@ -974,13 +985,17 @@ export default function DashboardPage(): React.JSX.Element {
               </div>
             </div>
             <div className="headerActions">
-              <button className="actionBtn editBtn" onClick={() => {
-                const sp = spaces.find(s => s.id === activeWorkspace.id);
-                if (sp) {
-                  setEditingSpace(sp);
-                  setShowEditSpaceModal(true);
-                }
-              }}>
+              <button 
+                className="actionBtn editBtn" 
+                style={isGeneralSpace ? { visibility: 'hidden', pointerEvents: 'none' } : {}}
+                onClick={() => {
+                  const sp = spaces.find(s => s.id === activeWorkspace.id);
+                  if (sp) {
+                    setEditingSpace(sp);
+                    setShowEditSpaceModal(true);
+                  }
+                }}
+              >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 <span>{t('spaces.editSpace')}</span>
               </button>
@@ -1092,13 +1107,17 @@ export default function DashboardPage(): React.JSX.Element {
               </div>
             </div>
             <div className="headerActions">
-              <button className="actionBtn editBtn" onClick={() => {
-                const sp = spaces.find(s => s.id === activeWorkspace.id);
-                if (sp) {
-                  setEditingSpace(sp);
-                  setShowEditSpaceModal(true);
-                }
-              }}>
+              <button 
+                className="actionBtn editBtn" 
+                style={isGeneralSpace ? { visibility: 'hidden', pointerEvents: 'none' } : {}}
+                onClick={() => {
+                  const sp = spaces.find(s => s.id === activeWorkspace.id);
+                  if (sp) {
+                    setEditingSpace(sp);
+                    setShowEditSpaceModal(true);
+                  }
+                }}
+              >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 <span>{t('spaces.editSpace')}</span>
               </button>
@@ -1308,13 +1327,17 @@ export default function DashboardPage(): React.JSX.Element {
               </p>
             </div>
             <div className="headerActions">
-              <button className="actionBtn editBtn" onClick={() => {
-                const sp = spaces.find(s => s.id === activeWorkspace.id);
-                if (sp) {
-                  setEditingSpace(sp);
-                  setShowEditSpaceModal(true);
-                }
-              }}>
+              <button 
+                className="actionBtn editBtn" 
+                style={isGeneralSpace ? { visibility: 'hidden', pointerEvents: 'none' } : {}}
+                onClick={() => {
+                  const sp = spaces.find(s => s.id === activeWorkspace.id);
+                  if (sp) {
+                    setEditingSpace(sp);
+                    setShowEditSpaceModal(true);
+                  }
+                }}
+              >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 <span>{t('spaces.editSpace')}</span>
               </button>
