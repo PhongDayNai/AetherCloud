@@ -55,6 +55,7 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
 
   const client = await db.pool.connect();
   let dbActivePaths = new Set<string>();
+  let dbActiveIds = new Set<string>();
   try {
     // Dọn dẹp các asset mồ côi trong database (các asset đính kèm post nhưng post/space đã bị xóa)
     if (!isDryRun) {
@@ -70,13 +71,15 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
       }
     }
 
-    const res = await client.query('SELECT rel_path, play_rel_path, hls_rel_path FROM assets');
+    dbActiveIds = new Set<string>();
+    const res = await client.query('SELECT id, rel_path, play_rel_path, hls_rel_path FROM assets');
     for (const row of res.rows) {
+      if (row.id) dbActiveIds.add(row.id);
       if (row.rel_path) dbActivePaths.add(row.rel_path.replaceAll('\\', '/'));
       if (row.play_rel_path) dbActivePaths.add(row.play_rel_path.replaceAll('\\', '/'));
       if (row.hls_rel_path) dbActivePaths.add(row.hls_rel_path.replaceAll('\\', '/'));
     }
-    console.log(`[Cleaner] Fetched ${dbActivePaths.size} active reference paths from database.`);
+    console.log(`[Cleaner] Fetched ${dbActivePaths.size} active reference paths and ${dbActiveIds.size} active asset IDs from database.`);
   } catch (err: any) {
     console.error('[Cleaner] Database query error:', err.message);
     client.release();
@@ -183,6 +186,40 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
               orphanedCount++;
               spaceReclaimed += dirSize;
               console.log(`[Orphaned] [HLS-Derived] ${relPath}/ (${(dirSize / 1024 / 1024).toFixed(2)} MB)`);
+              if (!isDryRun) {
+                fs.rmSync(fullPath, { recursive: true, force: true });
+              }
+            }
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+
+  // 5. Quét derived/versions
+  const versionsRoot = path.join(DERIVED_ROOT, 'versions');
+  if (fs.existsSync(versionsRoot)) {
+    try {
+      const subdirs = fs.readdirSync(versionsRoot);
+      for (const subdir of subdirs) {
+        const fullPath = path.join(versionsRoot, subdir);
+        try {
+          const stat = fs.statSync(fullPath);
+          if (stat.isDirectory() && UUID_REGEX.test(subdir)) {
+            totalScanned++;
+            if (!dbActiveIds.has(subdir)) {
+              let dirSize = 0;
+              const versionFiles = walkFiles(fullPath);
+              for (const f of versionFiles) {
+                try {
+                  const fStat = fs.statSync(f);
+                  dirSize += fStat.size;
+                } catch {}
+              }
+              orphanedCount++;
+              spaceReclaimed += dirSize;
+              const relPath = path.relative(LIBRARY_PATH, fullPath).replaceAll('\\', '/');
+              console.log(`[Orphaned] [Versions-Derived] ${relPath}/ (${(dirSize / 1024 / 1024).toFixed(2)} MB)`);
               if (!isDryRun) {
                 fs.rmSync(fullPath, { recursive: true, force: true });
               }
