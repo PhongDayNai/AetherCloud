@@ -641,6 +641,7 @@ router.put('/:id/content', requireAuth, checkAssetOwnership, async (req: Request
     return res.status(409).json({
       message: 'Conflict',
       serverContent,
+      serverVersion: asset.version,
     });
   }
 
@@ -735,7 +736,12 @@ router.put('/:id/content', requireAuth, checkAssetOwnership, async (req: Request
 
     if (err.message === 'OCC_CONFLICT') {
       let serverContent = '';
+      let serverVersion = asset.version;
       try {
+        const verRes = await db.query('SELECT version FROM assets WHERE id = $1', [id]);
+        if (verRes.rows.length > 0) {
+          serverVersion = Number(verRes.rows[0].version);
+        }
         let activeExists = false;
         try {
           await fs.promises.access(currentAbsPath, fs.constants.F_OK);
@@ -748,6 +754,7 @@ router.put('/:id/content', requireAuth, checkAssetOwnership, async (req: Request
       return res.status(409).json({
         message: 'Conflict',
         serverContent,
+        serverVersion,
       });
     }
     return res.status(500).json({ message: err.message });
