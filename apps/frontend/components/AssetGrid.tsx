@@ -116,7 +116,10 @@ export default function AssetGrid({
                         ) : a.type === 'video' ? (
                           a.processingStatus === 'processing' ? (
                             <div className="processingPlaceholder">
-                              <div className="pulseLoader" />
+                              <div className="doubleRingLoader">
+                                <div className="ring1" />
+                                <div className="ring2" />
+                              </div>
                               <span className="processingText">{t('buttons.processing') || 'Đang xử lý...'}</span>
                             </div>
                           ) : (
@@ -354,12 +357,29 @@ export default function AssetGrid({
           background: var(--bg-input);
           gap: 12px;
         }
-        .pulseLoader {
+        .doubleRingLoader {
+          position: relative;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .doubleRingLoader .ring1 {
+          position: absolute;
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: #eab308;
+          animation: ring1Pulse 1.6s ease-in-out infinite;
+        }
+        .doubleRingLoader .ring2 {
+          position: absolute;
           width: 24px;
           height: 24px;
           border-radius: 50%;
-          background: var(--accent-color);
-          animation: pulse 1.6s ease-in-out infinite;
+          border: 2px solid rgba(234, 179, 8, 0.4);
+          animation: ring2Pulse 1.6s ease-in-out infinite;
         }
         .processingText {
           font-size: 11px;
@@ -387,10 +407,15 @@ export default function AssetGrid({
           border-radius: 4px;
           border: 1px solid var(--border-color);
         }
-        @keyframes pulse {
-          0% { transform: scale(0.9); opacity: 0.6; }
-          50% { transform: scale(1.1); opacity: 1; }
-          100% { transform: scale(0.9); opacity: 0.6; }
+        @keyframes ring1Pulse {
+          0% { transform: scale(0.8); opacity: 0.5; }
+          50% { transform: scale(1.2); opacity: 1; }
+          100% { transform: scale(0.8); opacity: 0.5; }
+        }
+        @keyframes ring2Pulse {
+          0% { transform: scale(1.2); opacity: 1; border-color: rgba(234, 179, 8, 0.4); }
+          50% { transform: scale(0.8); opacity: 0.2; border-color: rgba(234, 179, 8, 0.1); }
+          100% { transform: scale(1.2); opacity: 1; border-color: rgba(234, 179, 8, 0.4); }
         }
         @keyframes cardEnter {
           from { opacity: 0; transform: translateY(12px); }
