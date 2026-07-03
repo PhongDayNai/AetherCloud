@@ -1,12 +1,12 @@
 import express, { Request, Response } from 'express';
-import { getStorageUsage } from '../lib/storage';
 import { requireAuth } from '../middleware/requireAuth';
+import * as storageUsecase from '../usecases/storage';
 
 const router = express.Router();
 
 router.get('/usage', requireAuth, async (_req: Request, res: Response) => {
   try {
-    const usage = await getStorageUsage();
+    const usage = await storageUsecase.getStorageUsageStats();
     return res.json(usage);
   } catch (e: any) {
     return res.status(500).json({ message: e.message });
