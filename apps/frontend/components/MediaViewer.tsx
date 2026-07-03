@@ -5,6 +5,7 @@ import { Asset, Album, Tag, DocProject } from '../types';
 import { fmtBytes, docCategoryOf } from '../lib/utils';
 import SmartVideo from './SmartVideo';
 import * as Icons from './Icons';
+import { useCloud } from '../context/CloudContext';
 
 interface MediaViewerProps {
   active: Asset | null;
@@ -99,6 +100,17 @@ export default function MediaViewer({
 }: MediaViewerProps): React.JSX.Element | null {
   if (!active) return null;
 
+  const { activeWorkspace, groups } = useCloud();
+  
+  let userRole: string | null = null;
+  if (activeWorkspace?.type === 'group') {
+    userRole = activeWorkspace.role;
+  } else if (activeWorkspace?.type === 'space' && activeWorkspace.groupId) {
+    userRole = groups.find(g => g.id === activeWorkspace.groupId)?.role || 'member';
+  }
+  
+  const isReadOnly = (activeWorkspace?.type === 'group' || (activeWorkspace?.type === 'space' && activeWorkspace?.groupId)) && userRole === 'member';
+
   const currentList = tab === 'photos' ? albumFilteredPhotos : docsFiltered;
 
   const handlePrev = (e: React.MouseEvent) => {
@@ -171,7 +183,10 @@ export default function MediaViewer({
         {active.type === 'video' && (
           active.processingStatus === 'processing' ? (
             <div className="videoProcessingOverlay mediaEnter" onClick={(e) => e.stopPropagation()}>
-              <div className="loadingSpinner" />
+              <div className="doubleRingLoader">
+                <div className="ring1" />
+                <div className="ring2" />
+              </div>
               <div className="overlayTitle">{t('viewer.videoOptimizing')}</div>
               <div className="overlayDesc">{t('viewer.videoOptimizingDesc')}</div>
               <a href={`${api}/api/assets/_media/original/${active.id}`} download={active.originalName} className="downloadOriginalBtn" onClick={(e) => e.stopPropagation()}>
@@ -210,12 +225,16 @@ export default function MediaViewer({
       </div>
       <button className="nav right" onClick={handleNext}><Icons.ChevronRight size={24} /></button>
       <button className="topBtn infoBtn" onClick={(e) => { e.stopPropagation(); setShowInfo((v) => !v); }} title={t('details.title')}><Icons.Info size={18} /></button>
-      {active.type !== 'file' ? (
-        <button className="topBtn albumBtn" onClick={onAlbumBtnClick} title={t('viewer.createNewAlbum')}><Icons.Plus size={18} /></button>
-      ) : (
-        <button className="topBtn albumBtn" onClick={onDocProjectBtnClick} title={t('viewer.createNewProject') || 'Tạo tập tài liệu mới'}><Icons.Plus size={18} /></button>
+      {!isReadOnly && (
+        active.type !== 'file' ? (
+          <button className="topBtn albumBtn" onClick={onAlbumBtnClick} title={t('viewer.createNewAlbum')}><Icons.Plus size={18} /></button>
+        ) : (
+          <button className="topBtn albumBtn" onClick={onDocProjectBtnClick} title={t('viewer.createNewProject') || 'Tạo tập tài liệu mới'}><Icons.Plus size={18} /></button>
+        )
       )}
-      <button className="topBtn tagBtn" onClick={onTagBtnClick} title={t('sidebar.tagsTitle')}><Icons.Tag size={18} /></button>
+      {!isReadOnly && (
+        <button className="topBtn tagBtn" onClick={onTagBtnClick} title={t('sidebar.tagsTitle')}><Icons.Tag size={18} /></button>
+      )}
       <button className="close" onClick={handleClose} title={t('actions.cancel')}><Icons.Close size={18} /></button>
 
       {showInfo && (
@@ -806,13 +825,40 @@ export default function MediaViewer({
           text-align: center;
           box-shadow: 0 10px 35px rgba(0,0,0,0.5);
         }
-        .loadingSpinner {
-          width: 40px;
-          height: 40px;
-          border: 4px solid rgba(255, 255, 255, 0.1);
-          border-top: 4px solid #ffffff;
+        .doubleRingLoader {
+          position: relative;
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 8px;
+        }
+        .doubleRingLoader .ring1 {
+          position: absolute;
+          width: 12px;
+          height: 12px;
           border-radius: 50%;
-          animation: spin 1s linear infinite;
+          background: #eab308;
+          animation: ring1Pulse 1.6s ease-in-out infinite;
+        }
+        .doubleRingLoader .ring2 {
+          position: absolute;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          border: 2px solid rgba(234, 179, 8, 0.4);
+          animation: ring2Pulse 1.6s ease-in-out infinite;
+        }
+        @keyframes ring1Pulse {
+          0% { transform: scale(0.8); opacity: 0.5; }
+          50% { transform: scale(1.2); opacity: 1; }
+          100% { transform: scale(0.8); opacity: 0.5; }
+        }
+        @keyframes ring2Pulse {
+          0% { transform: scale(1.2); opacity: 1; border-color: rgba(234, 179, 8, 0.4); }
+          50% { transform: scale(0.8); opacity: 0.2; border-color: rgba(234, 179, 8, 0.1); }
+          100% { transform: scale(1.2); opacity: 1; border-color: rgba(234, 179, 8, 0.4); }
         }
         .overlayTitle {
           font-size: 15px;
