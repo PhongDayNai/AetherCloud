@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import * as db from '../lib/db';
 import { requireAuth } from '../middleware/requireAuth';
+import { isValidUUID, getGroupMemberRole } from '../lib/utils';
 
 const router = express.Router();
 
@@ -11,19 +12,22 @@ export async function requireGroupMember(req: Request, res: Response, next: Next
   if (!groupId) {
     return res.status(400).json({ message: 'Thiếu ID nhóm (groupId)' });
   }
+
+  // Xác thực định dạng UUID của groupId đầu vào để chặn đứng lỗi syntax của DB
+  if (!isValidUUID(groupId)) {
+    return res.status(400).json({ message: 'groupId không đúng định dạng UUID' });
+  }
+
   if (!req.user) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
   try {
-    const memberRes = await db.query(
-      'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
-      [groupId, req.user.sub]
-    );
-    if (memberRes.rows.length === 0) {
+    const role = await getGroupMemberRole(groupId, req.user.sub);
+    if (!role) {
       return res.status(403).json({ message: 'Bạn không phải là thành viên của nhóm này' });
     }
-    req.groupRole = memberRes.rows[0].role; // Lưu vai trò để dùng ở các handler sau
+    req.groupRole = role; // Lưu vai trò để dùng ở các handler sau
     next();
   } catch (err: any) {
     return res.status(500).json({ message: err.message });
@@ -252,18 +256,22 @@ router.post('/:groupId/owner', requireAuth, requireGroupMember, async (req: Requ
     return res.status(400).json({ message: 'Bạn đã là chủ sở hữu của nhóm này' });
   }
 
-  const client = await db.pool.connect();
+  // Xác minh người nhận chuyển nhượng có phải thành viên nhóm không (Đưa ra ngoài transaction)
   try {
-    await client.query('BEGIN');
-
-    // Xác minh người nhận chuyển nhượng có phải thành viên nhóm không
-    const checkRes = await client.query(
+    const checkRes = await db.query(
       'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
       [groupId, targetUserId]
     );
     if (checkRes.rows.length === 0) {
       return res.status(400).json({ message: 'Người nhận chuyển nhượng phải là thành viên của nhóm' });
     }
+  } catch (err: any) {
+    return res.status(500).json({ message: err.message });
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
 
     // 1. Cập nhật owner_id trong bảng groups
     await client.query(
