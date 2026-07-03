@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import * as db from '../lib/db';
 import { requireAuth } from '../middleware/requireAuth';
 import { generateSalt, hashPassword } from '../lib/auth';
+import { isValidUUID } from '../lib/utils';
 
 const router = express.Router();
 
@@ -110,6 +111,9 @@ router.get('/invitations', async (req: Request, res: Response) => {
 // 2. Vô hiệu hóa mã mời chủ động
 router.put('/invitations/:id/deactivate', async (req: Request, res: Response) => {
   const { id } = req.params;
+  if (!isValidUUID(id)) {
+    return res.status(400).json({ message: 'id không đúng định dạng UUID' });
+  }
   try {
     const result = await db.query(
       'UPDATE user_invitations SET is_active = false WHERE id = $1',
@@ -130,6 +134,9 @@ router.put('/invitations/:id/deactivate', async (req: Request, res: Response) =>
 // 3. Reset mật khẩu người dùng khác (cấp mật khẩu tạm thời)
 router.post('/users/:id/reset-password', async (req: Request, res: Response) => {
   const { id } = req.params;
+  if (!isValidUUID(id)) {
+    return res.status(400).json({ message: 'id người dùng không đúng định dạng UUID' });
+  }
   const { temp_password } = req.body || {};
 
   if (!temp_password) {
