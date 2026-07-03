@@ -167,7 +167,9 @@ export async function createSpacePost(
     await client.query('COMMIT');
 
     const postAssetsRes = await db.query(
-      'SELECT id, original_name, mime, size, rel_path, play_rel_path, hls_rel_path, processing_status, type, ext FROM assets WHERE id = ANY($1)',
+      `SELECT id, original_name, mime, size, rel_path, play_rel_path, hls_rel_path, processing_status, type, ext,
+              uploaded_at, taken_at, album_name, album_names, doc_project_name, doc_project_names, tags
+       FROM assets WHERE id = ANY($1)`,
       [linkedAssetIds]
     );
 
@@ -188,7 +190,14 @@ export async function createSpacePost(
           hlsRelPath: row.hls_rel_path,
           processingStatus: row.processing_status,
           type: row.type,
-          ext: row.ext
+          ext: row.ext,
+          uploadedAt: row.uploaded_at,
+          takenAt: row.taken_at,
+          albumName: row.album_name,
+          albumNames: row.album_names,
+          docProjectName: row.doc_project_name,
+          docProjectNames: row.doc_project_names,
+          tags: row.tags
         }))
       }
     };
