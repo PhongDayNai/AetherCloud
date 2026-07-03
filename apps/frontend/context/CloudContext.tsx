@@ -49,8 +49,8 @@ interface CloudContextType {
   setTab: React.Dispatch<React.SetStateAction<'photos' | 'docs' | 'dashboard' | 'space' | 'space-all' | 'spaces'>>;
   search: string;
   setSearch: React.Dispatch<React.SetStateAction<string>>;
-  activeWorkspace: { type: 'personal' } | { type: 'space'; id: string; name: string; spaceType: string };
-  setActiveWorkspace: React.Dispatch<React.SetStateAction<{ type: 'personal' } | { type: 'space'; id: string; name: string; spaceType: string }>>;
+  activeWorkspace: { type: 'personal' } | { type: 'group'; id: string; name: string; role: 'owner' | 'admin' | 'member' } | { type: 'space'; id: string; name: string; spaceType: string; groupId?: string };
+  setActiveWorkspace: React.Dispatch<React.SetStateAction<{ type: 'personal' } | { type: 'group'; id: string; name: string; role: 'owner' | 'admin' | 'member' } | { type: 'space'; id: string; name: string; spaceType: string; groupId?: string }>>;
   spaces: any[];
   setSpaces: React.Dispatch<React.SetStateAction<any[]>>;
   posts: any[];
@@ -61,6 +61,14 @@ interface CloudContextType {
   setPostFiles: React.Dispatch<React.SetStateAction<File[]>>;
   saveToPersonalPost: boolean;
   setSaveToPersonalPost: (val: boolean) => void;
+  groups: any[];
+  setGroups: React.Dispatch<React.SetStateAction<any[]>>;
+  saveToPersonalGroupUpload: boolean;
+  setSaveToPersonalGroupUpload: (val: boolean) => void;
+  processingVideoIds: string[];
+  setProcessingVideoIds: React.Dispatch<React.SetStateAction<string[]>>;
+  isRefreshing: boolean;
+  setIsRefreshing: React.Dispatch<React.SetStateAction<boolean>>;
 
   selectionMode: boolean;
   setSelectionMode: React.Dispatch<React.SetStateAction<boolean>>;
@@ -107,6 +115,8 @@ interface CloudContextType {
   setDocKindsExpanded: React.Dispatch<React.SetStateAction<boolean>>;
   collectionView: 'all' | 'recent' | 'images' | 'videos' | 'trash';
   setCollectionView: React.Dispatch<React.SetStateAction<'all' | 'recent' | 'images' | 'videos' | 'trash'>>;
+  spacesSubTab: 'active' | 'trash';
+  setSpacesSubTab: React.Dispatch<React.SetStateAction<'active' | 'trash'>>;
   albumsExpanded: boolean;
   setAlbumsExpanded: React.Dispatch<React.SetStateAction<boolean>>;
   docProjects: DocProject[];
@@ -138,6 +148,15 @@ interface CloudContextType {
   setShowEditSpaceModal: React.Dispatch<React.SetStateAction<boolean>>;
   editingSpace: { id: string; name: string; type: 'journal' | 'collection' | 'project'; description: string } | null;
   setEditingSpace: React.Dispatch<React.SetStateAction<{ id: string; name: string; type: 'journal' | 'collection' | 'project'; description: string } | null>>;
+  showCreateGroupModal: boolean;
+  setShowCreateGroupModal: React.Dispatch<React.SetStateAction<boolean>>;
+  showGroupSettingsModal: boolean;
+  setShowGroupSettingsModal: React.Dispatch<React.SetStateAction<boolean>>;
+  showBulkShareModal: boolean;
+  setShowBulkShareModal: React.Dispatch<React.SetStateAction<boolean>>;
+  showUploadModal: boolean;
+  setShowUploadModal: React.Dispatch<React.SetStateAction<boolean>>;
+  uploadFiles: (files: File[]) => Promise<void>;
 
   // Operations
   handleLogout: () => Promise<void>;
@@ -148,6 +167,13 @@ interface CloudContextType {
   loadAlbums: () => Promise<void>;
   loadDocProjects: () => Promise<void>;
   loadTags: () => Promise<void>;
+  handleCreateGroup: (name: string) => Promise<boolean>;
+  handleDeleteSpace: (id: string) => Promise<boolean>;
+  handleRestoreSpace: (id: string) => Promise<boolean>;
+  handlePurgeSpace: (id: string) => Promise<boolean>;
+  deleteSelectedSpaces: (ids: string[]) => Promise<void>;
+  restoreSelectedSpaces: (ids: string[]) => Promise<void>;
+  purgeSelectedSpaces: (ids: string[]) => Promise<void>;
   
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   moveSelectedToTrash: () => Promise<void>;
@@ -274,7 +300,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const [tab, setTab] = useState<'photos' | 'docs' | 'dashboard' | 'space' | 'space-all' | 'spaces'>('dashboard');
   const [search, setSearch] = useState<string>('');
 
-  const [activeWorkspace, setActiveWorkspace] = useState<{ type: 'personal' } | { type: 'space'; id: string; name: string; spaceType: string }>({ type: 'personal' });
+  const [activeWorkspace, setActiveWorkspace] = useState<{ type: 'personal' } | { type: 'group'; id: string; name: string; role: 'owner' | 'admin' | 'member' } | { type: 'space'; id: string; name: string; spaceType: string; groupId?: string }>({ type: 'personal' });
   const [spaces, setSpaces] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [postCaption, setPostCaption] = useState<string>('');
@@ -294,6 +320,25 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('aethercloud_save_to_personal_post_upload', String(val));
     }
   };
+
+  const [groups, setGroups] = useState<any[]>([]);
+  const [saveToPersonalGroupUpload, setSaveToPersonalGroupUploadState] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('aethercloud_save_to_personal_group_upload');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const setSaveToPersonalGroupUpload = (val: boolean) => {
+    setSaveToPersonalGroupUploadState(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aethercloud_save_to_personal_group_upload', String(val));
+    }
+  };
+
+  const [processingVideoIds, setProcessingVideoIds] = useState<string[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   const [selectionMode, setSelectionMode] = useState<boolean>(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -330,6 +375,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const [allFilesCollectionView, setAllFilesCollectionView] = useState<'all' | 'recent' | 'trash'>('all');
   const [docKindsExpanded, setDocKindsExpanded] = useState<boolean>(false);
   const [collectionView, setCollectionView] = useState<'all' | 'recent' | 'images' | 'videos' | 'trash'>('all');
+  const [spacesSubTab, setSpacesSubTab] = useState<'active' | 'trash'>('active');
   const [albumsExpanded, setAlbumsExpanded] = useState<boolean>(false);
   const [docProjects, setDocProjects] = useState<DocProject[]>([]);
   const [docProjectsExpanded, setDocProjectsExpanded] = useState<boolean>(false);
@@ -346,9 +392,54 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const [showCreateSpaceModal, setShowCreateSpaceModal] = useState<boolean>(false);
   const [showEditSpaceModal, setShowEditSpaceModal] = useState<boolean>(false);
   const [editingSpace, setEditingSpace] = useState<{ id: string; name: string; type: 'journal' | 'collection' | 'project'; description: string } | null>(null);
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState<boolean>(false);
+  const [showGroupSettingsModal, setShowGroupSettingsModal] = useState<boolean>(false);
+  const [showBulkShareModal, setShowBulkShareModal] = useState<boolean>(false);
+  const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
 
   const longPressRef = useRef<NodeJS.Timeout | null>(null);
   const suppressClickRef = useRef<string | null>(null);
+
+  // Polling for processing videos
+  useEffect(() => {
+    if (processingVideoIds.length === 0) return;
+    
+    const interval = setInterval(async () => {
+      try {
+        const idsParam = processingVideoIds.join(',');
+        const res = await fetch(`${api}/api/assets/status?ids=${idsParam}`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          const statusesList = Array.isArray(data.statuses) ? data.statuses : [];
+          let hasChanges = false;
+          let newIds = [...processingVideoIds];
+          
+          for (const item of statusesList) {
+            const { id, processingStatus } = item;
+            if (processingStatus === 'ready' || processingStatus === 'failed') {
+              hasChanges = true;
+              newIds = newIds.filter(x => x !== id);
+              
+              if (processingStatus === 'ready') {
+                setAssets(prev => prev.map(a => a.id === id ? { ...a, processingStatus: 'ready' } : a));
+              } else {
+                addToast(t('viewer.videoOptimizeFailed') || `Tệp video ${id} bị transcode lỗi.`, 'error');
+              }
+            }
+          }
+          
+          if (hasChanges) {
+            setProcessingVideoIds(newIds);
+            loadData(true);
+          }
+        }
+      } catch (err) {
+        console.error("Video processing polling error:", err);
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [processingVideoIds, api]);
 
   // Derived memos
   const filteredAssets = useMemo(() => {
@@ -569,11 +660,15 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   async function handleCreateSpace(name: string, type: 'journal' | 'collection' | 'project', description: string): Promise<boolean> {
     try {
       setMsg(t('spaces.creating') || "Đang tạo không gian con...");
+      const body: any = { name: name.trim(), type: type.toLowerCase(), description: description.trim() };
+      if (activeWorkspace.type === 'group') {
+        body.groupId = activeWorkspace.id;
+      }
       const r = await fetch(`${api}/api/spaces`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), type: type.toLowerCase(), description: description.trim() }),
+        body: JSON.stringify(body),
       });
       if (!r.ok) {
         const errorData = await r.json().catch(() => ({}));
@@ -610,7 +705,8 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
             type: 'space',
             id: id,
             name: data.space.name,
-            spaceType: data.space.type
+            spaceType: data.space.type,
+            groupId: data.space.groupId
           };
         }
         return prev;
@@ -620,6 +716,124 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
     } catch (e: any) {
       setErr(e.message || t('spaces.updateErr') || "Lỗi cập nhật không gian");
       throw e;
+    }
+  }
+
+  async function handleDeleteSpace(id: string): Promise<boolean> {
+    try {
+      const r = await fetch(`${api}/api/spaces/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!r.ok) {
+        const errorData = await r.json().catch(() => ({}));
+        throw new Error(errorData.message || t('spaces.deleteFailed'));
+      }
+      setSpaces(prev => prev.filter(s => s.id !== id));
+      addToast(t('spaces.deleteSuccess'), 'info');
+      return true;
+    } catch (e: any) {
+      addToast(e.message || t('spaces.deleteFailed'), 'error');
+      return false;
+    }
+  }
+
+  async function handleRestoreSpace(id: string): Promise<boolean> {
+    try {
+      const r = await fetch(`${api}/api/spaces/${id}/restore`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!r.ok) {
+        const errorData = await r.json().catch(() => ({}));
+        throw new Error(errorData.message || t('spaces.restoreFailed'));
+      }
+      const data = await r.json();
+      setSpaces(prev => [data.space, ...prev]);
+      addToast(t('spaces.restoreSuccess'), 'info');
+      return true;
+    } catch (e: any) {
+      addToast(e.message || t('spaces.restoreFailed'), 'error');
+      return false;
+    }
+  }
+
+  async function handlePurgeSpace(id: string): Promise<boolean> {
+    try {
+      const r = await fetch(`${api}/api/spaces/${id}/purge`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!r.ok) {
+        const errorData = await r.json().catch(() => ({}));
+        throw new Error(errorData.message || t('spaces.purgeFailed'));
+      }
+      addToast(t('spaces.purgeSuccess'), 'info');
+      return true;
+    } catch (e: any) {
+      addToast(e.message || t('spaces.purgeFailed'), 'error');
+      return false;
+    }
+  }
+
+  async function deleteSelectedSpaces(ids: string[]) {
+    if (ids.length === 0) return;
+    try {
+      const results = await Promise.all(ids.map(id => handleDeleteSpace(id)));
+      const successCount = results.filter(Boolean).length;
+      if (successCount > 0) {
+        await loadData(true);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function restoreSelectedSpaces(ids: string[]) {
+    if (ids.length === 0) return;
+    try {
+      const results = await Promise.all(ids.map(id => handleRestoreSpace(id)));
+      const successCount = results.filter(Boolean).length;
+      if (successCount > 0) {
+        await loadData(true);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function purgeSelectedSpaces(ids: string[]) {
+    if (ids.length === 0) return;
+    try {
+      const results = await Promise.all(ids.map(id => handlePurgeSpace(id)));
+      const successCount = results.filter(Boolean).length;
+      if (successCount > 0) {
+        await loadData(true);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleCreateGroup(name: string): Promise<boolean> {
+    try {
+      const r = await fetch(`${api}/api/groups`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (!r.ok) {
+        const errData = await r.json().catch(() => ({}));
+        throw new Error(errData.message || "Tạo nhóm thất bại");
+      }
+      const data = await r.json();
+      addToast(t('groups.createSuccess') || "Tạo nhóm thành công!", 'info');
+      await loadData();
+      return true;
+    } catch (e: any) {
+      addToast(e.message || "Lỗi tạo nhóm", 'error');
+      return false;
     }
   }
 
@@ -656,15 +870,25 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
 
   // 1. Tính toán current key
   const currentPhotosKey = useMemo(() => {
+    const prefix = activeWorkspace.type === 'group' 
+      ? `group_${activeWorkspace.id}` 
+      : activeWorkspace.type === 'space' 
+      ? `space_${activeWorkspace.id}` 
+      : 'personal';
     const sortedTags = selectedFilterTags.slice().sort().join(',');
-    return `${collectionView}::${selectedAlbum}::${sortedTags}`;
-  }, [collectionView, selectedAlbum, selectedFilterTags]);
+    return `${prefix}::${collectionView}::${selectedAlbum}::${sortedTags}`;
+  }, [collectionView, selectedAlbum, selectedFilterTags, activeWorkspace]);
 
   const currentDocsKey = useMemo(() => {
+    const prefix = activeWorkspace.type === 'group' 
+      ? `group_${activeWorkspace.id}` 
+      : activeWorkspace.type === 'space' 
+      ? `space_${activeWorkspace.id}` 
+      : 'personal';
     const sortedTags = selectedFilterTags.slice().sort().join(',');
     const sortedCats = docCategoryFilter.slice().sort().join(',');
-    return `${sortedCats}::${docTypeFilter}::${selectedDocProject}::${docCollectionView}::${sortedTags}`;
-  }, [docCategoryFilter, docTypeFilter, selectedDocProject, docCollectionView, selectedFilterTags]);
+    return `${prefix}::${sortedCats}::${docTypeFilter}::${selectedDocProject}::${docCollectionView}::${sortedTags}`;
+  }, [docCategoryFilter, docTypeFilter, selectedDocProject, docCollectionView, selectedFilterTags, activeWorkspace]);
 
   // 2. Tìm phần tử neo hiển thị đầu tiên trong viewport
   const findFirstVisibleAssetId = (): string | null => {
@@ -697,10 +921,16 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   // 4. Background Sync Photos
   const syncPhotosInBackground = async (key: string) => {
     try {
-      const [colView, album, tagsStr] = key.split('::');
+      const parts = key.split('::');
+      const [colView, album, tagsStr] = parts.length > 3 ? parts.slice(1) : parts;
       const params = new URLSearchParams();
       params.append('limit', '100');
       params.append('type', 'photos');
+      if (activeWorkspace.type === 'group') {
+        params.append('groupId', activeWorkspace.id);
+      } else if (activeWorkspace.type === 'space' && activeWorkspace.groupId) {
+        params.append('groupId', activeWorkspace.groupId);
+      }
       if (colView === 'images') params.append('subType', 'image');
       if (colView === 'videos') params.append('subType', 'video');
       if (colView === 'trash') {
@@ -726,10 +956,16 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   // 5. Background Sync Docs
   const syncDocsInBackground = async (key: string) => {
     try {
-      const [catFilter, typeFilter, project, docColView, tagsStr] = key.split('::');
+      const parts = key.split('::');
+      const [catFilter, typeFilter, project, docColView, tagsStr] = parts.length > 5 ? parts.slice(1) : parts;
       const params = new URLSearchParams();
       params.append('limit', '100');
       params.append('type', 'docs');
+      if (activeWorkspace.type === 'group') {
+        params.append('groupId', activeWorkspace.id);
+      } else if (activeWorkspace.type === 'space' && activeWorkspace.groupId) {
+        params.append('groupId', activeWorkspace.groupId);
+      }
       if (docColView === 'trash') {
         params.append('onlyTrash', 'true');
       } else {
@@ -857,10 +1093,16 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const fetchPhotosFromServer = async (key: string, cursor: string | null, isAppend = false) => {
     setIsLoadingMore(true);
     try {
-      const [colView, album, tagsStr] = key.split('::');
+      const parts = key.split('::');
+      const [colView, album, tagsStr] = parts.length > 3 ? parts.slice(1) : parts;
       const params = new URLSearchParams();
       params.append('limit', '100');
       params.append('type', 'photos');
+      if (activeWorkspace.type === 'group') {
+        params.append('groupId', activeWorkspace.id);
+      } else if (activeWorkspace.type === 'space' && activeWorkspace.groupId) {
+        params.append('groupId', activeWorkspace.groupId);
+      }
       if (colView === 'images') params.append('subType', 'image');
       if (colView === 'videos') params.append('subType', 'video');
       if (colView === 'trash') {
@@ -918,10 +1160,16 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const fetchDocsFromServer = async (key: string, cursor: string | null, isAppend = false) => {
     setIsLoadingMore(true);
     try {
-      const [catFilter, typeFilter, project, docColView, tagsStr] = key.split('::');
+      const parts = key.split('::');
+      const [catFilter, typeFilter, project, docColView, tagsStr] = parts.length > 5 ? parts.slice(1) : parts;
       const params = new URLSearchParams();
       params.append('limit', '100');
       params.append('type', 'docs');
+      if (activeWorkspace.type === 'group') {
+        params.append('groupId', activeWorkspace.id);
+      } else if (activeWorkspace.type === 'space' && activeWorkspace.groupId) {
+        params.append('groupId', activeWorkspace.groupId);
+      }
       if (docColView === 'trash') {
         params.append('onlyTrash', 'true');
       } else {
@@ -1041,9 +1289,28 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
         setShowSettingsModal(true);
       }
 
+      // Fetch groups
+      const groupsRes = await fetch(`${api}/api/groups`, { credentials: 'include' });
+      let groupsList = [];
+      if (groupsRes.ok) {
+        const groupsData = await groupsRes.json();
+        groupsList = groupsData.groups || [];
+        setGroups(groupsList);
+      }
+
+      let gId: string | null = null;
+      if (activeWorkspace.type === 'group') {
+        gId = activeWorkspace.id;
+      } else if (activeWorkspace.type === 'space' && activeWorkspace.groupId) {
+        gId = activeWorkspace.groupId;
+      }
+
+      const statsUrl = gId ? `${api}/api/assets/stats?groupId=${gId}` : `${api}/api/assets/stats`;
+      const spacesUrl = gId ? `${api}/api/spaces?groupId=${gId}&includeTrash=true` : `${api}/api/spaces?includeTrash=true`;
+
       const [statsRes, spacesRes] = await Promise.all([
-        fetch(`${api}/api/assets/stats`, { credentials: 'include' }),
-        fetch(`${api}/api/spaces`, { credentials: 'include' }),
+        fetch(statsUrl, { credentials: 'include' }),
+        fetch(spacesUrl, { credentials: 'include' }),
       ]);
       if (!statsRes.ok || !spacesRes.ok) throw new Error(t('messages.apiErrorOrSessionExpired'));
       const statsData = await statsRes.json();
@@ -1062,6 +1329,14 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
           const postsData = await postsRes.json();
           setPosts(postsData.posts || []);
         }
+      }
+
+      // Fetch processing videos
+      const processingUrl = gId ? `${api}/api/assets/processing?groupId=${gId}` : `${api}/api/assets/processing`;
+      const procRes = await fetch(processingUrl, { credentials: 'include' });
+      if (procRes.ok) {
+        const procData = await procRes.json();
+        setProcessingVideoIds(procData.ids || []);
       }
     } catch (e: any) {
       setErr(e.message || t('messages.loadDataFailed'));
@@ -1093,7 +1368,9 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
 
   async function loadAlbums() {
     try {
-      const r = await fetch(`${api}/api/assets/albums`, { credentials: 'include' });
+      const gId = activeWorkspace.type === 'group' ? activeWorkspace.id : (activeWorkspace.type === 'space' && activeWorkspace.groupId ? activeWorkspace.groupId : null);
+      const url = gId ? `${api}/api/assets/albums?groupId=${gId}` : `${api}/api/assets/albums`;
+      const r = await fetch(url, { credentials: 'include' });
       if (!r.ok) throw new Error(t('viewer.errorLoadAlbum'));
       const data = await r.json();
       setAlbums(data.items || []);
@@ -1104,7 +1381,9 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
 
   async function loadDocProjects() {
     try {
-      const r = await fetch(`${api}/api/assets/doc-projects`, { credentials: 'include' });
+      const gId = activeWorkspace.type === 'group' ? activeWorkspace.id : (activeWorkspace.type === 'space' && activeWorkspace.groupId ? activeWorkspace.groupId : null);
+      const url = gId ? `${api}/api/assets/doc-projects?groupId=${gId}` : `${api}/api/assets/doc-projects`;
+      const r = await fetch(url, { credentials: 'include' });
       if (!r.ok) throw new Error(t('viewer.errorLoadDocProjects'));
       const data = await r.json();
       setDocProjects(data.items || []);
@@ -1115,7 +1394,9 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
 
   async function loadTags() {
     try {
-      const r = await fetch(`${api}/api/assets/tags`, { credentials: 'include' });
+      const gId = activeWorkspace.type === 'group' ? activeWorkspace.id : (activeWorkspace.type === 'space' && activeWorkspace.groupId ? activeWorkspace.groupId : null);
+      const url = gId ? `${api}/api/assets/tags?groupId=${gId}` : `${api}/api/assets/tags`;
+      const r = await fetch(url, { credentials: 'include' });
       if (!r.ok) throw new Error(t('viewer.tagsLoadFailed'));
       const data = await r.json();
       setTags(data.items || []);
@@ -1125,11 +1406,22 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function uploadLargeFileByChunks(file: File, translateFn: (key: string, replacements?: Record<string, string | number>) => string) {
+    const isGroup = activeWorkspace.type === 'group';
+    const initBody: any = { 
+      fileName: file.name, 
+      mime: file.type || 'application/octet-stream', 
+      totalSize: file.size, 
+      lastModified: file.lastModified 
+    };
+    if (isGroup) {
+      initBody.groupId = activeWorkspace.id;
+      initBody.saveToPersonal = saveToPersonalGroupUpload;
+    }
     const init = await fetch(`${api}/api/assets/upload-chunk/init`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: file.name, mime: file.type || 'application/octet-stream', totalSize: file.size, lastModified: file.lastModified }),
+      body: JSON.stringify(initBody),
     });
     if (!init.ok) {
       const detail = await readErrorMessage(init, translateFn);
@@ -1186,8 +1478,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
+  async function uploadFiles(files: File[]) {
     if (!files.length) return;
 
     const failed = [];
@@ -1217,6 +1508,10 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
           const form = new FormData();
           form.append('files', file);
           form.append('lastModified', String(file.lastModified));
+          if (activeWorkspace.type === 'group') {
+            form.append('groupId', activeWorkspace.id);
+            form.append('saveToPersonal', String(saveToPersonalGroupUpload));
+          }
           const r = await fetch(`${api}/api/assets/upload`, {
             method: 'POST',
             credentials: 'include',
@@ -1239,7 +1534,6 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
     }
 
     await invalidateCacheAndReload();
-    e.target.value = '';
 
     if (failed.length === 0) {
       setMsg(t('messages.uploadDone', { done, total: files.length }));
@@ -1249,6 +1543,12 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
     const lines = failed.map((f) => `- #${f.index} ${f.name} | ${f.kind} | ${f.sizeMb}MB | ${f.mode} | ${f.reason}`);
     setErr(`${t('messages.uploadHasErrors', { failed: failed.length, total: files.length })}:\n${lines.join('\n')}`);
     setMsg(t('messages.uploadDoneWithErrors', { done, total: files.length, failed: failed.length }));
+  }
+
+  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    await uploadFiles(files);
+    e.target.value = '';
   }
 
   async function moveSelectedToTrash() {
@@ -1492,12 +1792,10 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
     setActiveIndex(-1);
   }, [tab, collectionView, selectedAlbum, docCollectionView, docCategoryFilter, selectedDocProject, selectedFilterTags]);
 
-  // Initial load
+  // Load data when activeWorkspace or tab changes
   useEffect(() => {
-    loadData();
-    loadAlbums();
-    loadDocProjects();
-  }, [activeWorkspace]);
+    loadData(true);
+  }, [activeWorkspace, tab]);
 
   return (
     <CloudContext.Provider value={{
@@ -1518,6 +1816,10 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       postCaption, setPostCaption,
       postFiles, setPostFiles,
       saveToPersonalPost, setSaveToPersonalPost,
+      groups, setGroups,
+      saveToPersonalGroupUpload, setSaveToPersonalGroupUpload,
+      processingVideoIds, setProcessingVideoIds,
+      isRefreshing, setIsRefreshing,
       selectionMode, setSelectionMode,
       selectedIds, setSelectedIds,
       activeIndex, setActiveIndex,
@@ -1540,6 +1842,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       allFilesCollectionView, setAllFilesCollectionView,
       docKindsExpanded, setDocKindsExpanded,
       collectionView, setCollectionView,
+      spacesSubTab, setSpacesSubTab,
       albumsExpanded, setAlbumsExpanded,
       docProjects, setDocProjects,
       docProjectsExpanded, setDocProjectsExpanded,
@@ -1555,12 +1858,17 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       showCreateSpaceModal, setShowCreateSpaceModal,
       showEditSpaceModal, setShowEditSpaceModal,
       editingSpace, setEditingSpace,
+      showCreateGroupModal, setShowCreateGroupModal,
+      showGroupSettingsModal, setShowGroupSettingsModal,
+      showBulkShareModal, setShowBulkShareModal,
+      showUploadModal, setShowUploadModal,
       
       // operations
       handleLogout,
       handleCreateSpace,
       handleUpdateSpace,
       handleCreatePost,
+      uploadFiles,
       loadData,
       loadAlbums,
       loadDocProjects,
@@ -1581,6 +1889,13 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       createNewTagInSelection,
       saveActiveTags,
       toggleFilterTag,
+      handleCreateGroup,
+      handleDeleteSpace,
+      handleRestoreSpace,
+      handlePurgeSpace,
+      deleteSelectedSpaces,
+      restoreSelectedSpaces,
+      purgeSelectedSpaces,
 
       // derived
       filteredAssets,
