@@ -7,6 +7,11 @@ import MediaViewer from '../../components/MediaViewer';
 import SettingsModal from '../../components/SettingsModal';
 import CreateSpaceModal from '../../components/CreateSpaceModal';
 import EditSpaceModal from '../../components/EditSpaceModal';
+import CreateGroupModal from '../../components/CreateGroupModal';
+import GroupSettingsModal from '../../components/GroupSettingsModal';
+import BulkShareModal from '../../components/BulkShareModal';
+import UploadModal from '../../components/UploadModal';
+import ProcessingBadge from '../../components/ProcessingBadge';
 import { useCloud, ToastItem } from '../../context/CloudContext';
 
 interface ToastProps {
@@ -68,11 +73,12 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
     tags, selectedFilterTags, toggleFilterTag, setSelectedFilterTags,
     usage, showProfileMenu, setShowProfileMenu, user,
     setShowSettingsModal, handleLogout, t, activeWorkspace,
-    setActiveWorkspace, spaces,
+    setActiveWorkspace, spaces, spacesSubTab,
 
     search, setSearch, selectionMode, selectedIds, onUpload, addSelectedToAlbum,
     addSelectedToDocProject, moveSelectedToTrash, restoreSelectedFromTrash,
-    purgeSelectedForever, msg, err,
+    purgeSelectedForever, deleteSelectedSpaces, restoreSelectedSpaces,
+    purgeSelectedSpaces, msg, err,
     toasts, removeToast,
 
     active, albumFilteredPhotos, docsFiltered, activeIndex, setActiveIndex,
@@ -95,8 +101,46 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
     showCreateSpaceModal, setShowCreateSpaceModal, handleCreateSpace,
     showEditSpaceModal, setShowEditSpaceModal, editingSpace, setEditingSpace, handleUpdateSpace,
     allActiveAssets, spaceAssets, stats,
-    showScrollAnchorBtn, scrollToAnchor
+    showScrollAnchorBtn, scrollToAnchor,
+    groups, handleCreateGroup,
+    showCreateGroupModal, setShowCreateGroupModal,
+    showGroupSettingsModal, setShowGroupSettingsModal,
+    showBulkShareModal, setShowBulkShareModal
   } = useCloud();
+
+  const handleBulkDelete = async () => {
+    if (tab === 'spaces') {
+      if (window.confirm(t('spaces.confirmDeleteMultiple') || 'Bạn có chắc muốn đưa các không gian đã chọn vào thùng rác?')) {
+        await deleteSelectedSpaces(selectedIds);
+        setSelectedIds([]);
+        setSelectionMode(false);
+      }
+    } else {
+      await moveSelectedToTrash();
+    }
+  };
+
+  const handleBulkRestore = async () => {
+    if (tab === 'spaces') {
+      await restoreSelectedSpaces(selectedIds);
+      setSelectedIds([]);
+      setSelectionMode(false);
+    } else {
+      await restoreSelectedFromTrash();
+    }
+  };
+
+  const handleBulkPurge = async () => {
+    if (tab === 'spaces') {
+      if (window.confirm(t('spaces.confirmPurgeMultiple') || 'CẢNH BÁO: Hành động này sẽ XÓA VĨNH VIỄN các không gian đã chọn và toàn bộ dữ liệu bên trong. Không thể khôi phục! Bạn chắc chắn muốn tiếp tục?')) {
+        await purgeSelectedSpaces(selectedIds);
+        setSelectedIds([]);
+        setSelectionMode(false);
+      }
+    } else {
+      await purgeSelectedForever();
+    }
+  };
 
   return (
     <div className="shell">
@@ -158,14 +202,14 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
           selectedIds={selectedIds}
           setSelectedIds={setSelectedIds}
           tab={tab}
-          collectionView={collectionView}
+          collectionView={tab === 'spaces' ? spacesSubTab : collectionView}
           docCollectionView={docCollectionView}
           onUpload={onUpload}
           addSelectedToAlbum={addSelectedToAlbum}
           addSelectedToDocProject={addSelectedToDocProject}
-          moveSelectedToTrash={moveSelectedToTrash}
-          restoreSelectedFromTrash={restoreSelectedFromTrash}
-          purgeSelectedForever={purgeSelectedForever}
+          moveSelectedToTrash={handleBulkDelete}
+          restoreSelectedFromTrash={handleBulkRestore}
+          purgeSelectedForever={handleBulkPurge}
           t={t}
         />
 
@@ -175,7 +219,9 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
           ))}
         </div>
 
-        {children}
+        <div key={`${activeWorkspace.type}-${activeWorkspace.type === 'personal' ? 'personal' : activeWorkspace.id}-${tab}-${collectionView}`} className="pageContentTransition">
+          {children}
+        </div>
       </main>
 
       <MediaViewer
@@ -249,6 +295,24 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
         space={editingSpace}
         onUpdate={handleUpdateSpace}
       />
+      <CreateGroupModal
+        isOpen={showCreateGroupModal}
+        onClose={() => setShowCreateGroupModal(false)}
+        onCreate={handleCreateGroup}
+      />
+      <GroupSettingsModal
+        isOpen={showGroupSettingsModal}
+        onClose={() => setShowGroupSettingsModal(false)}
+        group={activeWorkspace.type === 'group' ? activeWorkspace : null}
+      />
+      <BulkShareModal
+        isOpen={showBulkShareModal}
+        onClose={() => setShowBulkShareModal(false)}
+        selectedIds={selectedIds}
+        groups={groups}
+      />
+      <UploadModal />
+      <ProcessingBadge />
 
       {showScrollAnchorBtn && (
         <button className="scrollAnchorBtn" onClick={scrollToAnchor}>
@@ -448,6 +512,23 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
             padding-bottom: 0;
             border-top-width: 0;
             border-bottom-width: 0;
+          }
+        }
+        .pageContentTransition {
+          animation: pageFadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+        }
+        @keyframes pageFadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
           }
         }
       `}</style>

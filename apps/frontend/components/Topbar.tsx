@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useCloud } from '../context/CloudContext';
 
 interface TopbarProps {
   search: string;
@@ -39,6 +40,8 @@ export default function Topbar({
   purgeSelectedForever,
   t
 }: TopbarProps): React.JSX.Element {
+  const { activeWorkspace, setShowBulkShareModal, setShowUploadModal } = useCloud();
+
   return (
     <header className="topbar">
       <input 
@@ -49,10 +52,9 @@ export default function Topbar({
       />
 
       <div className="actions">
-        <label className="uploadBtn">
+        <div className="uploadBtn" onClick={() => setShowUploadModal(true)} style={{ userSelect: 'none' }}>
           {t('actions.upload')}
-          <input type="file" multiple onChange={onUpload} hidden />
-        </label>
+        </div>
 
         <button className="ghost" onClick={() => { setSelectionMode((v) => !v); if (selectionMode) setSelectedIds([]); }}>
           {selectionMode ? t('actions.exitSelect', { count: selectedIds.length }) : t('actions.selectMultiple')}
@@ -60,10 +62,19 @@ export default function Topbar({
 
         {selectionMode && selectedIds.length > 0 && (
           <>
-            {(tab === 'photos' && collectionView !== 'trash') || (tab === 'docs' && docCollectionView !== 'trash') ? (
+            {(tab === 'photos' && collectionView !== 'trash') || 
+             (tab === 'docs' && docCollectionView !== 'trash') ||
+             (tab === 'spaces' && collectionView !== 'trash') ? (
               <>
                 {tab === 'photos' && <button className="ghost" onClick={addSelectedToAlbum}>{t('actions.addToAlbum')}</button>}
                 {tab === 'docs' && <button className="ghost" onClick={addSelectedToDocProject}>{t('actions.addToProject')}</button>}
+                
+                {activeWorkspace.type === 'personal' && tab !== 'spaces' && (
+                  <button className="ghost" onClick={() => setShowBulkShareModal(true)}>
+                    {t('actions.shareToGroup') || 'Chia sẻ vào Nhóm'}
+                  </button>
+                )}
+                
                 <button className="danger" onClick={moveSelectedToTrash}>{t('actions.delete')}</button>
               </>
             ) : (
