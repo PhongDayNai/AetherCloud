@@ -13,6 +13,8 @@ import {
   getHlsDirAbsPathFromAsset,
   Asset,
   getUnifiedStats,
+  LIBRARY_PATH,
+  isEditableTextAsset,
 } from '../lib/assets';
 import { getStorageUsage } from '../lib/storage';
 import { isValidUUID, filterValidUUIDs, isGroupMember, getGroupMemberRole } from '../lib/utils';
@@ -47,6 +49,9 @@ const chunkSessions = new Map<string, ChunkSession>();
 // Middleware kiểm tra quyền sở hữu đối với 1 asset
 async function checkAssetOwnership(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params;
+  if (!isValidUUID(id)) {
+    return res.status(400).json({ message: 'Invalid ID format' });
+  }
   try {
     const asset = await getAsset(id);
     if (!asset) return res.status(404).json({ message: 'File not found' });
@@ -594,6 +599,420 @@ router.get('/status', requireAuth, async (req: Request, res: Response) => {
 // 20. GET thông tin chi tiết của 1 asset
 router.get('/:id', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
   return res.json(req.asset);
+});
+
+// 21. PUT cập nhật nội dung tệp (Write content với OCC)
+router.put('/:id/content', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { content, version } = req.body || {};
+
+  if (typeof content !== 'string') {
+    return res.status(400).json({ message: 'Content must be a string' });
+  }
+  if (typeof version !== 'number') {
+    return res.status(400).json({ message: 'Version number must be a number' });
+  }
+
+  const asset = req.asset!;
+  if (asset.isDeleted) {
+    return res.status(400).json({ message: 'Cannot modify a file that is in the trash.' });
+  }
+  if (!isEditableTextAsset(asset)) {
+    return res.status(400).json({ message: 'This file type is not editable.' });
+  }
+
+  const currentAbsPath = getAbsPathFromAsset(asset);
+
+  // OCC: check version
+  if (version !== asset.version) {
+    let serverContent = '';
+    try {
+      let activeExists = false;
+      try {
+        await fs.promises.access(currentAbsPath, fs.constants.F_OK);
+        activeExists = true;
+      } catch {}
+      if (activeExists) {
+        serverContent = await fs.promises.readFile(currentAbsPath, 'utf8');
+      }
+    } catch (e: any) {
+      console.error('[OCC] Error reading server content:', e.message);
+    }
+    return res.status(409).json({
+      message: 'Conflict',
+      serverContent,
+    });
+  }
+
+  const client = await db.pool.connect();
+  let tempFilePath = '';
+  let backupAbsPath = '';
+  try {
+    // 1. Chuẩn bị thư mục và đường dẫn sao lưu
+    const versionsDir = path.join(LIBRARY_PATH, 'derived', 'versions', id);
+    await fs.promises.mkdir(versionsDir, { recursive: true });
+
+    const backupFileName = `${asset.version}.bin`;
+    backupAbsPath = path.join(versionsDir, backupFileName);
+
+    // 2. Ghi nội dung mới vào tệp tạm để đảm bảo an toàn giao dịch
+    tempFilePath = currentAbsPath + '.tmp';
+    await fs.promises.writeFile(tempFilePath, content, 'utf8');
+    const tempStat = await fs.promises.stat(tempFilePath);
+    const newSize = tempStat.size;
+
+    await client.query('BEGIN');
+
+    // Sao lưu file hiện tại thành một phiên bản cũ
+    let activeExists = false;
+    try {
+      await fs.promises.access(currentAbsPath, fs.constants.F_OK);
+      activeExists = true;
+    } catch {}
+
+    if (activeExists) {
+      await fs.promises.copyFile(currentAbsPath, backupAbsPath);
+    } else {
+      await fs.promises.writeFile(currentAbsPath, '', 'utf8');
+      await fs.promises.copyFile(currentAbsPath, backupAbsPath);
+    }
+
+    const backupRelPath = path.relative(LIBRARY_PATH, backupAbsPath).replaceAll('\\', '/');
+    const backupStat = await fs.promises.stat(backupAbsPath);
+    const backupSize = backupStat.size;
+
+    const versionId = crypto.randomUUID();
+    const versionCreator = asset.lastModifiedById || asset.ownerId;
+    await client.query(`
+      INSERT INTO asset_versions (id, asset_id, version_number, rel_path, size, created_at, created_by)
+      VALUES ($1, $2, $3, $4, $5, NOW(), $6)
+    `, [versionId, id, asset.version, backupRelPath, backupSize, versionCreator]);
+
+    // 3. Cập nhật thông tin asset chính
+    const nextVersion = asset.version + 1;
+    const nowStr = new Date().toISOString();
+    const updateRes = await client.query(`
+      UPDATE assets
+      SET version = version + 1, size = $1, uploaded_at = $2, last_modified_by = $3
+      WHERE id = $4 AND version = $5
+    `, [newSize, nowStr, req.user!.sub, id, asset.version]);
+
+    if (updateRes.rowCount === 0) {
+      throw new Error('OCC_CONFLICT');
+    }
+
+    // Ghi nhận giao dịch DB thành công
+    await client.query('COMMIT');
+
+    // 4. Đổi tên tệp tạm thành tệp chính (hoạt động nguyên tử - atomic operation)
+    await fs.promises.rename(tempFilePath, currentAbsPath);
+
+    return res.json({ ok: true, version: nextVersion, size: newSize, uploadedAt: nowStr });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    
+    // Dọn dẹp tệp rác khi rollback
+    try {
+      if (tempFilePath) {
+        let tempExists = false;
+        try {
+          await fs.promises.access(tempFilePath, fs.constants.F_OK);
+          tempExists = true;
+        } catch {}
+        if (tempExists) await fs.promises.unlink(tempFilePath);
+      }
+      if (backupAbsPath) {
+        let backupExists = false;
+        try {
+          await fs.promises.access(backupAbsPath, fs.constants.F_OK);
+          backupExists = true;
+        } catch {}
+        if (backupExists) await fs.promises.unlink(backupAbsPath);
+      }
+    } catch (fsErr: any) {
+      console.error('[Rollback Cleanup] Error cleaning up files:', fsErr.message);
+    }
+
+    if (err.message === 'OCC_CONFLICT') {
+      let serverContent = '';
+      try {
+        let activeExists = false;
+        try {
+          await fs.promises.access(currentAbsPath, fs.constants.F_OK);
+          activeExists = true;
+        } catch {}
+        if (activeExists) {
+          serverContent = await fs.promises.readFile(currentAbsPath, 'utf8');
+        }
+      } catch {}
+      return res.status(409).json({
+        message: 'Conflict',
+        serverContent,
+      });
+    }
+    return res.status(500).json({ message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.get('/:id/versions', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const asset = req.asset!;
+  try {
+    const activeUserRes = await db.query(`
+      SELECT name FROM users WHERE id = $1
+    `, [asset.lastModifiedById || asset.ownerId]);
+    const activeUserName = activeUserRes.rows[0]?.name || 'Unknown';
+
+    const activeItem = {
+      versionNumber: asset.version,
+      size: asset.size,
+      createdAt: asset.uploadedAt || new Date().toISOString(),
+      createdBy: {
+        id: asset.lastModifiedById || asset.ownerId,
+        name: activeUserName,
+      },
+      isActive: true,
+    };
+
+    const queryRes = await db.query(`
+      SELECT av.version_number, av.size, av.created_at, u.id AS user_id, u.name AS user_name
+      FROM asset_versions av
+      LEFT JOIN users u ON av.created_by = u.id
+      WHERE av.asset_id = $1
+      ORDER BY av.version_number DESC
+    `, [id]);
+
+    const historyItems = queryRes.rows.map((row: any) => ({
+      versionNumber: row.version_number,
+      size: Number(row.size),
+      createdAt: new Date(row.created_at).toISOString(),
+      createdBy: row.user_id ? {
+        id: row.user_id,
+        name: row.user_name || 'Unknown',
+      } : null,
+      isActive: false,
+    }));
+
+    return res.json({ ok: true, items: [activeItem, ...historyItems] });
+  } catch (err: any) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// 22b. GET nội dung của một phiên bản cụ thể
+router.get('/:id/versions/:versionNumber/content', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
+  const { id, versionNumber } = req.params;
+  const targetVer = Number(versionNumber);
+
+  if (Number.isNaN(targetVer)) {
+    return res.status(400).json({ message: 'Invalid version number' });
+  }
+
+  const asset = req.asset!;
+  if (!isEditableTextAsset(asset)) {
+    return res.status(400).json({ message: 'This file type is not editable.' });
+  }
+
+  const currentAbsPath = getAbsPathFromAsset(asset);
+
+  try {
+    // Nếu yêu cầu phiên bản đang hoạt động hiện tại (active)
+    if (targetVer === asset.version) {
+      let content = '';
+      let activeExists = false;
+      try {
+        await fs.promises.access(currentAbsPath, fs.constants.F_OK);
+        activeExists = true;
+      } catch {}
+      if (activeExists) {
+        content = await fs.promises.readFile(currentAbsPath, 'utf8');
+      }
+      return res.json({ ok: true, versionNumber: targetVer, content });
+    }
+
+    // Truy vấn file backup trong db
+    const targetRes = await db.query(`
+      SELECT * FROM asset_versions
+      WHERE asset_id = $1 AND version_number = $2
+    `, [id, targetVer]);
+
+    if (targetRes.rows.length === 0) {
+      return res.status(404).json({ message: `Version ${targetVer} not found` });
+    }
+
+    const targetVerRow = targetRes.rows[0];
+    const targetAbsPath = path.join(LIBRARY_PATH, targetVerRow.rel_path);
+
+    let backupExists = false;
+    try {
+      await fs.promises.access(targetAbsPath, fs.constants.F_OK);
+      backupExists = true;
+    } catch {}
+
+    if (!backupExists) {
+      return res.status(410).json({ message: 'Version backup file is missing on disk' });
+    }
+
+    const content = await fs.promises.readFile(targetAbsPath, 'utf8');
+    return res.json({ ok: true, versionNumber: targetVer, content });
+  } catch (err: any) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// 23. POST khôi phục tệp về một phiên bản lịch sử cụ thể
+router.post('/:id/versions/:versionNumber/restore', requireAuth, checkAssetOwnership, async (req: Request, res: Response) => {
+  const { id, versionNumber } = req.params;
+  const targetVer = Number(versionNumber);
+
+  if (Number.isNaN(targetVer)) {
+    return res.status(400).json({ message: 'Invalid version number' });
+  }
+
+  const asset = req.asset!;
+  if (asset.isDeleted) {
+    return res.status(400).json({ message: 'Cannot modify a file that is in the trash.' });
+  }
+  if (!isEditableTextAsset(asset)) {
+    return res.status(400).json({ message: 'This file type is not editable.' });
+  }
+
+  const currentAbsPath = getAbsPathFromAsset(asset);
+
+  // Manual write permission check for POST restore method
+  if (asset.groupId) {
+    const isCreator = asset.ownerId === req.user!.sub;
+    const isManager = req.groupRole === 'owner' || req.groupRole === 'admin';
+    if (!isCreator && !isManager) {
+      return res.status(403).json({ message: 'Only contributors or group admins can modify this file' });
+    }
+  } else {
+    if (asset.ownerId !== req.user!.sub) {
+      return res.status(403).json({ message: 'You do not have permission to edit this file' });
+    }
+  }
+
+  // 1. Kiểm tra sự tồn tại của phiên bản đích
+  const targetRes = await db.query(`
+    SELECT * FROM asset_versions
+    WHERE asset_id = $1 AND version_number = $2
+  `, [id, targetVer]);
+
+  if (targetRes.rows.length === 0) {
+    return res.status(404).json({ message: `Version ${targetVer} not found` });
+  }
+
+  const targetVerRow = targetRes.rows[0];
+  const targetAbsPath = path.join(LIBRARY_PATH, targetVerRow.rel_path);
+
+  let targetExists = false;
+  try {
+    await fs.promises.access(targetAbsPath, fs.constants.F_OK);
+    targetExists = true;
+  } catch {}
+
+  if (!targetExists) {
+    return res.status(410).json({ message: 'Target version backup file has been deleted or is missing on disk' });
+  }
+
+  const client = await db.pool.connect();
+  let tempFilePath = '';
+  let backupAbsPath = '';
+  try {
+    // 2. Chuẩn bị thư mục và đường dẫn sao lưu
+    const versionsDir = path.join(LIBRARY_PATH, 'derived', 'versions', id);
+    await fs.promises.mkdir(versionsDir, { recursive: true });
+
+    const backupFileName = `${asset.version}.bin`;
+    backupAbsPath = path.join(versionsDir, backupFileName);
+
+    // Ghi nội dung của phiên bản cần phục hồi vào tệp tạm trước
+    tempFilePath = currentAbsPath + '.tmp';
+    await fs.promises.copyFile(targetAbsPath, tempFilePath);
+    const tempStat = await fs.promises.stat(tempFilePath);
+    const newSize = tempStat.size;
+
+    await client.query('BEGIN');
+
+    // Sao lưu bản hiện tại trước khi ghi đè
+    let activeExists = false;
+    try {
+      await fs.promises.access(currentAbsPath, fs.constants.F_OK);
+      activeExists = true;
+    } catch {}
+
+    if (activeExists) {
+      await fs.promises.copyFile(currentAbsPath, backupAbsPath);
+    } else {
+      await fs.promises.writeFile(currentAbsPath, '', 'utf8');
+      await fs.promises.copyFile(currentAbsPath, backupAbsPath);
+    }
+
+    const backupRelPath = path.relative(LIBRARY_PATH, backupAbsPath).replaceAll('\\', '/');
+    const backupStat = await fs.promises.stat(backupAbsPath);
+    const backupSize = backupStat.size;
+
+    const versionId = crypto.randomUUID();
+    const versionCreator = asset.lastModifiedById || asset.ownerId;
+    await client.query(`
+      INSERT INTO asset_versions (id, asset_id, version_number, rel_path, size, created_at, created_by)
+      VALUES ($1, $2, $3, $4, $5, NOW(), $6)
+    `, [versionId, id, asset.version, backupRelPath, backupSize, versionCreator]);
+
+    // 4. Tăng version chính của asset lên
+    const nextVersion = asset.version + 1;
+    const nowStr = new Date().toISOString();
+    const updateRes = await client.query(`
+      UPDATE assets
+      SET version = version + 1, size = $1, uploaded_at = $2, last_modified_by = $3
+      WHERE id = $4 AND version = $5
+    `, [newSize, nowStr, req.user!.sub, id, asset.version]);
+
+    if (updateRes.rowCount === 0) {
+      throw new Error('OCC_CONFLICT');
+    }
+
+    // Ghi nhận giao dịch DB thành công
+    await client.query('COMMIT');
+
+    // Đổi tên tệp tạm thành tệp chính (hoạt động nguyên tử)
+    await fs.promises.rename(tempFilePath, currentAbsPath);
+
+    return res.json({ ok: true, version: nextVersion, size: newSize, uploadedAt: nowStr });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+
+    // Dọn dẹp tệp rác khi rollback
+    try {
+      if (tempFilePath) {
+        let tempExists = false;
+        try {
+          await fs.promises.access(tempFilePath, fs.constants.F_OK);
+          tempExists = true;
+        } catch {}
+        if (tempExists) await fs.promises.unlink(tempFilePath);
+      }
+      if (backupAbsPath) {
+        let backupExists = false;
+        try {
+          await fs.promises.access(backupAbsPath, fs.constants.F_OK);
+          backupExists = true;
+        } catch {}
+        if (backupExists) await fs.promises.unlink(backupAbsPath);
+      }
+    } catch (fsErr: any) {
+      console.error('[Rollback Cleanup] Error cleaning up files:', fsErr.message);
+    }
+
+    if (err.message === 'OCC_CONFLICT') {
+      return res.status(409).json({ message: 'Conflict: The file has been modified by another process. Please reload and try again.' });
+    }
+    return res.status(500).json({ message: err.message });
+  } finally {
+    client.release();
+  }
 });
 
 export default router;
