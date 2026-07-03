@@ -100,7 +100,7 @@ export default function MediaViewer({
 }: MediaViewerProps): React.JSX.Element | null {
   if (!active) return null;
 
-  const { activeWorkspace, groups, language } = useCloud();
+  const { activeWorkspace, groups, language, selectedDocProject, posts } = useCloud();
   
   let userRole: string | null = null;
   if (activeWorkspace?.type === 'group') {
@@ -108,6 +108,38 @@ export default function MediaViewer({
   } else if (activeWorkspace?.type === 'space' && activeWorkspace.groupId) {
     userRole = groups.find(g => g.id === activeWorkspace.groupId)?.role || 'member';
   }
+
+  const getDocViewerUrl = () => {
+    if (!active) return '';
+    let url = `/doc-viewer?id=${active.id}`;
+    if (tab) {
+      url += `&tab=${tab}`;
+    }
+    
+    // Find if the asset belongs to a specific post in the current active space
+    if (posts && posts.length > 0) {
+      const activePost = posts.find((p: any) => 
+        p.assets && p.assets.some((a: any) => a.id === active.id)
+      );
+      if (activePost) {
+        url += `&postId=${activePost.id}`;
+        if (activePost.spaceId) {
+          url += `&spaceId=${activePost.spaceId}`;
+        }
+      }
+    }
+    
+    // If not set by post, but we are inside a space
+    if (!url.includes('&spaceId=') && activeWorkspace?.type === 'space') {
+      url += `&spaceId=${activeWorkspace.id}`;
+    }
+    
+    if (selectedDocProject) {
+      url += `&docProject=${encodeURIComponent(selectedDocProject)}`;
+    }
+    
+    return url;
+  };
   
   const isReadOnly = (activeWorkspace?.type === 'group' || (activeWorkspace?.type === 'space' && activeWorkspace?.groupId)) && userRole === 'member';
 
@@ -218,7 +250,7 @@ export default function MediaViewer({
             <div className="docTypeMeta" style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '10px', fontWeight: 500 }}>
               {t('categories.' + docCategoryOf(active)) || docCategoryOf(active).toUpperCase()} · {fmtBytes(active.size)}
             </div>
-            <a href={`${api}/api/assets/_media/original/${active.id}`} target="_blank" rel="noreferrer" className="ghost" style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            <a href={getDocViewerUrl()} target="_blank" rel="noreferrer" className="ghost" style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
               <span>{t('viewer.openDoc')}</span>
               <span>↗</span>
             </a>
@@ -814,6 +846,14 @@ export default function MediaViewer({
           color: #ffffff;
           line-height: 1.4;
           word-break: break-all;
+        }
+        :global([data-theme='light']) .docPreviewBlock {
+          background: rgba(255, 255, 255, 0.95);
+          border-color: rgba(0, 0, 0, 0.08);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        }
+        :global([data-theme='light']) .docPreviewBlock .docName {
+          color: #18181b;
         }
         .videoProcessingOverlay {
           display: flex;

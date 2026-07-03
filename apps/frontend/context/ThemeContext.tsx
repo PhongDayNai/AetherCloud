@@ -16,14 +16,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('system');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
 
-  // Load theme from localStorage on mount
+  // Load theme from localStorage on mount and sync across tabs
   useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'theme') {
+        const saved = e.newValue as Theme;
+        if (saved === 'light' || saved === 'dark' || saved === 'system') {
+          setThemeState(saved);
+        }
+      }
+    };
+
     const saved = localStorage.getItem('theme') as Theme;
     if (saved === 'light' || saved === 'dark' || saved === 'system') {
       setThemeState(saved);
     } else {
       setThemeState('system');
     }
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // Update theme on localStorage and HTML attributes
