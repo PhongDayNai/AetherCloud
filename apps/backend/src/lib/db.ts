@@ -79,6 +79,34 @@ BEGIN
   END IF;
 END $$;
 
+-- Phase 3 Groups and Group Members
+CREATE TABLE IF NOT EXISTS groups (
+  id UUID PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+  group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role VARCHAR(50) NOT NULL DEFAULT 'member',
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (group_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
+
+DO $$
+BEGIN
+  -- Thêm group_id vào bảng spaces
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='spaces' AND column_name='group_id') THEN
+    ALTER TABLE spaces ADD COLUMN group_id UUID REFERENCES groups(id) ON DELETE CASCADE;
+  END IF;
+  -- Giữ nguyên owner_id của space là NOT NULL để xác định rõ người tạo
+  ALTER TABLE spaces ALTER COLUMN owner_id SET NOT NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS refresh_tokens (
   id UUID PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

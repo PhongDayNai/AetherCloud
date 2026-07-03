@@ -29,7 +29,7 @@ function walkFiles(dir: string, fileList: string[] = []): string[] {
   return fileList;
 }
 
-function cleanEmptyDirs(dir: string) {
+function cleanEmptyDirs(dir: string): void {
   if (!fs.existsSync(dir)) return;
   try {
     const files = fs.readdirSync(dir);
@@ -54,11 +54,15 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
   }
 
   const client = await db.pool.connect();
-  let dbIds: Set<string>;
+  let dbActivePaths = new Set<string>();
   try {
-    const res = await client.query('SELECT id FROM assets');
-    dbIds = new Set(res.rows.map((row: any) => row.id));
-    console.log(`[Cleaner] Đã lấy ${dbIds.size} bản ghi từ database.`);
+    const res = await client.query('SELECT rel_path, play_rel_path, hls_rel_path FROM assets');
+    for (const row of res.rows) {
+      if (row.rel_path) dbActivePaths.add(row.rel_path.replaceAll('\\', '/'));
+      if (row.play_rel_path) dbActivePaths.add(row.play_rel_path.replaceAll('\\', '/'));
+      if (row.hls_rel_path) dbActivePaths.add(row.hls_rel_path.replaceAll('\\', '/'));
+    }
+    console.log(`[Cleaner] Đã lấy ${dbActivePaths.size} đường dẫn active tham chiếu từ database.`);
   } catch (err: any) {
     console.error('[Cleaner] Lỗi truy vấn database:', err.message);
     client.release();
@@ -76,14 +80,15 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
     const originalFiles = walkFiles(ORIGINALS_ROOT);
     for (const file of originalFiles) {
       totalScanned++;
+      const relPath = path.relative(LIBRARY_PATH, file).replaceAll('\\', '/');
       const baseName = path.basename(file, path.extname(file));
       if (UUID_REGEX.test(baseName)) {
-        if (!dbIds.has(baseName)) {
+        if (!dbActivePaths.has(relPath)) {
           orphanedCount++;
           try {
             const stat = fs.statSync(file);
             spaceReclaimed += stat.size;
-            console.log(`[Mồ côi] [Original] ${path.relative(LIBRARY_PATH, file)} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
+            console.log(`[Mồ côi] [Original] ${relPath} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
             if (!isDryRun) {
               fs.unlinkSync(file);
             }
@@ -98,14 +103,15 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
     const trashFiles = walkFiles(TRASH_ROOT);
     for (const file of trashFiles) {
       totalScanned++;
+      const relPath = path.relative(LIBRARY_PATH, file).replaceAll('\\', '/');
       const baseName = path.basename(file, path.extname(file));
       if (UUID_REGEX.test(baseName)) {
-        if (!dbIds.has(baseName)) {
+        if (!dbActivePaths.has(relPath)) {
           orphanedCount++;
           try {
             const stat = fs.statSync(file);
             spaceReclaimed += stat.size;
-            console.log(`[Mồ côi] [Trash] ${path.relative(LIBRARY_PATH, file)} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
+            console.log(`[Mồ côi] [Trash] ${relPath} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
             if (!isDryRun) {
               fs.unlinkSync(file);
             }
@@ -115,21 +121,21 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
     }
   }
 
-  // 3. Quét derived
-  // - play: derived/play/[UUID].mp4
+  // 3. Quét derived/play
   const playDir = path.join(DERIVED_ROOT, 'play');
   if (fs.existsSync(playDir)) {
     const playFiles = walkFiles(playDir);
     for (const file of playFiles) {
       totalScanned++;
+      const relPath = path.relative(LIBRARY_PATH, file).replaceAll('\\', '/');
       const baseName = path.basename(file, path.extname(file));
       if (UUID_REGEX.test(baseName)) {
-        if (!dbIds.has(baseName)) {
+        if (!dbActivePaths.has(relPath)) {
           orphanedCount++;
           try {
             const stat = fs.statSync(file);
             spaceReclaimed += stat.size;
-            console.log(`[Mồ côi] [Play-Derived] ${path.relative(LIBRARY_PATH, file)} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
+            console.log(`[Mồ côi] [Play-Derived] ${relPath} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
             if (!isDryRun) {
               fs.unlinkSync(file);
             }
@@ -139,7 +145,7 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
     }
   }
 
-  // - hls: derived/hls/[UUID]/...
+  // 4. Quét derived/hls
   const hlsDir = path.join(DERIVED_ROOT, 'hls');
   if (fs.existsSync(hlsDir)) {
     try {
@@ -150,7 +156,8 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
           const stat = fs.statSync(fullPath);
           if (stat.isDirectory() && UUID_REGEX.test(subdir)) {
             totalScanned++;
-            if (!dbIds.has(subdir)) {
+            const relPath = path.relative(LIBRARY_PATH, fullPath).replaceAll('\\', '/');
+            if (!dbActivePaths.has(relPath)) {
               let dirSize = 0;
               const hlsFiles = walkFiles(fullPath);
               for (const f of hlsFiles) {
@@ -161,7 +168,7 @@ export async function runOrphanedCleanup(isDryRun = false): Promise<{ scanned: n
               }
               orphanedCount++;
               spaceReclaimed += dirSize;
-              console.log(`[Mồ côi] [HLS-Derived] ${path.relative(LIBRARY_PATH, fullPath)}/ (${(dirSize / 1024 / 1024).toFixed(2)} MB)`);
+              console.log(`[Mồ côi] [HLS-Derived] ${relPath}/ (${(dirSize / 1024 / 1024).toFixed(2)} MB)`);
               if (!isDryRun) {
                 fs.rmSync(fullPath, { recursive: true, force: true });
               }
