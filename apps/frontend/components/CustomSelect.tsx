@@ -7,9 +7,10 @@ interface CustomSelectProps {
   options: { value: string; label: string }[];
   onChange: (val: string) => void;
   width?: string;
+  disabled?: boolean;
 }
 
-export default function CustomSelect({ value, options, onChange, width = '130px' }: CustomSelectProps) {
+export default function CustomSelect({ value, options, onChange, width = '130px', disabled = false }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -28,26 +29,29 @@ export default function CustomSelect({ value, options, onChange, width = '130px'
   return (
     <div ref={containerRef} style={{ position: 'relative', width: width, userSelect: 'none' }}>
       <div 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { if (!disabled) setIsOpen(!isOpen); }}
         style={{
           background: 'var(--bg-input)',
           border: '1px solid var(--border-input)',
           borderRadius: '8px',
           padding: '8px 14px',
-          color: 'var(--text-primary)',
+          color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
           fontSize: '13px',
           fontWeight: '500',
-          cursor: 'pointer',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.6 : 1,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           transition: 'all 0.15s ease'
         }}
         onMouseEnter={(e) => { 
+          if (disabled) return;
           e.currentTarget.style.borderColor = 'var(--border-input-focus)'; 
           e.currentTarget.style.background = 'var(--bg-input-focus)'; 
         }}
         onMouseLeave={(e) => { 
+          if (disabled) return;
           if (!isOpen) {
             e.currentTarget.style.borderColor = 'var(--border-input)'; 
             e.currentTarget.style.background = 'var(--bg-input)'; 
