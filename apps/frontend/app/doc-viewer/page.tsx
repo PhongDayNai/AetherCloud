@@ -425,7 +425,7 @@ function DocViewerContent() {
         } 
         // 3. Binder / Document Project context
         else if (docProject) {
-          const res = await fetch(`${api}/api/assets?limit=50&docProject=${encodeURIComponent(docProject)}`, { credentials: 'include' });
+          const res = await fetch(`${api}/api/assets?limit=50&type=doc&docProject=${encodeURIComponent(docProject)}`, { credentials: 'include' });
           if (res.ok) {
             const data = await res.json();
             const itemsList = data.items || [];
@@ -449,7 +449,7 @@ function DocViewerContent() {
         } 
         // 5. Default / Dashboard / Personal space context
         else {
-          const res = await fetch(`${api}/api/assets?limit=50`, { credentials: 'include' });
+          const res = await fetch(`${api}/api/assets?limit=50&type=doc`, { credentials: 'include' });
           if (res.ok) {
             const data = await res.json();
             const itemsList = data.items || [];
@@ -474,7 +474,7 @@ function DocViewerContent() {
       let url = `${api}/api/assets?limit=50&cursor=${nextCursor}`;
       if (docProject) {
         url += `&docProject=${encodeURIComponent(docProject)}`;
-      } else if (tabQuery === 'docs') {
+      } else {
         url += `&type=doc`;
       }
       
