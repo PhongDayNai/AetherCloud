@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useCloud } from '../context/CloudContext';
+import { useConfirm } from '../context/ConfirmContext';
 import * as Icons from './Icons';
 import CustomSelect from './CustomSelect';
 
@@ -19,6 +20,7 @@ export default function GroupSettingsModal({
 }: GroupSettingsModalProps): React.JSX.Element | null {
   const { t } = useLanguage();
   const { api, user, addToast, loadData } = useCloud();
+  const confirm = useConfirm();
 
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -114,7 +116,7 @@ export default function GroupSettingsModal({
 
   // 3. Trục xuất thành viên
   const handleKick = async (userId: string) => {
-    if (!window.confirm(t('groups.confirmKick') || 'Bạn có chắc chắn muốn trục xuất thành viên này?')) return;
+    if (!await confirm(t('groups.confirmKick') || 'Bạn có chắc chắn muốn trục xuất thành viên này?', { isDanger: true })) return;
     setActionLoadingId(userId);
     try {
       const res = await fetch(`${api}/api/groups/${group.id}/members/${userId}`, {
@@ -136,7 +138,7 @@ export default function GroupSettingsModal({
 
   // 4. Nhượng quyền Owner
   const handleTransferOwnership = async (userId: string) => {
-    if (!window.confirm(t('groups.confirmTransfer') || 'CẢNH BÁO: Bạn sẽ mất quyền Chủ nhóm sau khi chuyển nhượng. Tiếp tục?')) return;
+    if (!await confirm(t('groups.confirmTransfer') || 'CẢNH BÁO: Bạn sẽ mất quyền Chủ nhóm sau khi chuyển nhượng. Tiếp tục?', { isDanger: true })) return;
     setActionLoadingId(userId);
     try {
       const res = await fetch(`${api}/api/groups/${group.id}/owner`, {
@@ -161,7 +163,7 @@ export default function GroupSettingsModal({
 
   // 5. Rời nhóm
   const handleLeaveGroup = async () => {
-    if (!window.confirm(t('groups.confirmLeave') || 'Bạn có chắc muốn rời khỏi nhóm này không?')) return;
+    if (!await confirm(t('groups.confirmLeave') || 'Bạn có chắc muốn rời khỏi nhóm này không?', { isDanger: true })) return;
     try {
       const myMemberRecord = members.find(m => m.userId === user?.sub);
       if (!myMemberRecord) return;
@@ -183,7 +185,7 @@ export default function GroupSettingsModal({
 
   // 6. Giải tán nhóm (Owner chỉ định)
   const handleDisbandGroup = async () => {
-    if (!window.confirm(t('groups.confirmDisband') || 'HÀNH ĐỘNG NÀY KHÔNG THỂ PHỤC HỒI! Bạn có chắc chắn giải tán nhóm này?')) return;
+    if (!await confirm(t('groups.confirmDisband') || 'HÀNH ĐỘNG NÀY KHÔNG THỂ PHỤC HỒI! Bạn có chắc chắn giải tán nhóm này?', { isDanger: true })) return;
     try {
       const res = await fetch(`${api}/api/groups/${group.id}`, {
         method: 'DELETE',

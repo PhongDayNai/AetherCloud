@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
 import { CloudProvider, useCloud } from '../../context/CloudContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import VersionWidget from '../../components/VersionWidget';
 import MergeEditor from '../../components/MergeEditor';
 import { docCategoryOf, fmtBytes, hasWritePermission, alignAndDiffTwoWay, DiffLineBlock } from '../../lib/utils';
@@ -57,6 +58,7 @@ function DocViewerContent() {
   const [docTheme, setDocTheme] = useState<'light' | 'dark'>('dark');
   const tabId = useRef('');
   const { user, groups, addToast } = useCloud();
+  const confirm = useConfirm();
 
   const id = searchParams.get('id');
   console.log('[DocViewer] Global Resolved Theme:', globalTheme);
@@ -540,9 +542,9 @@ function DocViewerContent() {
   };
 
   // Context-aware URL click helper for sidebar switching
-  const handleSidebarItemClick = (fileId: string) => {
+  const handleSidebarItemClick = async (fileId: string) => {
     if (isDirty) {
-      if (!window.confirm(t('viewer.confirmDiscard') || 'Bạn có các thay đổi chưa lưu. Bạn có chắc muốn chuyển tệp và bỏ qua chúng?')) {
+      if (!await confirm(t('viewer.confirmDiscard') || 'Bạn có các thay đổi chưa lưu. Bạn có chắc muốn chuyển tệp và bỏ qua chúng?', { isDanger: true })) {
         return;
       }
     }
@@ -719,9 +721,9 @@ function DocViewerContent() {
   };
 
   // Close tab helper
-  const handleClose = () => {
+  const handleClose = async () => {
     if (isDirty) {
-      if (!window.confirm(t('viewer.confirmDiscard') || 'Bạn có các thay đổi chưa lưu. Bạn có chắc muốn đóng và bỏ qua chúng?')) {
+      if (!await confirm(t('viewer.confirmDiscard') || 'Bạn có các thay đổi chưa lưu. Bạn có chắc muốn đóng và bỏ qua chúng?', { isDanger: true })) {
         return;
       }
     }
@@ -729,9 +731,9 @@ function DocViewerContent() {
   };
 
   // Reset editor text helper
-  const handleReset = () => {
+  const handleReset = async () => {
     if (isDirty) {
-      if (window.confirm(t('viewer.confirmReset') || 'Are you sure you want to revert all changes?')) {
+      if (await confirm(t('viewer.confirmReset') || 'Are you sure you want to revert all changes?', { isDanger: true })) {
         if (category === 'markdown') {
           setMarkdownText(originalMarkdown);
         } else {
@@ -868,7 +870,7 @@ function DocViewerContent() {
   // Restore historic version
   const handleRestoreVersion = async (versionNumber: number) => {
     if (!asset) return;
-    if (!window.confirm(t('viewer.restoreConfirm') || 'Are you sure you want to restore the file to this version?')) {
+    if (!await confirm(t('viewer.restoreConfirm') || 'Are you sure you want to restore the file to this version?', { isDanger: true })) {
       return;
     }
     try {

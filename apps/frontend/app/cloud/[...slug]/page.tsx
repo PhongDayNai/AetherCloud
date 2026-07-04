@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useCloud } from '../../../context/CloudContext';
+import { useConfirm } from '../../../context/ConfirmContext';
 import AssetGrid from '../../../components/AssetGrid';
 import DocView from '../../../components/DocView';
 import SmartVideo from '../../../components/SmartVideo';
@@ -137,6 +138,7 @@ export default function DashboardPage(): React.JSX.Element {
 
   // Compute dashboard metrics from stats
   const { stats } = useCloud();
+  const confirm = useConfirm();
 
   // Derived active space translation
   const activeSpaceName = React.useMemo(() => {
@@ -1028,7 +1030,7 @@ export default function DashboardPage(): React.JSX.Element {
                     transition: 'all 0.2s'
                   }}
                   onClick={async () => {
-                    if (window.confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?')) {
+                    if (await confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?', { isDanger: true })) {
                       const success = await handleDeleteSpace(activeWorkspace.id);
                       if (success) {
                         if (activeWorkspace.groupId) {
@@ -1150,7 +1152,7 @@ export default function DashboardPage(): React.JSX.Element {
                     transition: 'all 0.2s'
                   }}
                   onClick={async () => {
-                    if (window.confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?')) {
+                    if (await confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?', { isDanger: true })) {
                       const success = await handleDeleteSpace(activeWorkspace.id);
                       if (success) {
                         if (activeWorkspace.groupId) {
@@ -1370,7 +1372,7 @@ export default function DashboardPage(): React.JSX.Element {
                     transition: 'all 0.2s'
                   }}
                   onClick={async () => {
-                    if (window.confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?')) {
+                    if (await confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?', { isDanger: true })) {
                       const success = await handleDeleteSpace(activeWorkspace.id);
                       if (success) {
                         if (activeWorkspace.groupId) {

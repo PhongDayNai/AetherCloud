@@ -216,6 +216,11 @@ const translations = {
     'groups.promoteFailed': 'Bổ nhiệm Quản trị viên thất bại',
     'groups.demoteSuccess': 'Hạ cấp Quản trị viên thành công',
     'groups.demoteFailed': 'Hạ cấp Quản trị viên thất bại',
+    'groups.confirmKick': 'Bạn có chắc chắn muốn trục xuất thành viên này?',
+    'groups.confirmTransfer': 'CẢNH BÁO: Bạn sẽ mất quyền Chủ nhóm sau khi chuyển nhượng. Tiếp tục?',
+    'groups.confirmLeave': 'Bạn có chắc muốn rời khỏi nhóm này không?',
+    'groups.confirmDisband': 'HÀNH ĐỘNG NÀY KHÔNG THỂ PHỤC HỒI! Bạn có chắc chắn giải tán nhóm này?',
+    'spaces.confirmDelete': 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?',
     'spaces.deleteSuccess': 'Đã chuyển không gian con vào thùng rác',
     'spaces.deleteFailed': 'Xóa không gian con thất bại',
     'spaces.restoreSuccess': 'Khôi phục không gian con thành công',
@@ -423,6 +428,7 @@ const translations = {
     'viewer.exportPdf': 'Xuất PDF',
     'viewer.playgroundWarning': 'Chế độ xem thử: Các thay đổi chỉ tạm thời và sẽ không được lưu.',
     'viewer.errorLoadFile': 'Không thể tải tệp tin',
+    'viewer.errorFetchDetails': 'Không tải được thông tin chi tiết tệp tin',
     'viewer.loadingFile': 'Đang tải tệp tin...',
     'viewer.sandboxMode': 'Chế độ Sandbox',
     'viewer.copiedSuccess': '✓ Đã sao chép',
@@ -519,6 +525,8 @@ const translations = {
     'merge.conflictsRemaining': 'Còn {count} dòng xung đột cần giải quyết',
     'merge.reset': 'Trộn lại',
     'dialogs.warning': 'Cảnh báo',
+    'dialogs.confirmTitle': 'Xác nhận',
+    'dialogs.confirmButton': 'Xác nhận',
   },
   en: {
     // Auth & General
@@ -725,6 +733,11 @@ const translations = {
     'groups.promoteFailed': 'Failed to promote member',
     'groups.demoteSuccess': 'Demote member to Member successfully',
     'groups.demoteFailed': 'Failed to demote member',
+    'groups.confirmKick': 'Are you sure you want to expel this member?',
+    'groups.confirmTransfer': 'WARNING: You will lose Group Owner privileges after transferring. Do you want to proceed?',
+    'groups.confirmLeave': 'Are you sure you want to leave this group?',
+    'groups.confirmDisband': 'THIS ACTION CANNOT BE UNDONE! Are you sure you want to disband this group?',
+    'spaces.confirmDelete': 'Are you sure you want to move this sub-space to the trash?',
     'spaces.deleteSuccess': 'Moved space to trash',
     'spaces.deleteFailed': 'Failed to delete space',
     'spaces.restoreSuccess': 'Restored space successfully',
@@ -933,6 +946,7 @@ const translations = {
     'viewer.exportPdf': 'Export PDF',
     'viewer.playgroundWarning': 'Sandbox Mode: Changes made here are for preview purposes only and will not be saved.',
     'viewer.errorLoadFile': 'Failed to load file',
+    'viewer.errorFetchDetails': 'Failed to load file details',
     'viewer.loadingFile': 'Loading file...',
     'viewer.sandboxMode': 'Sandbox Mode',
     'viewer.copiedSuccess': '✓ Copied',
@@ -1029,6 +1043,8 @@ const translations = {
     'merge.conflictsRemaining': '{count} conflict{plural} remaining',
     'merge.reset': 'Re-merge',
     'dialogs.warning': 'Warning',
+    'dialogs.confirmTitle': 'Confirm',
+    'dialogs.confirmButton': 'Confirm',
   }
 };
 

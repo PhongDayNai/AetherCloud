@@ -13,6 +13,7 @@ import BulkShareModal from '../../components/BulkShareModal';
 import UploadModal from '../../components/UploadModal';
 import ProcessingBadge from '../../components/ProcessingBadge';
 import { useCloud, ToastItem } from '../../context/CloudContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 interface ToastProps {
   toast: ToastItem;
@@ -108,9 +109,11 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
     showBulkShareModal, setShowBulkShareModal
   } = useCloud();
 
+  const confirm = useConfirm();
+
   const handleBulkDelete = async () => {
     if (tab === 'spaces') {
-      if (window.confirm(t('spaces.confirmDeleteMultiple') || 'Bạn có chắc muốn đưa các không gian đã chọn vào thùng rác?')) {
+      if (await confirm(t('spaces.confirmDeleteMultiple') || 'Bạn có chắc muốn đưa các không gian đã chọn vào thùng rác?', { isDanger: true })) {
         await deleteSelectedSpaces(selectedIds);
         setSelectedIds([]);
         setSelectionMode(false);
@@ -132,7 +135,7 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
 
   const handleBulkPurge = async () => {
     if (tab === 'spaces') {
-      if (window.confirm(t('spaces.confirmPurgeMultiple') || 'CẢNH BÁO: Hành động này sẽ XÓA VĨNH VIỄN các không gian đã chọn và toàn bộ dữ liệu bên trong. Không thể khôi phục! Bạn chắc chắn muốn tiếp tục?')) {
+      if (await confirm(t('spaces.confirmPurgeMultiple') || 'CẢNH BÁO: Hành động này sẽ XÓA VĨNH VIỄN các không gian đã chọn và toàn bộ dữ liệu bên trong. Không thể khôi phục! Bạn chắc chắn muốn tiếp tục?', { isDanger: true })) {
         await purgeSelectedSpaces(selectedIds);
         setSelectedIds([]);
         setSelectionMode(false);

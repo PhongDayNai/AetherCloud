@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from './LanguageContext';
+import { useConfirm } from './ConfirmContext';
 import { Asset, User, Album, Tag, DocProject } from '../types';
 import {
   getApiOrigin,
@@ -229,6 +230,7 @@ const CloudContext = createContext<CloudContextType | undefined>(undefined);
 
 export function CloudProvider({ children }: { children: React.ReactNode }) {
   const { language, t } = useLanguage();
+  const confirm = useConfirm();
   const api = useMemo(() => getApiOrigin(), []);
 
   const [usage, setUsage] = useState<any>(null);
@@ -1605,7 +1607,7 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
 
   async function purgeSelectedForever() {
     if (!selectedIds.length) return;
-    const ok = window.confirm(t('dialogs.deleteForeverConfirm', { count: selectedIds.length }));
+    const ok = await confirm(t('dialogs.deleteForeverConfirm', { count: selectedIds.length }), { isDanger: true });
     if (!ok) return;
 
     try {

@@ -2,6 +2,7 @@ import React from 'react';
 import { Metadata } from 'next';
 import { LanguageProvider } from '../context/LanguageContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { ConfirmProvider } from '../context/ConfirmContext';
 
 export const metadata: Metadata = {
   title: 'AetherCloud',
@@ -205,7 +206,9 @@ export default function RootLayout({ children }: RootLayoutProps): React.JSX.Ele
       <body>
         <ThemeProvider>
           <LanguageProvider>
-            {children}
+            <ConfirmProvider>
+              {children}
+            </ConfirmProvider>
           </LanguageProvider>
         </ThemeProvider>
       </body>

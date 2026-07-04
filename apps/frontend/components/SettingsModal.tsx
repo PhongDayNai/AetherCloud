@@ -5,6 +5,7 @@ import CustomDatePicker from './CustomDatePicker';
 import CustomSelect from './CustomSelect';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 interface User {
   sub: string;
@@ -107,6 +108,7 @@ export default function SettingsModal({
 }: SettingsModalProps): React.JSX.Element | null {
   const { language, setLanguage, t } = useLanguage();
   const { theme: appearance, setTheme: setAppearance } = useTheme();
+  const confirm = useConfirm();
 
   const [showMainPanel, setShowMainPanel] = useState<boolean>(true);
   const [settingsTab, setSettingsTab] = useState<'general' | 'profile' | 'invites'>('general');
@@ -243,7 +245,7 @@ export default function SettingsModal({
   }
 
   async function handleDeactivateInvitation(id: string) {
-    if (!window.confirm(t('invite.confirmLock'))) return;
+    if (!await confirm(t('invite.confirmLock'), { isDanger: true })) return;
     try {
       const res = await fetch(`${api}/api/admin/invitations/${id}/deactivate`, {
         method: 'PUT',
