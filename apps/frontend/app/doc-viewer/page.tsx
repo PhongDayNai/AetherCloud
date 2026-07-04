@@ -841,6 +841,23 @@ function DocViewerContent() {
     }
   };
 
+  // Keyboard shortcut listener for saving (Ctrl + S / Cmd + S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isCtrl = e.ctrlKey || e.metaKey;
+      if (isCtrl && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (isWritable && isDirty && previewVersion === null && !isSaving && !asset?.isDeleted) {
+          handleSave();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isWritable, isDirty, previewVersion, isSaving, asset, handleSave]);
+
   // Preview version content
   const handlePreviewVersion = async (version: any | null) => {
     if (!asset) return;
