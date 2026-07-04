@@ -21,6 +21,10 @@ export interface Asset {
   isDeleted: boolean;
   deletedAt: string | null;
   type: 'image' | 'video' | 'file' | string;
+  version?: number;
+  lastModifiedById?: string | null;
+  ownerId?: string;
+  groupId?: string | null;
 }
 
 export interface User {

@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useEffect, useState, useRef, Suspense } from 'react';
+import React, { useEffect, useState, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTheme } from '../../context/ThemeContext';
 import { CloudProvider, useCloud } from '../../context/CloudContext';
-import { docCategoryOf, fmtBytes } from '../../lib/utils';
+import VersionWidget from '../../components/VersionWidget';
+import MergeEditor from '../../components/MergeEditor';
+import { docCategoryOf, fmtBytes, hasWritePermission, alignAndDiffTwoWay, DiffLineBlock } from '../../lib/utils';
 import { Asset } from '../../types';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
@@ -18,6 +20,35 @@ import 'highlight.js/styles/github-dark.css';
 
 const api = process.env.NEXT_PUBLIC_API_ORIGIN || 'http://localhost:45174';
 
+function splitHtmlIntoLines(html: string): string[] {
+  const lines = html.split('\n');
+  const openTags: string[] = [];
+  
+  return lines.map((line) => {
+    let prefix = openTags.join('');
+    
+    // Find all span tags in the current line
+    const tagRegex = /<\/?span[^>]*>/g;
+    let match;
+    
+    while ((match = tagRegex.exec(line)) !== null) {
+      const tag = match[0];
+      if (tag.startsWith('</')) {
+        openTags.pop();
+      } else {
+        openTags.push(tag);
+      }
+    }
+    
+    let suffix = '';
+    for (let i = openTags.length - 1; i >= 0; i--) {
+      suffix += '</span>';
+    }
+    
+    return prefix + line + suffix;
+  });
+}
+
 function DocViewerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -25,7 +56,7 @@ function DocViewerContent() {
   const { resolvedTheme: globalTheme } = useTheme();
   const [docTheme, setDocTheme] = useState<'light' | 'dark'>('dark');
   const tabId = useRef('');
-  const { user } = useCloud();
+  const { user, groups, addToast } = useCloud();
 
   const id = searchParams.get('id');
   console.log('[DocViewer] Global Resolved Theme:', globalTheme);
@@ -113,9 +144,121 @@ function DocViewerContent() {
   const [originalMarkdown, setOriginalMarkdown] = useState<string>('');
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [codeText, setCodeText] = useState<string>('');
+  const [originalCode, setOriginalCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [previewVersion, setPreviewVersion] = useState<any | null>(null);
+  const [historyContent, setHistoryContent] = useState<string>('');
+  const [mdCompareMode, setMdCompareMode] = useState<'diff' | 'preview'>('diff');
+  const [sandboxMode, setSandboxMode] = useState<boolean>(true);
+  const [isModeHovered, setIsModeHovered] = useState<boolean>(false);
+  const draftContentRef = useRef<string>('');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('default_sandbox_mode');
+    setSandboxMode(saved === 'off' ? false : true);
+  }, []);
+
+  const [showMerge, setShowMerge] = useState<boolean>(false);
+  const [serverVersion, setServerVersion] = useState<number>(1);
+  const [conflictServerContent, setConflictServerContent] = useState<string>('');
+  const [conflictLocalContent, setConflictLocalContent] = useState<string>('');
+
+  const category = asset ? docCategoryOf(asset) : 'other';
+  const isDirty = category === 'markdown' ? (markdownText !== originalMarkdown) : (codeText !== originalCode);
+  const isWritable = asset ? hasWritePermission(asset, user, groups) : false;
+
+  const codeDiffRows = useMemo(() => {
+    if (!previewVersion) return [];
+    const alignedBlocks = alignAndDiffTwoWay(codeText, historyContent);
+    let leftLineNo = 0;
+    let rightLineNo = 0;
+    return alignedBlocks.map(block => {
+      let lNo = '';
+      let rNo = '';
+      if (block.type === 'normal' || block.type === 'modified') {
+        leftLineNo++;
+        rightLineNo++;
+        lNo = String(leftLineNo);
+        rNo = String(rightLineNo);
+      } else if (block.type === 'deleted') {
+        leftLineNo++;
+        lNo = String(leftLineNo);
+      } else if (block.type === 'added') {
+        rightLineNo++;
+        rNo = String(rightLineNo);
+      }
+      return {
+        ...block,
+        leftLineNo: lNo,
+        rightLineNo: rNo
+      };
+    });
+  }, [codeText, historyContent, previewVersion]);
+
+  const mdDiffRows = useMemo(() => {
+    if (!previewVersion) return [];
+    const alignedBlocks = alignAndDiffTwoWay(markdownText, historyContent);
+    let leftLineNo = 0;
+    let rightLineNo = 0;
+    return alignedBlocks.map(block => {
+      let lNo = '';
+      let rNo = '';
+      if (block.type === 'normal' || block.type === 'modified') {
+        leftLineNo++;
+        rightLineNo++;
+        lNo = String(leftLineNo);
+        rNo = String(rightLineNo);
+      } else if (block.type === 'deleted') {
+        leftLineNo++;
+        lNo = String(leftLineNo);
+      } else if (block.type === 'added') {
+        rightLineNo++;
+        rNo = String(rightLineNo);
+      }
+      return {
+        ...block,
+        leftLineNo: lNo,
+        rightLineNo: rNo
+      };
+    });
+  }, [markdownText, historyContent, previewVersion]);
+  
+  const leftLineDiffTypes = useMemo(() => {
+    const map: Record<number, 'normal' | 'added' | 'deleted' | 'modified'> = {};
+    codeDiffRows.forEach(row => {
+      if (row.leftLineNo) {
+        const lineNum = Number(row.leftLineNo);
+        map[lineNum] = row.type;
+      }
+    });
+    return map;
+  }, [codeDiffRows]);
+
+  const rightLineDiffTypes = useMemo(() => {
+    const map: Record<number, 'normal' | 'added' | 'deleted' | 'modified'> = {};
+    codeDiffRows.forEach(row => {
+      if (row.rightLineNo) {
+        const lineNum = Number(row.rightLineNo);
+        map[lineNum] = row.type;
+      }
+    });
+    return map;
+  }, [codeDiffRows]);
+
+  const historyPreviewHtml = useMemo(() => {
+    if (!previewVersion || !historyContent) return '';
+    try {
+      const html = marked.parse(historyContent);
+      return DOMPurify.sanitize(html as string);
+    } catch {
+      return '';
+    }
+  }, [previewVersion, historyContent]);
+
 
   // Sidebar query parameters & pagination states
   const tabQuery = searchParams.get('tab') || '';
@@ -145,7 +288,42 @@ function DocViewerContent() {
   const lastScrollTop = useRef<number>(0);
   const lastScrollTime = useRef<number>(Date.now());
   const scrollDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const lineNoRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const codePreRef = useRef<HTMLPreElement>(null);
+  const leftCodePreRef = useRef<HTMLPreElement>(null);
+  const leftLineNoRef = useRef<HTMLDivElement>(null);
 
+  const handleEditorScroll = () => {
+    if (textareaRef.current && lineNoRef.current) {
+      lineNoRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
+
+  const leftCodeContainerRef = useRef<HTMLDivElement>(null);
+  const rightCodeContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleLeftCodeScroll = () => {
+    if (activeScrollRef.current === 'right') return;
+    activeScrollRef.current = 'left';
+    if (leftCodeContainerRef.current && rightCodeContainerRef.current) {
+      rightCodeContainerRef.current.scrollTop = leftCodeContainerRef.current.scrollTop;
+      rightCodeContainerRef.current.scrollLeft = leftCodeContainerRef.current.scrollLeft;
+    }
+    if (scrollSyncTimeoutRef.current) clearTimeout(scrollSyncTimeoutRef.current);
+    scrollSyncTimeoutRef.current = setTimeout(() => { activeScrollRef.current = null; }, 50);
+  };
+
+  const handleRightCodeScroll = () => {
+    if (activeScrollRef.current === 'left') return;
+    activeScrollRef.current = 'right';
+    if (leftCodeContainerRef.current && rightCodeContainerRef.current) {
+      leftCodeContainerRef.current.scrollTop = rightCodeContainerRef.current.scrollTop;
+      leftCodeContainerRef.current.scrollLeft = rightCodeContainerRef.current.scrollLeft;
+    }
+    if (scrollSyncTimeoutRef.current) clearTimeout(scrollSyncTimeoutRef.current);
+    scrollSyncTimeoutRef.current = setTimeout(() => { activeScrollRef.current = null; }, 50);
+  };
   // Initialize marked parser with custom code renderer
   const markedRenderer = new marked.Renderer();
   markedRenderer.code = (code: string, language?: string) => {
@@ -363,6 +541,11 @@ function DocViewerContent() {
 
   // Context-aware URL click helper for sidebar switching
   const handleSidebarItemClick = (fileId: string) => {
+    if (isDirty) {
+      if (!window.confirm(t('viewer.confirmDiscard') || 'Bạn có các thay đổi chưa lưu. Bạn có chắc muốn chuyển tệp và bỏ qua chúng?')) {
+        return;
+      }
+    }
     let url = `/doc-viewer?id=${fileId}`;
     if (tabQuery) url += `&tab=${tabQuery}`;
     if (spaceId) url += `&spaceId=${spaceId}`;
@@ -382,8 +565,17 @@ function DocViewerContent() {
     const loadData = async () => {
       try {
         setIsLoading(true);
+        // Reset states to prevent state bleeding between documents
+        setAsset(null);
+        setMarkdownText('');
+        setOriginalMarkdown('');
+        setCodeText('');
+        setOriginalCode('');
+        setPreviewVersion(null);
+        setError(null);
+
         // 1. Fetch metadata
-        const metadataRes = await fetch(`${api}/api/assets/${id}`, { credentials: 'include' });
+        const metadataRes = await fetch(`${api}/api/assets/${id}?t=${Date.now()}`, { credentials: 'include' });
         if (!metadataRes.ok) {
           throw new Error(`${t('viewer.errorFetchDetails') || 'Failed to load asset details'} (HTTP ${metadataRes.status})`);
         }
@@ -403,7 +595,7 @@ function DocViewerContent() {
             throw new Error(t('viewer.fileTooLarge') || 'Tệp tin quá lớn (> 10MB), vui lòng tải về để xem trực tiếp.');
           }
 
-          const contentRes = await fetch(`${api}/api/assets/_media/original/${id}`, { credentials: 'include' });
+          const contentRes = await fetch(`${api}/api/assets/_media/original/${id}?t=${Date.now()}`, { credentials: 'include' });
           if (!contentRes.ok) {
             throw new Error(`${t('viewer.errorFetchContent') || 'Failed to download raw file content'} (HTTP ${contentRes.status})`);
           }
@@ -414,6 +606,7 @@ function DocViewerContent() {
             setOriginalMarkdown(text);
           } else {
             setCodeText(text);
+            setOriginalCode(text);
           }
         }
       } catch (err: any) {
@@ -499,12 +692,12 @@ function DocViewerContent() {
     };
 
     renderMermaid();
-  }, [previewHtml]);
+  }, [previewHtml, historyPreviewHtml, mdCompareMode]);
 
   // Prompt user on unsaved changes before tab close / reload
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (markdownText !== originalMarkdown) {
+      if (isDirty) {
         e.preventDefault();
         e.returnValue = ''; // Standard trigger for modern browsers
         return '';
@@ -512,7 +705,7 @@ function DocViewerContent() {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [markdownText, originalMarkdown]);
+  }, [isDirty]);
 
   // Copy helper
   const handleCopy = async (text: string) => {
@@ -527,21 +720,199 @@ function DocViewerContent() {
 
   // Close tab helper
   const handleClose = () => {
+    if (isDirty) {
+      if (!window.confirm(t('viewer.confirmDiscard') || 'Bạn có các thay đổi chưa lưu. Bạn có chắc muốn đóng và bỏ qua chúng?')) {
+        return;
+      }
+    }
     window.close();
   };
 
   // Reset editor text helper
   const handleReset = () => {
-    if (markdownText !== originalMarkdown) {
+    if (isDirty) {
       if (window.confirm(t('viewer.confirmReset') || 'Are you sure you want to revert all changes?')) {
-        setMarkdownText(originalMarkdown);
+        if (category === 'markdown') {
+          setMarkdownText(originalMarkdown);
+        } else {
+          setCodeText(originalCode);
+        }
       }
     }
   };
 
-  // Export PDF helper
   const handlePrint = () => {
+    const originalUrl = window.location.href;
+    
+    // Grab native, un-monkeypatched replaceState from a temporary iframe to prevent Next.js Router from reacting
+    let nativeReplaceState = window.history.replaceState;
+    let iframe: HTMLIFrameElement | null = null;
+    try {
+      iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      if (iframe.contentWindow) {
+        nativeReplaceState = iframe.contentWindow.history.replaceState;
+      }
+    } catch (e) {
+      console.warn('Failed to get native replaceState, falling back', e);
+    }
+
+    // Set URL to root domain path natively
+    nativeReplaceState.call(window.history, null, '', '/');
+    
     window.print();
+    
+    // Restore original URL natively
+    setTimeout(() => {
+      nativeReplaceState.call(window.history, null, '', originalUrl);
+      if (iframe && iframe.parentNode) {
+        iframe.parentNode.removeChild(iframe);
+      }
+    }, 200);
+  };
+
+  // Save changes handler (with conflict check)
+  const handleSave = async (customContent?: string, customVersion?: number) => {
+    if (!asset || isSaving) return;
+
+    const contentToSave = customContent !== undefined
+      ? customContent
+      : (category === 'markdown' ? markdownText : codeText);
+
+    const versionToSave = customVersion !== undefined
+      ? customVersion
+      : (asset.version || 1);
+
+    try {
+      setIsSaving(true);
+      const res = await fetch(`${api}/api/assets/${id}/content`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: contentToSave,
+          version: versionToSave,
+        }),
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        addToast(t('viewer.saveSuccess') || 'Đã lưu tệp tin thành công!', 'info');
+
+        // Update asset metadata
+        setAsset(prev => prev ? {
+          ...prev,
+          version: data.version,
+          size: data.size,
+          uploadedAt: data.uploadedAt,
+          lastModifiedById: user ? user.sub : prev.lastModifiedById
+        } : null);
+
+        // Update original and active values
+        if (category === 'markdown') {
+          setOriginalMarkdown(contentToSave);
+          setMarkdownText(contentToSave);
+        } else {
+          setOriginalCode(contentToSave);
+          setCodeText(contentToSave);
+        }
+        setShowMerge(false);
+      } else if (res.status === 409) {
+        const conflictData = await res.json();
+        // Server version returned from conflict
+        setServerVersion(conflictData.serverVersion);
+        setConflictServerContent(conflictData.serverContent);
+        setConflictLocalContent(contentToSave);
+        setShowMerge(true);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.message || 'Failed to save file');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error occurred while saving');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Preview version content
+  const handlePreviewVersion = async (version: any | null) => {
+    if (!asset) return;
+    if (version) {
+      try {
+        setIsLoading(true);
+        const res = await fetch(`${api}/api/assets/${id}/versions/${version.versionNumber}/content`, {
+          credentials: 'include'
+        });
+        if (!res.ok) {
+          throw new Error(t('viewer.errorFetchContent') || 'Failed to download raw file content');
+        }
+        const data = await res.json();
+        setPreviewVersion(version);
+        setHistoryContent(data.content || '');
+      } catch (err: any) {
+        alert(err.message || 'Failed to load version content');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setPreviewVersion(null);
+      setHistoryContent('');
+    }
+  };
+
+  // Restore historic version
+  const handleRestoreVersion = async (versionNumber: number) => {
+    if (!asset) return;
+    if (!window.confirm(t('viewer.restoreConfirm') || 'Are you sure you want to restore the file to this version?')) {
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const res = await fetch(`${api}/api/assets/${id}/versions/${versionNumber}/restore`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        addToast(t('viewer.restoreSuccess') || 'File restored successfully!', 'info');
+
+        // Update asset metadata
+        setAsset(prev => prev ? {
+          ...prev,
+          version: data.version,
+          size: data.size,
+          uploadedAt: data.uploadedAt,
+          lastModifiedById: user ? user.sub : prev.lastModifiedById
+        } : null);
+
+        // Fetch restored content
+        const contentRes = await fetch(`${api}/api/assets/_media/original/${id}`, { credentials: 'include' });
+        if (contentRes.ok) {
+          const text = await contentRes.text();
+          if (category === 'markdown') {
+            setMarkdownText(text);
+            setOriginalMarkdown(text);
+          } else {
+            setCodeText(text);
+            setOriginalCode(text);
+          }
+        }
+        setPreviewVersion(null);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.message || 'Failed to restore version');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error occurred while restoring version');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (error) {
@@ -572,7 +943,8 @@ function DocViewerContent() {
     );
   }
 
-  const category = asset ? docCategoryOf(asset) : 'other';
+
+
 
   // Compute highlighted code lines for formatting with line numbers
   const ext = asset ? (asset.ext || '').toLowerCase().replace(/^\./, '') : '';
@@ -580,31 +952,119 @@ function DocViewerContent() {
   const highlightedHtml = codeText 
     ? (validLang ? hljs.highlight(codeText, { language: validLang }).value : hljs.highlightAuto(codeText).value)
     : '';
-  const highlightedLines = highlightedHtml.split('\n');
+  const highlightedLines = splitHtmlIntoLines(highlightedHtml);
+
+  // Compute highlighted lines for history comparison view
+  const currentCompareHighlightedLines = useMemo(() => {
+    const textToHighlight = category === 'markdown' ? markdownText : codeText;
+    if (!textToHighlight) return [];
+    try {
+      const extStr = category === 'markdown' ? 'markdown' : (asset ? (asset.ext || '').toLowerCase().replace(/^\./, '') : '');
+      const lang = extStr && hljs.getLanguage(extStr) ? extStr : null;
+      const html = lang 
+        ? hljs.highlight(textToHighlight, { language: lang }).value 
+        : hljs.highlightAuto(textToHighlight).value;
+      return splitHtmlIntoLines(html);
+    } catch {
+      return textToHighlight.split('\n');
+    }
+  }, [codeText, markdownText, category, asset]);
+
+  const historyCompareHighlightedLines = useMemo(() => {
+    if (!historyContent) return [];
+    try {
+      const extStr = category === 'markdown' ? 'markdown' : (asset ? (asset.ext || '').toLowerCase().replace(/^\./, '') : '');
+      const lang = extStr && hljs.getLanguage(extStr) ? extStr : null;
+      const html = lang 
+        ? hljs.highlight(historyContent, { language: lang }).value 
+        : hljs.highlightAuto(historyContent).value;
+      return splitHtmlIntoLines(html);
+    } catch {
+      return historyContent.split('\n');
+    }
+  }, [historyContent, category, asset]);
+
+  // Helper to determine the mode and styles for the sandbox/edit button
+  const getSandboxModeConfig = () => {
+    if (sandboxMode) {
+      return {
+        label: t('viewer.sandboxMode') || 'Sandbox Mode',
+        tooltip: t('viewer.sandboxModeTooltip') || 'Read-only protection mode. Click to toggle to prevent accidental edits.',
+        color: '#fbbf24',
+        bg: 'rgba(245, 158, 11, 0.1)',
+        bgHover: 'rgba(245, 158, 11, 0.2)',
+        border: '1px solid rgba(245, 158, 11, 0.4)',
+        boxShadow: '0 0 12px rgba(245, 158, 11, 0.2)',
+        icon: (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        )
+      };
+    } else if (isWritable) {
+      return {
+        label: t('viewer.editMode') || 'Edit Mode',
+        tooltip: t('viewer.editModeTooltip') || 'Edit Mode. You have permission to modify and save changes to this file.',
+        color: '#34d399',
+        bg: 'rgba(52, 211, 153, 0.1)',
+        bgHover: 'rgba(52, 211, 153, 0.2)',
+        border: '1px solid rgba(52, 211, 153, 0.4)',
+        boxShadow: '0 0 12px rgba(52, 211, 153, 0.2)',
+        icon: (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+          </svg>
+        )
+      };
+    } else {
+      return {
+        label: t('viewer.previewEditMode') || 'Preview Edit Mode',
+        tooltip: t('viewer.previewEditModeTooltip') || 'You do not have write permission. This mode only allows temporary editing for local preview, changes cannot be saved.',
+        color: '#60a5fa',
+        bg: 'rgba(96, 165, 250, 0.1)',
+        bgHover: 'rgba(96, 165, 250, 0.2)',
+        border: '1px solid rgba(96, 165, 250, 0.4)',
+        boxShadow: '0 0 12px rgba(96, 165, 250, 0.2)',
+        icon: (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+            <circle cx="12" cy="7" r="1" fill="currentColor"></circle>
+          </svg>
+        )
+      };
+    }
+  };
+
+  const modeConfig = getSandboxModeConfig();
 
   // Shared content sheet title/header renderer
   const renderContentHeader = () => {
     if (!asset) return null;
     return (
-      <div className="docContentHeader no-print">
+      <div className="docContentHeader no-print" style={{ borderBottom: previewVersion ? '1px solid rgba(255, 255, 255, 0.05)' : undefined }}>
         <h1 className="docContentTitle">{asset.originalName}</h1>
-        <div className="docContentMeta">
-          <span>{category.toUpperCase()}</span>
-          <span>•</span>
-          <span>{fmtBytes(asset.size)}</span>
-          {asset.uploadedAt && (
-            <>
-              <span>•</span>
-              <span>{new Date(asset.uploadedAt).toLocaleDateString()}</span>
-            </>
-          )}
-        </div>
+        {!previewVersion && (
+          <div className="docContentMeta">
+            <span>{category.toUpperCase()}</span>
+            <span>•</span>
+            <span>{fmtBytes(asset.size)}</span>
+            {asset.uploadedAt && (
+              <>
+                <span>•</span>
+                <span>{new Date(asset.uploadedAt).toLocaleDateString()}</span>
+              </>
+            )}
+          </div>
+        )}
       </div>
     );
   };
 
   return (
-    <div className="docViewerContainer">
+    <div className={`docViewerContainer ${sandboxMode ? 'mode-sandbox' : 'mode-edit'} ${mdCompareMode === 'diff' ? 'md-diff' : 'md-preview'} ${previewVersion !== null ? 'is-compare' : 'is-normal'}`}>
       <header className="viewerHeader no-print">
         <div className="headerLeft">
           <button 
@@ -623,21 +1083,203 @@ function DocViewerContent() {
         </div>
 
         <div className="headerCenter">
-          {category === 'markdown' && (
-            <span className="playgroundBadge">
-              {t('viewer.sandboxMode') || 'Sandbox Mode'}
-            </span>
+          {['markdown', 'code', 'config', 'text'].includes(category) && (
+            <div 
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              onMouseEnter={() => setIsModeHovered(true)}
+              onMouseLeave={() => setIsModeHovered(false)}
+            >
+              <button
+                className="sandboxToggleBtn"
+                onClick={() => setSandboxMode(!sandboxMode)}
+                title={modeConfig.tooltip}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 12px',
+                  borderRadius: '999px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  outline: 'none',
+                  boxShadow: modeConfig.boxShadow,
+                  border: modeConfig.border,
+                  background: modeConfig.bg,
+                  color: modeConfig.color
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = modeConfig.bgHover;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = modeConfig.bg;
+                }}
+              >
+                {modeConfig.icon}
+                <span>{modeConfig.label}</span>
+              </button>
+
+              <span
+                className="sandboxChangeIcon"
+                title={modeConfig.tooltip}
+                style={{
+                  color: 'var(--text-muted, #71717a)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '6px',
+                  pointerEvents: 'none',
+                  transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transform: isModeHovered ? 'rotate(180deg)' : 'none'
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 16V4M7 4L3 8M7 4L11 8" />
+                  <path d="M17 8v12M17 20l-4-4M17 20l4-4" />
+                </svg>
+              </span>
+            </div>
           )}
         </div>
 
         <div className="headerRight">
+          {asset && ['markdown', 'code', 'config', 'text'].includes(category) && (
+            <div className="versionWidgetWrapper">
+              <VersionWidget
+                assetId={asset.id}
+                currentVersion={asset.version || 1}
+                hasWritePermission={isWritable && !asset.isDeleted}
+                onPreviewVersion={handlePreviewVersion}
+                onRestoreVersion={handleRestoreVersion}
+                previewVersion={previewVersion}
+              />
+            </div>
+          )}
+
+          {['markdown', 'code', 'config', 'text'].includes(category) && (
+            <div className="saveActionGroup">
+              {!isWritable && (
+                <span className="readOnlyReasonLabel" title={t('viewer.readOnlyReason')}>
+                  {t('viewer.readOnlyReason')}
+                </span>
+              )}
+              {asset?.isDeleted && (
+                <span className="readOnlyReasonLabel">
+                  {t('viewer.fileInTrash')}
+                </span>
+              )}
+              <button
+                className="btn primary btnSave"
+                onClick={() => handleSave()}
+                disabled={!isWritable || !isDirty || previewVersion !== null || isSaving || asset?.isDeleted}
+                title={isSaving ? t('viewer.saving') : t('viewer.save')}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '6px',
+                  flexShrink: 0
+                }}
+              >
+                {isSaving ? (
+                  <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: 'spin 1s linear infinite' }}>
+                    <style>{`
+                      @keyframes spin {
+                        to { transform: rotate(360deg); }
+                      }
+                    `}</style>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeDasharray="30 15"></circle>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                  </svg>
+                )}
+              </button>
+              <button 
+                onClick={handleReset} 
+                disabled={!isDirty}
+                title={t('viewer.reset') || 'Reset'}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: isDirty ? 'var(--text-color, #ffffff)' : 'var(--text-muted, #71717a)',
+                  cursor: isDirty ? 'pointer' : 'not-allowed',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                  opacity: isDirty ? 1 : 0.4
+                }}
+                onMouseEnter={(e) => {
+                  if (isDirty) {
+                    e.currentTarget.style.background = docTheme === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.06)';
+                    e.currentTarget.style.color = docTheme === 'light' ? '#000000' : '#ffffff';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = isDirty ? 'var(--text-color, #ffffff)' : 'var(--text-muted, #71717a)';
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                  <polyline points="3 3 3 8 8 8"></polyline>
+                </svg>
+              </button>
+            </div>
+          )}
+
           {category === 'markdown' && (
             <>
-              <button className="btn" onClick={handleReset} disabled={markdownText === originalMarkdown}>
-                {t('viewer.reset') || 'Reset'}
-              </button>
-              <button className="btn" onClick={() => handleCopy(markdownText)}>
-                {isCopied ? (t('viewer.copiedSuccess') || '✓ Copied') : (t('viewer.copyRaw') || 'Copy')}
+              <button 
+                onClick={() => handleCopy(markdownText)}
+                title={isCopied ? t('viewer.copiedSuccess') || 'Copied' : t('viewer.copyRaw') || 'Copy'}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: isCopied ? '#10b981' : 'var(--text-muted, #71717a)',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = docTheme === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.06)';
+                  if (!isCopied) {
+                    e.currentTarget.style.color = docTheme === 'light' ? '#000000' : '#ffffff';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  if (!isCopied) {
+                    e.currentTarget.style.color = 'var(--text-muted, #71717a)';
+                  }
+                }}
+              >
+                {isCopied ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                )}
               </button>
               <button className="btn primary" onClick={handlePrint}>
                 {t('viewer.exportPdf') || 'Export PDF'}
@@ -646,9 +1288,50 @@ function DocViewerContent() {
           )}
 
           {['code', 'config', 'text'].includes(category) && (
-            <button className="btn" onClick={() => handleCopy(codeText)}>
-              {isCopied ? (t('viewer.copiedSuccess') || '✓ Copied') : (t('viewer.copyRaw') || 'Copy')}
-            </button>
+            <>
+              <button 
+                onClick={() => handleCopy(codeText)}
+                title={isCopied ? t('viewer.copiedSuccess') || 'Copied' : t('viewer.copyRaw') || 'Copy'}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: isCopied ? '#10b981' : 'var(--text-muted, #71717a)',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = docTheme === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.06)';
+                  if (!isCopied) {
+                    e.currentTarget.style.color = docTheme === 'light' ? '#000000' : '#ffffff';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  if (!isCopied) {
+                    e.currentTarget.style.color = 'var(--text-muted, #71717a)';
+                  }
+                }}
+              >
+                {isCopied ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                )}
+              </button>
+              <button className="btn primary" onClick={handlePrint}>
+                {t('viewer.exportPdf') || 'Export PDF'}
+              </button>
+            </>
           )}
 
           <button 
@@ -759,6 +1442,23 @@ function DocViewerContent() {
             </div>
           ) : asset ? (
             <>
+              {/* Print-only Header */}
+              <div className="printHeaderOnly">
+                <div className="printHeaderLogo">AetherCloud</div>
+                <div className="printHeaderFileName">{asset.originalName}</div>
+                <div className="printHeaderMeta">
+                  <span>Version: v{asset.version || 1}</span>
+                  <span> · </span>
+                  <span>Size: {fmtBytes(asset.size)}</span>
+                  {asset.uploadedAt && (
+                    <>
+                      <span> · </span>
+                      <span>Date: {new Date(asset.uploadedAt).toLocaleString()}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
               {category === 'pdf' && (
                 <div className="pdfContentWrapper">
                   {renderContentHeader()}
@@ -775,44 +1475,533 @@ function DocViewerContent() {
               {category === 'markdown' && (
                 <div className="markdownContentWrapper">
                   {renderContentHeader()}
-                  <div className="splitLayout">
-                    <div className="leftPane no-print">
-                      <textarea
-                        ref={leftPaneRef}
-                        className="editorInput"
-                        value={markdownText}
-                        onChange={(e) => setMarkdownText(e.target.value)}
-                        onScroll={handleLeftScroll}
-                      />
+                  {previewVersion && (
+                    <div className="previewVersionBanner">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <span>
+                          {t('viewer.previewBanner', { ver: previewVersion.versionNumber })}
+                        </span>
+                        <button 
+                          className="btnText" 
+                          onClick={() => setMdCompareMode(prev => prev === 'diff' ? 'preview' : 'diff')}
+                          style={{ textDecoration: 'underline', fontSize: '12.5px', fontWeight: 600 }}
+                        >
+                          {mdCompareMode === 'diff' ? t('viewer.viewPreview') || 'Xem Preview' : t('viewer.viewDiff') || 'Xem Bản Gốc (Diff)'}
+                        </button>
+                      </div>
+                      <button className="btnText" onClick={() => handlePreviewVersion(null)}>
+                        {t('viewer.exitPreview')}
+                      </button>
                     </div>
-                    <div 
-                      ref={rightPaneRef}
-                      className="rightPane"
-                      onScroll={handleRightScroll}
-                    >
+                  )}
+                  {previewVersion !== null ? (
+                    <div className="splitLayout">
+                      {mdCompareMode === 'diff' ? (
+                        <>
+                          {/* Left: Active Source Code Diff */}
+                          <div className="leftPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                            <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
+                              <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {t('viewer.compareCurrent') || 'Current Version'}
+                              </h3>
+                              <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
+                                <span>v{asset.version || 1}</span>
+                                <span>•</span>
+                                <span>{fmtBytes(asset.size)}</span>
+                                {asset.uploadedAt && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{new Date(asset.uploadedAt).toLocaleString()}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            {!sandboxMode ? (
+                              <textarea
+                                className="editorInput hljs"
+                                value={markdownText}
+                                onChange={(e) => setMarkdownText(e.target.value)}
+                                style={{
+                                  flex: 1,
+                                  height: '100%',
+                                  padding: '24px',
+                                  border: 'none',
+                                  resize: 'none',
+                                  outline: 'none',
+                                  background: 'transparent',
+                                  color: 'var(--text-color, #f4f4f5)',
+                                  overflow: 'auto',
+                                  fontFamily: 'inherit',
+                                  fontSize: 'inherit',
+                                  lineHeight: 'inherit'
+                                }}
+                              />
+                            ) : (
+                              <div 
+                                ref={leftCodeContainerRef}
+                                className="codeContainer hljs" 
+                                onScroll={handleLeftCodeScroll}
+                                style={{ flex: 1, overflow: 'auto' }}
+                              >
+                                <div style={{ display: 'flex', minWidth: 'fit-content' }}>
+                                  <div className="lineNumbers">
+                                    {mdDiffRows.map((row, i) => (
+                                      <div key={i} className={`lineNo diff-line ${row.type === 'added' ? 'diff-empty' : row.type}`}>
+                                        {row.leftLineNo || ' '}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <pre className="codePre" style={{ flex: 1, margin: 0, padding: '24px 16px', overflow: 'visible' }}>
+                                    <code className="hljs markdown">
+                                      {mdDiffRows.map((row, i) => (
+                                        <div 
+                                          key={i} 
+                                          className={`codeLine diff-line ${row.type === 'added' ? 'diff-empty' : row.type}`}
+                                          style={{ height: '21.6px', lineHeight: '21.6px' }}
+                                          dangerouslySetInnerHTML={{
+                                            __html: row.type === 'added' ? '' : (row.leftLineNo ? (currentCompareHighlightedLines[Number(row.leftLineNo) - 1] || ' ') : ' ')
+                                          }}
+                                        />
+                                      ))}
+                                    </code>
+                                  </pre>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Right: History Source Code Diff */}
+                          <div className="rightPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                            <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
+                              <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {t('viewer.compareHistory', { ver: previewVersion.versionNumber }) || `History Version v${previewVersion.versionNumber}`}
+                              </h3>
+                              <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
+                                <span>v{previewVersion.versionNumber}</span>
+                                <span>•</span>
+                                <span>{previewVersion.size ? fmtBytes(previewVersion.size) : ''}</span>
+                                {previewVersion.createdAt && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{new Date(previewVersion.createdAt).toLocaleString()}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                              <div 
+                                ref={rightCodeContainerRef}
+                                className="codeContainer hljs" 
+                                onScroll={handleRightCodeScroll}
+                                style={{ flex: 1, overflow: 'auto' }}
+                              >
+                                <div style={{ display: 'flex', minWidth: 'fit-content' }}>
+                                  <div className="lineNumbers">
+                                    {mdDiffRows.map((row, i) => (
+                                      <div key={i} className={`lineNo diff-line ${row.type === 'deleted' ? 'diff-empty' : row.type}`}>
+                                        {row.rightLineNo || ' '}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <pre className="codePre" style={{ flex: 1, margin: 0, padding: '24px 16px', overflow: 'visible' }}>
+                                    <code className="hljs markdown">
+                                      {mdDiffRows.map((row, i) => (
+                                        <div 
+                                          key={i} 
+                                          className={`codeLine diff-line ${row.type === 'deleted' ? 'diff-empty' : row.type}`}
+                                          style={{ height: '21.6px', lineHeight: '21.6px' }}
+                                          dangerouslySetInnerHTML={{
+                                            __html: row.type === 'deleted' ? '' : (row.rightLineNo ? (historyCompareHighlightedLines[Number(row.rightLineNo) - 1] || ' ') : ' ')
+                                          }}
+                                        />
+                                      ))}
+                                    </code>
+                                  </pre>
+                                </div>
+                              </div>
+                            </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* Left: Active HTML Preview */}
+                          <div className="leftPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                            <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
+                              <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {t('viewer.compareCurrent') || 'Current Version'}
+                              </h3>
+                              <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
+                                <span>v{asset.version || 1}</span>
+                                <span>•</span>
+                                <span>{fmtBytes(asset.size)}</span>
+                                {asset.uploadedAt && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{new Date(asset.uploadedAt).toLocaleString()}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div 
+                              ref={leftCodeContainerRef}
+                              onScroll={handleLeftCodeScroll}
+                              style={{ flex: 1, overflow: 'auto', padding: '24px' }}
+                            >
+                              <div 
+                                className="previewContainer markdown-body" 
+                                dangerouslySetInnerHTML={{ __html: previewHtml }} 
+                              />
+                            </div>
+                          </div>
+
+                          {/* Right: History HTML Preview */}
+                          <div className="rightPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                            <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
+                              <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {t('viewer.compareHistory', { ver: previewVersion.versionNumber }) || `History Version v${previewVersion.versionNumber}`}
+                              </h3>
+                              <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
+                                <span>v{previewVersion.versionNumber}</span>
+                                <span>•</span>
+                                <span>{previewVersion.size ? fmtBytes(previewVersion.size) : ''}</span>
+                                {previewVersion.createdAt && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{new Date(previewVersion.createdAt).toLocaleString()}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div 
+                              ref={rightCodeContainerRef}
+                              onScroll={handleRightCodeScroll}
+                              style={{ flex: 1, overflow: 'auto', padding: '24px' }}
+                            >
+                              <div 
+                                className="previewContainer markdown-body" 
+                                dangerouslySetInnerHTML={{ __html: historyPreviewHtml }} 
+                              />
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="splitLayout">
+                      <div className="leftPane no-print">
+                        <textarea
+                          ref={leftPaneRef}
+                          className="editorInput"
+                          value={markdownText}
+                          onChange={(e) => setMarkdownText(e.target.value)}
+                          onScroll={handleLeftScroll}
+                          readOnly={sandboxMode}
+                        />
+                      </div>
+                      
+                      {/* Print-only Markdown Source view (clean pre/code instead of textarea) */}
+                      <div className="print-only-markdown-source" style={{ display: 'none' }}>
+                        <pre className="codePre" style={{ padding: '24px', margin: 0 }}>
+                          <code className="hljs markdown" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                            {markdownText}
+                          </code>
+                        </pre>
+                      </div>
+
                       <div 
-                        className="previewContainer markdown-body" 
-                        dangerouslySetInnerHTML={{ __html: previewHtml }} 
-                      />
+                        ref={rightPaneRef}
+                        className="rightPane"
+                        onScroll={handleRightScroll}
+                      >
+                        <div 
+                          className="previewContainer markdown-body" 
+                          dangerouslySetInnerHTML={{ __html: previewHtml }} 
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
               {['code', 'config', 'text'].includes(category) && (
                 <div className="docContentWrapper">
                   {renderContentHeader()}
-                  <div className="codeViewContainer">
-                    <div className="codeContainer" style={{ display: 'flex', flexDirection: 'column' }} onScroll={handleCodeScroll}>
-                      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+                  {previewVersion && (
+                    <div className="previewVersionBanner">
+                      <span>
+                        {t('viewer.previewBanner', { ver: previewVersion.versionNumber })}
+                      </span>
+                      <button className="btnText" onClick={() => handlePreviewVersion(null)}>
+                        {t('viewer.exitPreview')}
+                      </button>
+                    </div>
+                  )}
+                  <div className="codeViewContainer" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                    {previewVersion !== null ? (
+                      <div className="splitLayout">
+                        {/* Left Pane: Active Version */}
+                        <div className="leftPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                          <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
+                            <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {t('viewer.compareCurrent') || 'Current Version'}
+                            </h3>
+                            <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
+                              <span>v{asset.version || 1}</span>
+                              <span>•</span>
+                              <span>{fmtBytes(asset.size)}</span>
+                              {asset.uploadedAt && (
+                                <>
+                                  <span>•</span>
+                                  <span>{new Date(asset.uploadedAt).toLocaleString()}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          {!sandboxMode ? (
+                            <div 
+                              ref={leftCodeContainerRef}
+                              className="codeContainer hljs" 
+                              onScroll={handleLeftCodeScroll}
+                              style={{ flex: 1, overflow: 'auto' }}
+                            >
+                              <div style={{ display: 'flex', minWidth: 'fit-content' }}>
+                                <div className="lineNumbers">
+                                  {codeText.split('\n').map((_, i) => {
+                                    const lineNum = i + 1;
+                                    const diffType = leftLineDiffTypes[lineNum] || 'normal';
+                                    return (
+                                      <div key={i} className={`lineNo diff-line ${diffType}`}>
+                                        {lineNum}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'visible', position: 'relative' }}>
+                                  <code className="hljs" style={{ display: 'block', height: '100%', position: 'relative' }}>
+                                    <div style={{ pointerEvents: 'none' }}>
+                                      {highlightedLines.map((line, i) => {
+                                        const lineNum = i + 1;
+                                        const diffType = leftLineDiffTypes[lineNum] || 'normal';
+                                        return (
+                                          <div 
+                                            key={i} 
+                                            className={`codeLine diff-line ${diffType}`}
+                                            dangerouslySetInnerHTML={{ __html: line || '&nbsp;' }} 
+                                          />
+                                        );
+                                      })}
+                                    </div>
+                                    <textarea
+                                      ref={textareaRef}
+                                      className="editorInput codeEditorInput hljs"
+                                      value={codeText}
+                                      onChange={(e) => setCodeText(e.target.value)}
+                                      spellCheck={false}
+                                      style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: '100%',
+                                        height: '100%',
+                                        border: 'none',
+                                        resize: 'none',
+                                        outline: 'none',
+                                        background: 'transparent',
+                                        color: 'transparent',
+                                        caretColor: docTheme === 'light' ? '#18181b' : '#ffffff',
+                                        overflow: 'hidden',
+                                        whiteSpace: 'pre',
+                                        wordWrap: 'normal',
+                                        padding: 0,
+                                        margin: 0,
+                                        fontFamily: 'inherit',
+                                        fontSize: 'inherit',
+                                        lineHeight: 'inherit',
+                                        zIndex: 2
+                                      }}
+                                    />
+                                  </code>
+                                </pre>
+                              </div>
+                            </div>
+                          ) : (
+                            <div 
+                              ref={leftCodeContainerRef}
+                              className="codeContainer hljs" 
+                              onScroll={handleLeftCodeScroll}
+                              style={{ flex: 1, overflow: 'auto' }}
+                            >
+                              <div style={{ display: 'flex', minWidth: 'fit-content' }}>
+                                <div className="lineNumbers">
+                                  {codeDiffRows.map((row, i) => (
+                                    <div key={i} className={`lineNo diff-line ${row.type === 'added' ? 'diff-empty' : row.type}`}>
+                                      {row.leftLineNo || ' '}
+                                    </div>
+                                  ))}
+                                </div>
+                                <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'visible' }}>
+                                  <code className="hljs">
+                                    {codeDiffRows.map((row, i) => (
+                                      <div 
+                                        key={i} 
+                                        className={`codeLine diff-line ${row.type === 'added' ? 'diff-empty' : row.type}`}
+                                        style={{ height: '21.6px', lineHeight: '21.6px' }}
+                                        dangerouslySetInnerHTML={{
+                                          __html: row.type === 'added' ? '' : (row.leftLineNo ? (currentCompareHighlightedLines[Number(row.leftLineNo) - 1] || ' ') : ' ')
+                                        }}
+                                      />
+                                    ))}
+                                  </code>
+                                </pre>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right Pane: History Version */}
+                        <div className="rightPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                          <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
+                            <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {t('viewer.compareHistory', { ver: previewVersion.versionNumber }) || `History Version v${previewVersion.versionNumber}`}
+                            </h3>
+                            <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
+                              <span>v{previewVersion.versionNumber}</span>
+                              <span>•</span>
+                              <span>{previewVersion.size ? fmtBytes(previewVersion.size) : ''}</span>
+                              {previewVersion.createdAt && (
+                                <>
+                                  <span>•</span>
+                                  <span>{new Date(previewVersion.createdAt).toLocaleString()}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div 
+                            ref={rightCodeContainerRef}
+                            className="codeContainer hljs" 
+                            onScroll={handleRightCodeScroll}
+                            style={{ flex: 1, overflow: 'auto' }}
+                          >
+                            <div style={{ display: 'flex', minWidth: 'fit-content' }}>
+                              {sandboxMode ? (
+                                <>
+                                  <div className="lineNumbers">
+                                    {codeDiffRows.map((row, i) => (
+                                      <div key={i} className={`lineNo diff-line ${row.type === 'deleted' ? 'diff-empty' : row.type}`}>
+                                        {row.rightLineNo || ' '}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'visible' }}>
+                                    <code className="hljs">
+                                      {codeDiffRows.map((row, i) => (
+                                        <div 
+                                          key={i} 
+                                          className={`codeLine diff-line ${row.type === 'deleted' ? 'diff-empty' : row.type}`}
+                                          style={{ height: '21.6px', lineHeight: '21.6px' }}
+                                          dangerouslySetInnerHTML={{
+                                            __html: row.type === 'deleted' ? '' : (row.rightLineNo ? (historyCompareHighlightedLines[Number(row.rightLineNo) - 1] || ' ') : ' ')
+                                          }}
+                                        />
+                                      ))}
+                                    </code>
+                                  </pre>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="lineNumbers">
+                                    {historyContent.split('\n').map((_, i) => {
+                                      const lineNum = i + 1;
+                                      const diffType = rightLineDiffTypes[lineNum] || 'normal';
+                                      return (
+                                        <div key={i} className={`lineNo diff-line ${diffType}`}>
+                                          {lineNum}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'visible' }}>
+                                    <code className="hljs">
+                                      {historyContent.split('\n').map((_, i) => {
+                                        const lineNum = i + 1;
+                                        const diffType = rightLineDiffTypes[lineNum] || 'normal';
+                                        return (
+                                          <div 
+                                            key={i} 
+                                            className={`codeLine diff-line ${diffType}`}
+                                            style={{ height: '21.6px', lineHeight: '21.6px' }}
+                                            dangerouslySetInnerHTML={{
+                                              __html: historyCompareHighlightedLines[i] || '&nbsp;'
+                                            }}
+                                          />
+                                        );
+                                      })}
+                                    </code>
+                                  </pre>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                          </div>
+                    ) : !sandboxMode ? (
+                      <div className="codeContainer hljs">
                         <div className="lineNumbers">
-                          {highlightedLines.slice(0, visibleLinesCount).map((_, i) => (
+                          {codeText.split('\n').map((_, i) => (
+                            <div key={i} className="lineNo">{i + 1}</div>
+                          ))}
+                        </div>
+                        <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'hidden', position: 'relative' }}>
+                          <code className="hljs" style={{ display: 'block', height: '100%', position: 'relative' }}>
+                            <div style={{ pointerEvents: 'none' }}>
+                              {highlightedLines.map((line, i) => (
+                                <div 
+                                  key={i} 
+                                  className="codeLine" 
+                                  dangerouslySetInnerHTML={{ __html: line || '&nbsp;' }} 
+                                />
+                              ))}
+                            </div>
+                            <textarea
+                              ref={textareaRef}
+                              className="editorInput codeEditorInput hljs"
+                              value={codeText}
+                              onChange={(e) => setCodeText(e.target.value)}
+                              spellCheck={false}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                border: 'none',
+                                resize: 'none',
+                                outline: 'none',
+                                background: 'transparent',
+                                color: 'transparent',
+                                caretColor: docTheme === 'light' ? '#18181b' : '#ffffff',
+                                overflow: 'hidden',
+                                whiteSpace: 'pre',
+                                wordWrap: 'normal',
+                                padding: 0,
+                                margin: 0,
+                                fontFamily: 'inherit',
+                                fontSize: 'inherit',
+                                lineHeight: 'inherit',
+                                zIndex: 2
+                              }}
+                            />
+                          </code>
+                        </pre>
+                      </div>
+                    ) : (
+                      <div className="codeContainer">
+                        <div className="lineNumbers">
+                          {highlightedLines.map((_, i) => (
                             <div key={i} className="lineNo">{i + 1}</div>
                           ))}
                         </div>
                         <pre className="codePre">
-                          <code>
-                            {highlightedLines.slice(0, visibleLinesCount).map((line, i) => (
+                          <code className="hljs">
+                            {highlightedLines.map((line, i) => (
                               <div 
                                 key={i} 
                                 className="codeLine" 
@@ -822,19 +2011,7 @@ function DocViewerContent() {
                           </code>
                         </pre>
                       </div>
-                      {highlightedLines.length > visibleLinesCount && (
-                        <div style={{ padding: '12px 16px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)', color: '#71717a', fontSize: '12px' }} className="no-print">
-                          {isScrollingFast ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-                              <div className="skeleton-line" style={{ width: '80%', height: '12px', background: 'var(--border-color, rgba(255,255,255,0.1))', borderRadius: '4px', animation: 'pulse 1.5s infinite ease-in-out' }} />
-                              <div className="skeleton-line" style={{ width: '60%', height: '12px', background: 'var(--border-color, rgba(255,255,255,0.1))', borderRadius: '4px', animation: 'pulse 1.5s infinite ease-in-out' }} />
-                            </div>
-                          ) : (
-                            t('viewer.loadingMoreLines') || 'Đang tải thêm...'
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -878,6 +2055,15 @@ function DocViewerContent() {
           ) : null}
         </main>
       </div>
+
+      {showMerge && (
+        <MergeEditor
+          serverContent={conflictServerContent}
+          localContent={conflictLocalContent}
+          onApply={(mergedContent) => handleSave(mergedContent, serverVersion)}
+          onCancel={() => setShowMerge(false)}
+        />
+      )}
     </div>
   );
 }
