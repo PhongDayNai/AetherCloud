@@ -509,7 +509,7 @@ function DocViewerContent() {
         } 
         // 3. Binder / Document Project context
         else if (docProjectParam !== null && docProjectParam !== '') {
-          let url = `${api}/api/assets?limit=50&type=doc&docProject=${encodeURIComponent(docProjectParam)}`;
+          let url = `${api}/api/assets?limit=50&type=docs&docProject=${encodeURIComponent(docProjectParam)}`;
           if (activeGroupId) url += `&groupId=${activeGroupId}`;
           const res = await fetch(url, { credentials: 'include' });
           if (res.ok) {
@@ -524,7 +524,7 @@ function DocViewerContent() {
         } 
         // 4. Documents tab context
         else if (tabQuery === 'docs') {
-          let url = `${api}/api/assets?limit=50&type=doc`;
+          let url = `${api}/api/assets?limit=50&type=docs`;
           if (activeGroupId) url += `&groupId=${activeGroupId}`;
           const res = await fetch(url, { credentials: 'include' });
           if (res.ok) {
@@ -539,7 +539,7 @@ function DocViewerContent() {
         } 
         // 5. Default / Dashboard / Personal space context
         else {
-          let url = `${api}/api/assets?limit=50&type=doc`;
+          let url = `${api}/api/assets?limit=50&type=docs`;
           if (activeGroupId) url += `&groupId=${activeGroupId}`;
           const res = await fetch(url, { credentials: 'include' });
           if (res.ok) {
@@ -568,7 +568,7 @@ function DocViewerContent() {
       if (docProjectParam !== null && docProjectParam !== '') {
         url += `&docProject=${encodeURIComponent(docProjectParam)}`;
       } else {
-        url += `&type=doc`;
+        url += `&type=docs`;
       }
       const activeGroupId = asset?.groupId || '';
       if (activeGroupId) {
