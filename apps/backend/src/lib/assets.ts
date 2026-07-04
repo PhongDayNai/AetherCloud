@@ -624,7 +624,7 @@ export async function listAssets(limit = 200, opts: any = {}): Promise<Asset[]> 
   if (type) {
     if (type === 'photos') {
       clauses.push(`(type = 'image' OR type = 'video')`);
-    } else if (type === 'docs') {
+    } else if (type === 'docs' || type === 'doc') {
       clauses.push(`type = 'file'`);
     }
   }
