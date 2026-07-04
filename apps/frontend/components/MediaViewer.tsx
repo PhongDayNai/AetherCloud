@@ -117,7 +117,7 @@ export default function MediaViewer({
     }
     
     // Find if the asset belongs to a specific post in the current active space
-    if (posts && posts.length > 0) {
+    if (tab !== 'space-all' && posts && posts.length > 0) {
       const activePost = posts.find((p: any) => 
         p.assets && p.assets.some((a: any) => a.id === active.id)
       );
