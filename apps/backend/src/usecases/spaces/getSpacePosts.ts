@@ -29,7 +29,7 @@ export async function getSpacePosts(spaceId: string, userId: string) {
            u.name AS post_user_name, u.avatar_url AS post_user_avatar_url,
            a.id AS asset_id, a.original_name, a.mime, a.size, a.rel_path, a.play_rel_path, a.hls_rel_path,
            a.processing_status, a.type AS asset_type, a.ext, a.uploaded_at, a.taken_at, a.album_name,
-           a.album_names, a.doc_project_name, a.doc_project_names, a.tags
+           a.album_names, a.doc_project_name, a.doc_project_names, a.tags, a.version, a.last_modified_by
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
     LEFT JOIN post_assets pa ON p.id = pa.post_id
@@ -71,7 +71,9 @@ export async function getSpacePosts(spaceId: string, userId: string) {
         albumNames: row.album_names,
         docProjectName: row.doc_project_name,
         docProjectNames: row.doc_project_names,
-        tags: row.tags
+        tags: row.tags,
+        version: row.version !== undefined && row.version !== null ? Number(row.version) : 1,
+        lastModifiedById: row.last_modified_by || null
       });
     }
   }

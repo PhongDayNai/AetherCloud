@@ -88,13 +88,15 @@ export async function createSpacePost(
                   id, original_name, mime, size, owner_id, group_id, uploaded_at, taken_at, rel_path,
                   play_rel_path, hls_rel_path, processing_status, processing_started_at,
                   processing_finished_at, ext, album_name, album_names, doc_project_name,
-                  doc_project_names, tags, is_deleted, deleted_at, is_library, type
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+                  doc_project_names, tags, is_deleted, deleted_at, is_library, type, version, last_modified_by
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
               `, [
                 targetAssetId, original.original_name, original.mime, original.size, user.sub, groupId,
                 new Date().toISOString(), original.taken_at, original.rel_path, original.play_rel_path, original.hls_rel_path,
                 original.processing_status, original.processing_started_at, original.processing_finished_at,
-                original.ext, null, '{}', null, '{}', original.tags, false, null, false, original.type
+                original.ext, null, '{}', null, '{}', original.tags, false, null, false, original.type,
+                original.version !== undefined && original.version !== null ? Number(original.version) : 1,
+                original.last_modified_by || null
               ]);
             }
 
@@ -168,7 +170,7 @@ export async function createSpacePost(
 
     const postAssetsRes = await db.query(
       `SELECT id, original_name, mime, size, rel_path, play_rel_path, hls_rel_path, processing_status, type, ext,
-              uploaded_at, taken_at, album_name, album_names, doc_project_name, doc_project_names, tags
+              uploaded_at, taken_at, album_name, album_names, doc_project_name, doc_project_names, tags, version, last_modified_by
        FROM assets WHERE id = ANY($1)`,
       [linkedAssetIds]
     );
@@ -197,7 +199,9 @@ export async function createSpacePost(
           albumNames: row.album_names,
           docProjectName: row.doc_project_name,
           docProjectNames: row.doc_project_names,
-          tags: row.tags
+          tags: row.tags,
+          version: row.version !== undefined && row.version !== null ? Number(row.version) : 1,
+          lastModifiedById: row.last_modified_by || null
         }))
       }
     };

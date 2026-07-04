@@ -686,8 +686,8 @@ router.put('/:id/content', requireAuth, checkAssetOwnership, async (req: Request
     const versionCreator = asset.lastModifiedById || asset.ownerId;
     await client.query(`
       INSERT INTO asset_versions (id, asset_id, version_number, rel_path, size, created_at, created_by)
-      VALUES ($1, $2, $3, $4, $5, NOW(), $6)
-    `, [versionId, id, asset.version, backupRelPath, backupSize, versionCreator]);
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `, [versionId, id, asset.version, backupRelPath, backupSize, asset.uploadedAt || new Date(), versionCreator]);
 
     // 3. Cập nhật thông tin asset chính
     const nextVersion = asset.version + 1;
@@ -965,8 +965,8 @@ router.post('/:id/versions/:versionNumber/restore', requireAuth, checkAssetOwner
     const versionCreator = asset.lastModifiedById || asset.ownerId;
     await client.query(`
       INSERT INTO asset_versions (id, asset_id, version_number, rel_path, size, created_at, created_by)
-      VALUES ($1, $2, $3, $4, $5, NOW(), $6)
-    `, [versionId, id, asset.version, backupRelPath, backupSize, versionCreator]);
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `, [versionId, id, asset.version, backupRelPath, backupSize, asset.uploadedAt || new Date(), versionCreator]);
 
     // 4. Tăng version chính của asset lên
     const nextVersion = asset.version + 1;
