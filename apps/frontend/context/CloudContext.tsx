@@ -844,6 +844,10 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
 
   async function handleCreatePost() {
     if (!postCaption.trim() && postFiles.length === 0) return;
+    if (postFiles.length > 20) {
+      setErr(t('spaces.maxFilesExceeded', { max: 20 }));
+      return;
+    }
     try {
       setMsg(t('spaces.posting') || "Đang đăng bài viết...");
       const fd = new FormData();
@@ -861,7 +865,10 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
         credentials: 'include',
         body: fd
       });
-      if (!r.ok) throw new Error(t('spaces.postingFailed') || "Đăng bài thất bại");
+      if (!r.ok) {
+        const errorData = await r.json().catch(() => ({}));
+        throw new Error(errorData.message || t('spaces.postingFailed') || "Đăng bài thất bại");
+      }
       const data = await r.json();
       setPosts(prev => [data.post, ...prev]);
       setPostCaption('');

@@ -12,7 +12,7 @@ fs.mkdirSync(tempDir, { recursive: true });
 const upload = multer({
   dest: tempDir,
   limits: {
-    files: 10,
+    files: 20,
     fileSize: 100 * 1024 * 1024, // 100MB cho upload trực tiếp vào Space
   },
 });
@@ -133,7 +133,7 @@ router.get('/:spaceId/posts', requireAuth, async (req: Request, res: Response) =
 });
 
 // 4. POST tạo bài viết mới trong không gian con (hỗ trợ upload trực tiếp hoặc đính kèm id cũ)
-router.post('/:spaceId/posts', requireAuth, upload.array('files', 10), async (req: Request, res: Response) => {
+router.post('/:spaceId/posts', requireAuth, upload.array('files', 20), async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
   const { spaceId } = req.params;
   const { caption, saveToPersonal, lastModifieds } = req.body || {};
