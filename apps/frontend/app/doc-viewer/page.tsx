@@ -503,7 +503,8 @@ function DocViewerContent() {
               }
             }
             const docAssets = list.filter((item: Asset) => !['image', 'video'].includes(item.type));
-            setSidebarFiles(docAssets);
+            const uniqueDocAssets = docAssets.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+            setSidebarFiles(uniqueDocAssets);
             lastFetchedContext.current = { tabQuery, spaceId, postId, docProjectParam, groupId: activeGroupId };
           }
         } 
