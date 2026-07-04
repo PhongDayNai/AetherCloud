@@ -1644,7 +1644,7 @@ function DocViewerContent() {
                                     })}
                                   </div>
                                   <pre className="codePre" style={{ flex: 1, margin: 0, padding: '24px 16px', overflow: 'visible', position: 'relative' }}>
-                                    <code className="hljs markdown" style={{ display: 'block', height: '100%', position: 'relative' }}>
+                                    <code className="hljs markdown" style={{ display: 'block', position: 'relative' }}>
                                       <div style={{ pointerEvents: 'none' }}>
                                         {mdHighlightedLines.map((line, i) => {
                                           const lineNum = i + 1;
@@ -1892,7 +1892,7 @@ function DocViewerContent() {
                                 ))}
                               </div>
                               <pre className="codePre" style={{ flex: 1, margin: 0, padding: '24px 16px', overflow: 'visible', position: 'relative' }}>
-                                <code className="hljs markdown" style={{ display: 'block', height: '100%', position: 'relative' }}>
+                                <code className="hljs markdown" style={{ display: 'block', position: 'relative' }}>
                                   <div style={{ pointerEvents: 'none' }}>
                                     {mdHighlightedLines.map((line, i) => (
                                       <div 
@@ -2042,7 +2042,7 @@ function DocViewerContent() {
                                   })}
                                 </div>
                                 <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'visible', position: 'relative' }}>
-                                  <code className="hljs" style={{ display: 'block', height: '100%', position: 'relative' }}>
+                                  <code className="hljs" style={{ display: 'block', position: 'relative' }}>
                                     <div style={{ pointerEvents: 'none' }}>
                                       {highlightedLines.map((line, i) => {
                                         const lineNum = i + 1;
@@ -2216,8 +2216,8 @@ function DocViewerContent() {
                             <div key={i} className="lineNo">{i + 1}</div>
                           ))}
                         </div>
-                        <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'hidden', position: 'relative' }}>
-                          <code className="hljs" style={{ display: 'block', height: '100%', position: 'relative' }}>
+                        <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'visible', position: 'relative' }}>
+                          <code className="hljs" style={{ display: 'block', position: 'relative' }}>
                             <div style={{ pointerEvents: 'none' }}>
                               {highlightedLines.map((line, i) => (
                                 <div 
