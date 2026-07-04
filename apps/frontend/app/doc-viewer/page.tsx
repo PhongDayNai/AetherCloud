@@ -266,7 +266,8 @@ function DocViewerContent() {
   const tabQuery = searchParams.get('tab') || '';
   const spaceId = searchParams.get('spaceId') || '';
   const postId = searchParams.get('postId') || '';
-  const docProject = searchParams.get('docProject') || '';
+  const docProjectParam = searchParams.get('docProject');
+  const docProject = docProjectParam !== null ? docProjectParam : 'all';
 
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState<boolean>(false);
@@ -292,6 +293,13 @@ function DocViewerContent() {
   const scrollDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const lineNoRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lastFetchedContext = useRef<{
+    tabQuery: string;
+    spaceId: string;
+    postId: string;
+    docProjectParam: string | null;
+    groupId: string | null;
+  } | null>(null);
   const codePreRef = useRef<HTMLPreElement>(null);
   const leftCodePreRef = useRef<HTMLPreElement>(null);
   const leftLineNoRef = useRef<HTMLDivElement>(null);
@@ -392,7 +400,23 @@ function DocViewerContent() {
 
   // Fetch sidebar files list (with context filter)
   useEffect(() => {
+    if (isLoading) return;
+
     const fetchSidebarFiles = async () => {
+      const activeGroupId = asset?.groupId || '';
+      
+      // Prevent reload if context is identical
+      if (
+        lastFetchedContext.current &&
+        lastFetchedContext.current.tabQuery === tabQuery &&
+        lastFetchedContext.current.spaceId === spaceId &&
+        lastFetchedContext.current.postId === postId &&
+        lastFetchedContext.current.docProjectParam === docProjectParam &&
+        lastFetchedContext.current.groupId === activeGroupId
+      ) {
+        return;
+      }
+
       try {
         setNextCursor(null);
         setHasMore(false);
@@ -407,6 +431,7 @@ function DocViewerContent() {
             const postAssets = activePost?.assets || [];
             const docAssets = postAssets.filter((item: Asset) => !['image', 'video'].includes(item.type));
             setSidebarFiles(docAssets);
+            lastFetchedContext.current = { tabQuery, spaceId, postId, docProjectParam, groupId: activeGroupId };
           }
         } 
         // 2. Space view context: filter files in that specific Space
@@ -423,11 +448,14 @@ function DocViewerContent() {
             }
             const docAssets = list.filter((item: Asset) => !['image', 'video'].includes(item.type));
             setSidebarFiles(docAssets);
+            lastFetchedContext.current = { tabQuery, spaceId, postId, docProjectParam, groupId: activeGroupId };
           }
         } 
         // 3. Binder / Document Project context
-        else if (docProject) {
-          const res = await fetch(`${api}/api/assets?limit=50&type=doc&docProject=${encodeURIComponent(docProject)}`, { credentials: 'include' });
+        else if (docProjectParam !== null && docProjectParam !== '') {
+          let url = `${api}/api/assets?limit=50&type=doc&docProject=${encodeURIComponent(docProjectParam)}`;
+          if (activeGroupId) url += `&groupId=${activeGroupId}`;
+          const res = await fetch(url, { credentials: 'include' });
           if (res.ok) {
             const data = await res.json();
             const itemsList = data.items || [];
@@ -435,11 +463,14 @@ function DocViewerContent() {
             setSidebarFiles(docAssets);
             setNextCursor(data.nextCursor || null);
             setHasMore(!!data.nextCursor);
+            lastFetchedContext.current = { tabQuery, spaceId, postId, docProjectParam, groupId: activeGroupId };
           }
         } 
         // 4. Documents tab context
         else if (tabQuery === 'docs') {
-          const res = await fetch(`${api}/api/assets?limit=50&type=doc`, { credentials: 'include' });
+          let url = `${api}/api/assets?limit=50&type=doc`;
+          if (activeGroupId) url += `&groupId=${activeGroupId}`;
+          const res = await fetch(url, { credentials: 'include' });
           if (res.ok) {
             const data = await res.json();
             const itemsList = data.items || [];
@@ -447,11 +478,14 @@ function DocViewerContent() {
             setSidebarFiles(docAssets);
             setNextCursor(data.nextCursor || null);
             setHasMore(!!data.nextCursor);
+            lastFetchedContext.current = { tabQuery, spaceId, postId, docProjectParam, groupId: activeGroupId };
           }
         } 
         // 5. Default / Dashboard / Personal space context
         else {
-          const res = await fetch(`${api}/api/assets?limit=50&type=doc`, { credentials: 'include' });
+          let url = `${api}/api/assets?limit=50&type=doc`;
+          if (activeGroupId) url += `&groupId=${activeGroupId}`;
+          const res = await fetch(url, { credentials: 'include' });
           if (res.ok) {
             const data = await res.json();
             const itemsList = data.items || [];
@@ -459,6 +493,7 @@ function DocViewerContent() {
             setSidebarFiles(docAssets);
             setNextCursor(data.nextCursor || null);
             setHasMore(!!data.nextCursor);
+            lastFetchedContext.current = { tabQuery, spaceId, postId, docProjectParam, groupId: activeGroupId };
           }
         }
       } catch (err) {
@@ -466,7 +501,7 @@ function DocViewerContent() {
       }
     };
     fetchSidebarFiles();
-  }, [tabQuery, spaceId, postId, docProject]);
+  }, [tabQuery, spaceId, postId, docProjectParam, asset?.groupId, isLoading]);
 
   // Lazy load: fetch next page of sidebar files
   const loadMoreSidebarFiles = async () => {
@@ -474,10 +509,14 @@ function DocViewerContent() {
     try {
       setIsLoadingMore(true);
       let url = `${api}/api/assets?limit=50&cursor=${nextCursor}`;
-      if (docProject) {
-        url += `&docProject=${encodeURIComponent(docProject)}`;
+      if (docProjectParam !== null && docProjectParam !== '') {
+        url += `&docProject=${encodeURIComponent(docProjectParam)}`;
       } else {
         url += `&type=doc`;
+      }
+      const activeGroupId = asset?.groupId || '';
+      if (activeGroupId) {
+        url += `&groupId=${activeGroupId}`;
       }
       
       const res = await fetch(url, { credentials: 'include' });
@@ -552,7 +591,7 @@ function DocViewerContent() {
     if (tabQuery) url += `&tab=${tabQuery}`;
     if (spaceId) url += `&spaceId=${spaceId}`;
     if (postId) url += `&postId=${postId}`;
-    if (docProject) url += `&docProject=${encodeURIComponent(docProject)}`;
+    if (docProjectParam !== null && docProjectParam !== '') url += `&docProject=${encodeURIComponent(docProjectParam)}`;
     router.push(url);
   };
 
@@ -1427,14 +1466,7 @@ function DocViewerContent() {
                   title={file.originalName}
                 >
                   <span className="fileItemIcon">
-                    {fileCat === 'pdf' && '📕'}
-                    {fileCat === 'markdown' && '📝'}
-                    {['code', 'config', 'text'].includes(fileCat) && '💻'}
-                    {fileCat === 'word' && '📄'}
-                    {fileCat === 'excel' && '📊'}
-                    {fileCat === 'powerpoint' && '📉'}
-                    {fileCat === 'archive' && '📦'}
-                    {!['pdf', 'markdown', 'code', 'config', 'text', 'word', 'excel', 'powerpoint', 'archive'].includes(fileCat) && '📎'}
+                    <Icons.DocIcon item={file} size={18} />
                   </span>
                   <span className="fileItemName">{file.originalName}</span>
                 </div>
@@ -2040,20 +2072,8 @@ function DocViewerContent() {
                   {renderContentHeader()}
                   <div className="fallbackContainer">
                     <div className="fallbackCard">
-                      <div className="fallbackIcon">
-                        {category === 'word' && '📄'}
-                        {category === 'excel' && '📊'}
-                        {category === 'powerpoint' && '📉'}
-                        {category === 'archive' && '📦'}
-                        {category === 'ebook' && '📚'}
-                        {category === 'database' && '🗄️'}
-                        {category === 'installer' && '🤖'}
-                        {category === 'disk-image' && '💿'}
-                        {category === 'font' && '🔤'}
-                        {category === 'design' && '🎨'}
-                        {category === 'cad' && '📐'}
-                        {category === 'executable' && '⚙️'}
-                        {!['word', 'excel', 'powerpoint', 'archive', 'ebook', 'database', 'installer', 'disk-image', 'font', 'design', 'cad', 'executable'].includes(category) && '📎'}
+                      <div className="fallbackIcon" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        <Icons.DocIcon item={asset} size={64} />
                       </div>
                       <div className="fallbackName">{asset.originalName}</div>
                       <div className="fallbackMeta">

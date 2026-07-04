@@ -134,7 +134,7 @@ export default function MediaViewer({
       url += `&spaceId=${activeWorkspace.id}`;
     }
     
-    if (selectedDocProject) {
+    if (selectedDocProject && selectedDocProject !== 'all') {
       url += `&docProject=${encodeURIComponent(selectedDocProject)}`;
     }
     

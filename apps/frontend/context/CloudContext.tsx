@@ -14,8 +14,7 @@ import {
   monthLabel,
   yearLabel,
   inferUploadKind,
-  readErrorMessage,
-  docIconOf
+  readErrorMessage
 } from '../lib/utils';
 
 export interface ToastItem {
