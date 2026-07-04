@@ -1040,6 +1040,20 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     if (saved === 'vi' || saved === 'en') {
       setLanguageState(saved);
     }
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'language') {
+        const val = e.newValue as Language;
+        if (val === 'vi' || val === 'en') {
+          setLanguageState(val);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   const setLanguage = (lang: Language) => {
