@@ -112,6 +112,7 @@ export default function SettingsModal({
   const [settingsTab, setSettingsTab] = useState<'general' | 'profile' | 'invites'>('general');
   const [profileNameInput, setProfileNameInput] = useState<string>('');
   const [updateProfileMsg, setUpdateProfileMsg] = useState<string>('');
+  const [defaultSandboxMode, setDefaultSandboxModeState] = useState<'on' | 'off'>('on');
 
   // State cho quản lý mã mời (Admin)
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -141,6 +142,9 @@ export default function SettingsModal({
       setChangePasswordMsg('');
       setCreateInviteMsg('');
       setToastMsg('');
+
+      const savedSandbox = localStorage.getItem('default_sandbox_mode');
+      setDefaultSandboxModeState(savedSandbox === 'off' ? 'off' : 'on');
     }
   }, [isOpen, user, mustChangePassword]);
 
@@ -639,6 +643,30 @@ export default function SettingsModal({
                             setGroupByTimeEnabled(true);
                             setGroupMode(val as 'month' | 'year');
                           }
+                        }}
+                      />
+                    </div>
+
+                    {/* Row 4: Default Sandbox Mode */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingBottom: '14px',
+                      borderBottom: '1px solid var(--border-color)'
+                    }}>
+                      <span style={{ fontSize: '13.5px', color: 'var(--text-primary)', fontWeight: '500' }}>
+                        {t('settings.defaultSandboxMode') || 'Default Sandbox Mode'}
+                      </span>
+                      <CustomSelect 
+                        value={defaultSandboxMode}
+                        options={[
+                          { value: 'on', label: t('settings.sandboxEnabled') || 'Enabled (Read-only by default)' },
+                          { value: 'off', label: t('settings.sandboxDisabled') || 'Disabled (Editable by default)' }
+                        ]}
+                        onChange={(val) => {
+                          setDefaultSandboxModeState(val as 'on' | 'off');
+                          localStorage.setItem('default_sandbox_mode', val);
                         }}
                       />
                     </div>

@@ -24,7 +24,21 @@ export default function CustomSelect({ value, options, onChange, width = '130px'
     return () => document.removeEventListener('mousedown', clickOutside);
   }, []);
 
+  const getLabelParts = (label: string) => {
+    const index = label.indexOf('(');
+    if (index === -1) {
+      return { main: label, desc: '' };
+    }
+    return {
+      main: label.substring(0, index).trim(),
+      desc: label.substring(index).trim()
+    };
+  };
+
   const selectedOpt = options.find(o => o.value === value) || options[0];
+  const selectedParts = selectedOpt ? getLabelParts(selectedOpt.label) : { main: '', desc: '' };
+  const hasDesc = options.some(o => o.label.includes('('));
+  const popoverMinWidth = hasDesc ? '240px' : '100%';
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: width, userSelect: 'none' }}>
@@ -58,7 +72,7 @@ export default function CustomSelect({ value, options, onChange, width = '130px'
           }
         }}
       >
-        <span>{selectedOpt?.label}</span>
+        <span>{selectedParts.main}</span>
         <svg 
           width="12" 
           height="12" 
@@ -82,14 +96,14 @@ export default function CustomSelect({ value, options, onChange, width = '130px'
       <div style={{
         position: 'absolute',
         top: 'calc(100% + 6px)',
-        right: 0,
+        left: 0,
         background: 'var(--bg-popover)',
         border: '1px solid var(--border-color)',
         borderRadius: '8px',
         boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
         padding: '4px',
         zIndex: 1000,
-        minWidth: '100%',
+        minWidth: popoverMinWidth,
         boxSizing: 'border-box',
         opacity: isOpen ? 1 : 0,
         transform: isOpen ? 'translateY(0)' : 'translateY(-8px)',
@@ -99,6 +113,7 @@ export default function CustomSelect({ value, options, onChange, width = '130px'
       }}>
         {options.map((opt) => {
           const isSel = opt.value === value;
+          const optParts = getLabelParts(opt.label);
           return (
             <div
               key={opt.value}
@@ -130,7 +145,14 @@ export default function CustomSelect({ value, options, onChange, width = '130px'
                 }
               }}
             >
-              {opt.label}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', width: '100%' }}>
+                <span style={{ fontSize: '13px' }}>{optParts.main}</span>
+                {optParts.desc && (
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted, #71717a)', fontWeight: '400', opacity: 0.75 }}>
+                    {optParts.desc}
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}

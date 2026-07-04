@@ -15,7 +15,7 @@ const translations = {
     // Auth & General
     'app.loading': 'Đang kiểm tra phiên đăng nhập...',
     'app.name': 'AetherCloud',
-    
+
     // Login / Register page
     'login.title': 'Đăng nhập hệ thống',
     'login.subtitle': 'Chào mừng bạn quay lại với không gian lưu trữ riêng tư',
@@ -44,7 +44,7 @@ const translations = {
     'messages.connectionError': 'Lỗi: Không kết nối được API server',
     'messages.loginFailed': 'Lỗi: Không đăng nhập được',
     'messages.registerFailed': 'Lỗi: Không đăng ký được',
-    
+
     // Dashboard Sidebar
     'sidebar.photos': 'Ảnh & Video',
     'sidebar.docs': 'Tài liệu & Tệp tin',
@@ -230,7 +230,7 @@ const translations = {
     'profile.admin': 'Quản trị viên',
     'profile.member': 'Thành viên',
     'profile.hello': 'Chào {name},',
-    
+
     // Settings Modal
     'settings.title': 'Cài đặt tài khoản',
     'settings.tabGeneral': 'Tổng quan',
@@ -248,6 +248,9 @@ const translations = {
     'settings.themeLight': 'Sáng',
     'settings.groupByTime': 'Gom nhóm theo thời gian',
     'settings.groupTimeDisabled': 'Tắt',
+    'settings.defaultSandboxMode': 'Chế độ Sandbox mặc định',
+    'settings.sandboxEnabled': 'Bật (Mặc định chỉ đọc)',
+    'settings.sandboxDisabled': 'Tắt (Mặc định cho phép sửa)',
     'settings.accentDefault': 'Mặc định',
     'settings.accentIndigo': 'Chàm',
     'settings.accentEmerald': 'Ngọc lục bảo',
@@ -269,7 +272,7 @@ const translations = {
     'settings.strongPasswordDescSuggest': 'Nên định kỳ cập nhật mật khẩu mới để bảo vệ dữ liệu đám mây luôn an toàn.',
     'settings.strongPasswordRequirement1': 'Tối thiểu 8 ký tự',
     'settings.strongPasswordRequirement2': 'Gồm chữ hoa, chữ thường, số và ký tự đặc biệt',
-    
+
     // Invitation Management
     'invite.title': 'Quản lý mã mời đăng ký',
     'invite.createTitle': 'Tạo mã mời mới',
@@ -420,7 +423,7 @@ const translations = {
     'viewer.playgroundWarning': 'Chế độ xem thử: Các thay đổi chỉ tạm thời và sẽ không được lưu.',
     'viewer.errorLoadFile': 'Không thể tải tệp tin',
     'viewer.loadingFile': 'Đang tải tệp tin...',
-    'viewer.sandboxMode': 'Chế độ xem thử',
+    'viewer.sandboxMode': 'Chế độ Sandbox',
     'viewer.copiedSuccess': '✓ Đã sao chép',
     'viewer.confirmReset': 'Bạn có chắc chắn muốn hủy bỏ mọi thay đổi đã gõ?',
     'viewer.noFilesFound': 'Không tìm thấy tệp tin nào',
@@ -479,12 +482,48 @@ const translations = {
     'messages.kindImage': 'ảnh',
     'messages.kindVideo': 'video',
     'messages.kindDoc': 'tài liệu/file khác',
+    'viewer.save': 'Lưu thay đổi',
+    'viewer.saving': 'Đang lưu tệp...',
+    'viewer.saveSuccess': 'Đã lưu tệp tin thành công!',
+    'viewer.history': 'Lịch sử phiên bản',
+    'viewer.noHistoryFound': 'Không tìm thấy lịch sử',
+    'viewer.currentVersion': 'Bản hiện hành',
+    'viewer.preview': 'Xem trước',
+    'viewer.restore': 'Khôi phục',
+    'viewer.restoreConfirm': 'Bạn có chắc chắn muốn khôi phục tệp về phiên bản này? Phiên bản hiện tại sẽ được sao lưu lại thành một phiên bản mới trong lịch sử.',
+    'viewer.restoreSuccess': 'Đã khôi phục tệp tin thành công!',
+    'viewer.previewBanner': 'Bạn đang xem trước phiên bản {ver} (Chỉ đọc).',
+    'viewer.editMode': 'Chế độ Chỉnh sửa',
+    'viewer.previewEditMode': 'Chỉnh sửa Xem thử',
+    'viewer.sandboxModeTooltip': 'Chế độ chỉ đọc bảo vệ. Nhấn để bật/tắt nhằm tránh việc chỉnh sửa nhầm.',
+    'viewer.editModeTooltip': 'Chế độ chỉnh sửa. Bạn có quyền sửa đổi và lưu các thay đổi của tệp này.',
+    'viewer.previewEditModeTooltip': 'Bạn không có quyền sửa tệp này. Chế độ này chỉ cho phép chỉnh sửa tạm thời để xem thử cục bộ, không thể lưu.',
+    'viewer.viewPreview': 'Xem Preview',
+    'viewer.viewDiff': 'Xem Bản Gốc',
+    'viewer.compareCurrent': 'Bản hiện tại',
+    'viewer.compareHistory': 'Bản lịch sử v{ver}',
+    'viewer.exitPreview': 'Quay lại bản sửa đổi',
+    'viewer.confirmDiscard': 'Bạn có các thay đổi chưa lưu. Bạn có chắc muốn chuyển tệp và bỏ qua chúng?',
+    'viewer.readOnlyReason': 'Chỉ đọc: Bạn không có quyền lưu thay đổi đối với tệp tin nhóm này.',
+    'viewer.fileInTrash': 'Không thể chỉnh sửa tệp tin đang nằm trong Thùng rác.',
+    'merge.title': 'Giải quyết xung đột phiên bản (3-Way Merge)',
+    'merge.server': 'Bản trên Server (Incoming)',
+    'merge.local': 'Bản nháp của bạn (Local)',
+    'merge.result': 'Kết quả gộp (Merged Result)',
+    'merge.apply': 'Áp dụng và Lưu tệp',
+    'merge.cancel': 'Hủy bỏ và quay lại',
+    'merge.unresolved': 'Vui lòng giải quyết toàn bộ các dòng xung đột trước khi lưu.',
+    'merge.screenTooSmall': 'Màn hình quá nhỏ: Bộ trộn mã 3 bên yêu cầu chiều rộng tối thiểu 1024px. Vui lòng xoay ngang màn hình hoặc phóng to trình duyệt.',
+    'merge.changesPending': 'Còn {count} thay đổi chưa xử lý',
+    'merge.conflictsRemaining': 'Còn {count} dòng xung đột cần giải quyết',
+    'merge.reset': 'Trộn lại',
+    'dialogs.warning': 'Cảnh báo',
   },
   en: {
     // Auth & General
     'app.loading': 'Checking login session...',
     'app.name': 'AetherCloud',
-    
+
     // Login / Register page
     'login.title': 'System Login',
     'login.subtitle': 'Welcome back to your private storage space',
@@ -717,6 +756,9 @@ const translations = {
     'settings.themeLight': 'Light',
     'settings.groupByTime': 'Group items by time',
     'settings.groupTimeDisabled': 'Disabled',
+    'settings.defaultSandboxMode': 'Default Sandbox Mode',
+    'settings.sandboxEnabled': 'Enabled (Read-only by default)',
+    'settings.sandboxDisabled': 'Disabled (Editable by default)',
     'settings.accentDefault': 'Default',
     'settings.accentIndigo': 'Indigo',
     'settings.accentEmerald': 'Emerald',
@@ -949,6 +991,42 @@ const translations = {
     'messages.kindImage': 'image',
     'messages.kindVideo': 'video',
     'messages.kindDoc': 'document/other file',
+    'viewer.save': 'Save Changes',
+    'viewer.saving': 'Saving file...',
+    'viewer.saveSuccess': 'File saved successfully!',
+    'viewer.history': 'Version History',
+    'viewer.noHistoryFound': 'No history found',
+    'viewer.currentVersion': 'Current Version',
+    'viewer.preview': 'Preview',
+    'viewer.restore': 'Restore',
+    'viewer.restoreConfirm': 'Are you sure you want to restore the file to this version? The current active content will be backed up as a new version.',
+    'viewer.restoreSuccess': 'File restored successfully!',
+    'viewer.previewBanner': 'You are previewing version {ver} (Read-only).',
+    'viewer.editMode': 'Edit Mode',
+    'viewer.previewEditMode': 'Preview Edit Mode',
+    'viewer.sandboxModeTooltip': 'Read-only protection mode. Click to toggle to prevent accidental edits.',
+    'viewer.editModeTooltip': 'Edit Mode. You have permission to modify and save changes to this file.',
+    'viewer.previewEditModeTooltip': 'You do not have write permission. This mode only allows temporary editing for local preview, changes cannot be saved.',
+    'viewer.viewPreview': 'View Preview',
+    'viewer.viewDiff': 'View Source',
+    'viewer.compareCurrent': 'Current Version',
+    'viewer.compareHistory': 'History Version v{ver}',
+    'viewer.exitPreview': 'Back to active version',
+    'viewer.confirmDiscard': 'You have unsaved changes. Are you sure you want to discard them?',
+    'viewer.readOnlyReason': 'Read-only: You do not have permission to save changes to this group file.',
+    'viewer.fileInTrash': 'Cannot modify a file that is in the trash.',
+    'merge.title': 'Resolve Version Conflict (3-Way Merge)',
+    'merge.server': 'Server Version (Incoming)',
+    'merge.local': 'Your Version (Local)',
+    'merge.result': 'Merged Result',
+    'merge.apply': 'Apply & Save File',
+    'merge.cancel': 'Cancel and Go Back',
+    'merge.unresolved': 'Please resolve all conflict blocks before saving.',
+    'merge.screenTooSmall': 'Screen too small: The 3-way merge editor requires a minimum width of 1024px. Please rotate your device to landscape or maximize your browser window.',
+    'merge.changesPending': '{count} change{plural} pending',
+    'merge.conflictsRemaining': '{count} conflict{plural} remaining',
+    'merge.reset': 'Re-merge',
+    'dialogs.warning': 'Warning',
   }
 };
 
@@ -972,7 +1050,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const t = (key: string, replacements?: Record<string, string | number>): string => {
     const dict = translations[language];
     let val = (dict as any)[key] || (translations['vi'] as any)[key] || key;
-    
+
     if (replacements) {
       Object.entries(replacements).forEach(([k, v]) => {
         val = val.replace(`{${k}}`, String(v));
