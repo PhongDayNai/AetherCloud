@@ -2002,46 +2002,71 @@
 
   /* --- Default Compare Mode (for Code, Config, Text) --- */
   .is-compare .codeContainer .lineNumbers {
-    display: block !important;
-    background: transparent !important;
-    border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
-    color: #71717a !important;
-    padding: 0 12px 0 16px !important;
-    /* Zero top/bottom padding to match code block alignment */
-    position: static !important;
-    margin-right: 12px !important;
-    min-width: 45px !important;
-    text-align: right !important;
-    user-select: none !important;
+    display: none !important; /* Hide original static line numbers to prevent vertical misalignment */
   }
 
-  /* Disable text wrapping for structured code comparison to ensure line matching */
+  .is-compare .codeContainer {
+    counter-reset: line-counter;
+  }
+
+  .is-compare .codeContainer .codeLine:not(.diff-empty) {
+    counter-increment: line-counter;
+  }
+
+  /* Allow text wrapping for Code in compare view as requested, but keep them aligned via CSS Counters */
   .is-compare .codeContainer .codePre,
   .is-compare .codeContainer .codeLine {
-    white-space: pre !important;
+    white-space: pre-wrap !important;
     word-break: normal !important;
-    overflow-wrap: normal !important;
-    word-wrap: normal !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
   }
 
-  .is-compare .codeContainer .lineNo,
   .is-compare .codeContainer .codeLine {
+    position: relative !important;
+    padding-left: 45px !important;
+    text-align: left !important;
     font-family: 'Fira Code', 'Courier New', Courier, monospace !important;
-    font-size: 10px !important;
-    height: 18px !important;
-    line-height: 18px !important;
-    min-height: 18px !important;
+    font-size: 9.5px !important;
+    line-height: 1.4 !important;
+    height: auto !important;
+    min-height: 14px !important;
     box-sizing: border-box !important;
+  }
+
+  .is-compare .codeContainer .codeLine::before {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 32px !important;
+    text-align: right !important;
+    color: #71717a !important;
+    font-family: 'Fira Code', 'Courier New', Courier, monospace !important;
+    font-size: 9.5px !important;
+    user-select: none !important;
+    border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+    padding-right: 8px !important;
+    box-sizing: border-box !important;
+    display: inline-block !important;
+    line-height: 1.4 !important;
+    height: 100% !important;
+  }
+
+  .is-compare .codeContainer .codeLine:not(.diff-empty)::before {
+    content: counter(line-counter) !important;
+  }
+
+  .is-compare .codeContainer .codeLine.diff-empty::before {
+    content: " " !important; /* Visual empty line placeholder to keep the vertical line straight */
   }
 
   .is-compare .codeContainer .codePre {
     flex: 1 !important;
     min-width: 0 !important;
     font-family: 'Fira Code', 'Courier New', Courier, monospace !important;
-    font-size: 10px !important;
-    line-height: 18px !important;
+    font-size: 9.5px !important;
+    line-height: 1.4 !important;
     padding: 0 20px 0 16px !important;
-    /* Zero top/bottom padding to perfectly match lineNumbers */
   }
 
   /* --- Specific Compare Mode Overrides for Markdown Source --- */
@@ -2172,6 +2197,7 @@
   }
 
   .is-normal.mode-edit .print-only-markdown-source code {
+    font-family: 'Fira Code', 'Courier New', Courier, monospace !important;
     font-size: 11px !important;
     line-height: 1.5 !important;
     white-space: pre-wrap !important;
