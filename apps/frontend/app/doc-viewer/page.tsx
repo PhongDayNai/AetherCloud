@@ -150,13 +150,11 @@ function DocViewerContent() {
     };
   }, []);
 
-  // Initialize theme from storage or globalTheme
+  // Sync docTheme with globalTheme whenever globalTheme changes
   useEffect(() => {
-    const tempTheme = localStorage.getItem('docviewer_theme') as 'light' | 'dark';
-    if (tempTheme === 'light' || tempTheme === 'dark') {
-      setDocTheme(tempTheme);
-    } else {
+    if (globalTheme === 'light' || globalTheme === 'dark') {
       setDocTheme(globalTheme);
+      localStorage.setItem('docviewer_theme', globalTheme);
     }
   }, [globalTheme]);
 
