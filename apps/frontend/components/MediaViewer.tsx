@@ -251,9 +251,13 @@ export default function MediaViewer({
             <div className="docTypeMeta" style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '10px', fontWeight: 500 }}>
               {t('categories.' + docCategoryOf(active)) || docCategoryOf(active).toUpperCase()} · {fmtBytes(active.size)}
             </div>
-            <a href={getDocViewerUrl()} target="_blank" rel="noreferrer" className="ghost" style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+            <a href={getDocViewerUrl()} target="_blank" rel="noreferrer" className="openDocBtn">
               <span>{t('viewer.openDoc')}</span>
               <span>↗</span>
+            </a>
+            <a href={`${api}/api/assets/_media/original/${active.id}`} download={active.originalName} className="downloadDocBtn">
+              <span>{t('details.download') || 'Tải xuống'}</span>
+              <span>↓</span>
             </a>
           </div>
         )}
@@ -848,12 +852,66 @@ export default function MediaViewer({
           line-height: 1.4;
           word-break: break-all;
         }
+        .docPreviewBlock .openDocBtn {
+          margin-top: 24px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          background: var(--accent-color, #6366f1);
+          color: #ffffff;
+          padding: 10px 24px;
+          border-radius: 12px;
+          font-weight: 600;
+          font-size: 13.5px;
+          text-decoration: none;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          cursor: pointer;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .docPreviewBlock .openDocBtn:hover {
+          background: var(--accent-color-hover, #4f46e5);
+          transform: translateY(-1.5px);
+          box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+        }
+        .docPreviewBlock .openDocBtn:active {
+          transform: translateY(0.5px);
+        }
+        .docPreviewBlock .downloadDocBtn {
+          margin-top: 14px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          background: transparent;
+          color: var(--text-muted, #a1a1aa);
+          padding: 6px 16px;
+          font-weight: 500;
+          font-size: 12.5px;
+          text-decoration: none;
+          transition: all 0.2s ease;
+          cursor: pointer;
+        }
+        .docPreviewBlock .downloadDocBtn:hover {
+          color: #ffffff;
+          text-decoration: underline;
+        }
         :global([data-theme='light']) .docPreviewBlock {
           background: rgba(255, 255, 255, 0.95);
           border-color: rgba(0, 0, 0, 0.08);
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
         }
         :global([data-theme='light']) .docPreviewBlock .docName {
+          color: #18181b;
+        }
+        :global([data-theme='light']) .docPreviewBlock .openDocBtn {
+          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+          border: none;
+        }
+        :global([data-theme='light']) .docPreviewBlock .downloadDocBtn:hover {
           color: #18181b;
         }
         .videoProcessingOverlay {
