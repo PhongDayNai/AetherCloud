@@ -477,8 +477,8 @@ function DocViewerContent() {
         setNextCursor(null);
         setHasMore(false);
         
-        // 1. Post context: filter files inside that specific post
-        if (postId && spaceId) {
+        // 1. Post context: filter files inside that specific post (only when tab is space or space-all)
+        if (postId && spaceId && (tabQuery === 'space' || tabQuery === 'space-all')) {
           const res = await fetch(`${api}/api/spaces/${spaceId}/posts`, { credentials: 'include' });
           if (res.ok) {
             const data = await res.json();
@@ -490,8 +490,23 @@ function DocViewerContent() {
             lastFetchedContext.current = { tabQuery, spaceId, postId, docProjectParam, groupId: activeGroupId };
           }
         } 
-        // 2. Space view context: filter files in that specific Space
-        else if (spaceId) {
+        // 2. Binder / Document Project context
+        else if (docProjectParam !== null && docProjectParam !== '') {
+          let url = `${api}/api/assets?limit=50&type=docs&docProject=${encodeURIComponent(docProjectParam)}`;
+          if (activeGroupId) url += `&groupId=${activeGroupId}`;
+          const res = await fetch(url, { credentials: 'include' });
+          if (res.ok) {
+            const data = await res.json();
+            const itemsList = data.items || [];
+            const docAssets = itemsList.filter((item: Asset) => !['image', 'video'].includes(item.type));
+            setSidebarFiles(docAssets);
+            setNextCursor(data.nextCursor || null);
+            setHasMore(!!data.nextCursor);
+            lastFetchedContext.current = { tabQuery, spaceId, postId, docProjectParam, groupId: activeGroupId };
+          }
+        } 
+        // 3. Space view context: filter files in that specific Space (only when tab is space or space-all)
+        else if (spaceId && (tabQuery === 'space-all' || tabQuery === 'space')) {
           const res = await fetch(`${api}/api/spaces/${spaceId}/posts`, { credentials: 'include' });
           if (res.ok) {
             const data = await res.json();
@@ -505,21 +520,6 @@ function DocViewerContent() {
             const docAssets = list.filter((item: Asset) => !['image', 'video'].includes(item.type));
             const uniqueDocAssets = docAssets.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
             setSidebarFiles(uniqueDocAssets);
-            lastFetchedContext.current = { tabQuery, spaceId, postId, docProjectParam, groupId: activeGroupId };
-          }
-        } 
-        // 3. Binder / Document Project context
-        else if (docProjectParam !== null && docProjectParam !== '') {
-          let url = `${api}/api/assets?limit=50&type=docs&docProject=${encodeURIComponent(docProjectParam)}`;
-          if (activeGroupId) url += `&groupId=${activeGroupId}`;
-          const res = await fetch(url, { credentials: 'include' });
-          if (res.ok) {
-            const data = await res.json();
-            const itemsList = data.items || [];
-            const docAssets = itemsList.filter((item: Asset) => !['image', 'video'].includes(item.type));
-            setSidebarFiles(docAssets);
-            setNextCursor(data.nextCursor || null);
-            setHasMore(!!data.nextCursor);
             lastFetchedContext.current = { tabQuery, spaceId, postId, docProjectParam, groupId: activeGroupId };
           }
         } 
@@ -646,8 +646,11 @@ function DocViewerContent() {
     }
     let url = `/doc-viewer?id=${fileId}`;
     if (tabQuery) url += `&tab=${tabQuery}`;
-    if (spaceId) url += `&spaceId=${spaceId}`;
-    if (postId) url += `&postId=${postId}`;
+    // Only forward spaceId and postId when in space or space-all context to keep URL clean
+    if (tabQuery === 'space' || tabQuery === 'space-all') {
+      if (spaceId) url += `&spaceId=${spaceId}`;
+      if (postId) url += `&postId=${postId}`;
+    }
     if (docProjectParam !== null && docProjectParam !== '') url += `&docProject=${encodeURIComponent(docProjectParam)}`;
     router.push(url);
   };
