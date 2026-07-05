@@ -100,6 +100,22 @@ function DocViewerContent() {
   const { t } = useLanguage();
   const { resolvedTheme: globalTheme } = useTheme();
   const [docTheme, setDocTheme] = useState<'light' | 'dark'>('dark');
+  const [enableJustify, setEnableJustify] = useState(false);
+  const [justifyClass, setJustifyClass] = useState('');
+  const justifySupportedCategories = ['markdown'];
+
+  useEffect(() => {
+    if (enableJustify) {
+      setJustifyClass('justify-active justify-text');
+    } else {
+      setJustifyClass((prev) => prev.includes('justify-text') ? 'justify-inactive' : '');
+    }
+  }, [enableJustify]);
+
+  const getCodeContainerClass = (extraClasses = '') => {
+    const isSupported = justifySupportedCategories.includes(category);
+    return `codeContainer ${isSupported ? justifyClass : ''} ${extraClasses}`.trim();
+  };
   const tabId = useRef('');
   const { user, groups, addToast } = useCloud();
   const confirm = useConfirm();
@@ -1180,7 +1196,7 @@ function DocViewerContent() {
   };
 
   return (
-    <div className={`docViewerContainer ${sandboxMode ? 'mode-sandbox' : 'mode-edit'} ${mdCompareMode === 'diff' ? 'md-diff' : 'md-preview'} ${previewVersion !== null ? 'is-compare' : 'is-normal'}`}>
+    <div className={`docViewerContainer cat-${category} ${sandboxMode ? 'mode-sandbox' : 'mode-edit'} ${mdCompareMode === 'diff' ? 'md-diff' : 'md-preview'} ${previewVersion !== null ? 'is-compare' : 'is-normal'}`}>
       <header className="viewerHeader no-print">
         <div className="headerLeft">
           <button
@@ -1400,6 +1416,36 @@ function DocViewerContent() {
               <button className="btn primary" onClick={handlePrint}>
                 {t('viewer.exportPdf') || 'Export PDF'}
               </button>
+              {justifySupportedCategories.includes(category) && (
+                <button
+                  onClick={() => setEnableJustify(!enableJustify)}
+                  title={enableJustify ? "Disable Justify Text" : "Enable Justify Text"}
+                  className="no-print"
+                  style={{
+                    background: enableJustify ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                    border: '1px solid ' + (enableJustify ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.08)'),
+                    color: enableJustify ? '#818cf8' : 'var(--text-muted, #71717a)',
+                    cursor: 'pointer',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    transition: 'all 0.15s ease',
+                    marginLeft: '8px'
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="21" y1="10" x2="3" y2="10"></line>
+                    <line x1="21" y1="6" x2="3" y2="6"></line>
+                    <line x1="21" y1="14" x2="3" y2="14"></line>
+                    <line x1="21" y1="18" x2="3" y2="18"></line>
+                  </svg>
+                  <span>Justify</span>
+                </button>
+              )}
             </>
           )}
 
@@ -1447,6 +1493,36 @@ function DocViewerContent() {
               <button className="btn primary" onClick={handlePrint}>
                 {t('viewer.exportPdf') || 'Export PDF'}
               </button>
+              {justifySupportedCategories.includes(category) && (
+                <button
+                  onClick={() => setEnableJustify(!enableJustify)}
+                  title={enableJustify ? "Disable Justify Text" : "Enable Justify Text"}
+                  className="no-print"
+                  style={{
+                    background: enableJustify ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                    border: '1px solid ' + (enableJustify ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.08)'),
+                    color: enableJustify ? '#818cf8' : 'var(--text-muted, #71717a)',
+                    cursor: 'pointer',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    transition: 'all 0.15s ease',
+                    marginLeft: '8px'
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="21" y1="10" x2="3" y2="10"></line>
+                    <line x1="21" y1="6" x2="3" y2="6"></line>
+                    <line x1="21" y1="14" x2="3" y2="14"></line>
+                    <line x1="21" y1="18" x2="3" y2="18"></line>
+                  </svg>
+                  <span>Justify</span>
+                </button>
+              )}
             </>
           )}
 
@@ -1628,7 +1704,7 @@ function DocViewerContent() {
                             {!sandboxMode ? (
                               <div
                                 ref={leftCodeContainerRef}
-                                className="codeContainer hljs"
+                                className={getCodeContainerClass('hljs')}
                                 onScroll={handleLeftCodeScroll}
                                 style={{ flex: 1, overflow: 'auto' }}
                               >
@@ -1695,7 +1771,7 @@ function DocViewerContent() {
                             ) : (
                               <div
                                 ref={leftCodeContainerRef}
-                                className="codeContainer hljs"
+                                className={getCodeContainerClass('hljs')}
                                 onScroll={handleLeftCodeScroll}
                                 style={{ flex: 1, overflow: 'auto' }}
                               >
@@ -1746,7 +1822,7 @@ function DocViewerContent() {
                             </div>
                             <div
                               ref={rightCodeContainerRef}
-                              className="codeContainer hljs"
+                              className={getCodeContainerClass('hljs')}
                               onScroll={handleRightCodeScroll}
                               style={{ flex: 1, overflow: 'auto' }}
                             >
@@ -1838,7 +1914,7 @@ function DocViewerContent() {
                               style={{ flex: 1, overflow: 'auto', padding: '24px' }}
                             >
                               <div
-                                className="previewContainer markdown-body"
+                                className={`previewContainer markdown-body ${justifyClass}`}
                                 dangerouslySetInnerHTML={{ __html: previewHtml }}
                               />
                             </div>
@@ -1868,7 +1944,7 @@ function DocViewerContent() {
                               style={{ flex: 1, overflow: 'auto', padding: '24px' }}
                             >
                               <div
-                                className="previewContainer markdown-body"
+                                className={`previewContainer markdown-body ${justifyClass}`}
                                 dangerouslySetInnerHTML={{ __html: historyPreviewHtml }}
                               />
                             </div>
@@ -1882,7 +1958,7 @@ function DocViewerContent() {
                         {!sandboxMode ? (
                           <div
                             ref={leftPaneRef}
-                            className="codeContainer hljs"
+                            className={getCodeContainerClass('hljs')}
                             onScroll={handleLeftScroll}
                             style={{ flex: 1, overflow: 'auto' }}
                           >
@@ -1939,7 +2015,7 @@ function DocViewerContent() {
                         ) : (
                           <div
                             ref={leftPaneRef}
-                            className="codeContainer hljs"
+                            className={getCodeContainerClass('hljs')}
                             onScroll={handleLeftScroll}
                             style={{ flex: 1, overflow: 'auto' }}
                           >
@@ -1966,7 +2042,7 @@ function DocViewerContent() {
                       </div>
 
                       {/* Print-only Markdown Source view (clean pre/code instead of textarea) */}
-                      <div className="print-only-markdown-source" style={{ display: 'none' }}>
+                      <div className={`print-only-markdown-source ${justifyClass}`} style={{ display: 'none' }}>
                         <pre className="codePre" style={{ padding: '24px', margin: 0 }}>
                           <code className="hljs markdown" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                             {markdownText}
@@ -1980,7 +2056,7 @@ function DocViewerContent() {
                         onScroll={handleRightScroll}
                       >
                         <div
-                          className="previewContainer markdown-body"
+                          className={`previewContainer markdown-body ${justifyClass}`}
                           dangerouslySetInnerHTML={{ __html: previewHtml }}
                         />
                       </div>
@@ -2026,7 +2102,7 @@ function DocViewerContent() {
                           {!sandboxMode ? (
                             <div
                               ref={leftCodeContainerRef}
-                              className="codeContainer hljs"
+                              className={getCodeContainerClass('hljs')}
                               onScroll={handleLeftCodeScroll}
                               style={{ flex: 1, overflow: 'auto' }}
                             >
@@ -2093,7 +2169,7 @@ function DocViewerContent() {
                           ) : (
                             <div
                               ref={leftCodeContainerRef}
-                              className="codeContainer hljs"
+                              className={getCodeContainerClass('hljs')}
                               onScroll={handleLeftCodeScroll}
                               style={{ flex: 1, overflow: 'auto' }}
                             >
@@ -2144,7 +2220,7 @@ function DocViewerContent() {
                           </div>
                           <div
                             ref={rightCodeContainerRef}
-                            className="codeContainer hljs"
+                            className={getCodeContainerClass('hljs')}
                             onScroll={handleRightCodeScroll}
                             style={{ flex: 1, overflow: 'auto' }}
                           >
@@ -2211,7 +2287,7 @@ function DocViewerContent() {
                         </div>
                       </div>
                     ) : !sandboxMode ? (
-                      <div className="codeContainer hljs">
+                      <div className={getCodeContainerClass('hljs')}>
                         <div className="codeWrapper" style={{ display: 'flex', width: '100%' }}>
                           <div className="lineNumbers">
                             {codeText.split('\n').map((_, i) => (
@@ -2263,7 +2339,7 @@ function DocViewerContent() {
                         </div>
                       </div>
                     ) : (
-                      <div className="codeContainer">
+                      <div className={getCodeContainerClass()}>
                         <div className="codeWrapper" style={{ display: 'flex', width: '100%' }}>
                           <div className="lineNumbers">
                             {highlightedLines.map((_, i) => (

@@ -1723,11 +1723,91 @@
   width: 100%;
 }
 
+.justify-text p,
+.justify-text li,
+.justify-text blockquote,
+.justify-text td,
+.justify-text th {
+  text-align: justify !important;
+  text-justify: inter-word !important;
+  text-align-last: left !important;
+  hyphens: auto !important;
+  overflow-wrap: break-word !important;
+  word-break: normal !important;
+}
+
+/* Animation for justifying text transitions (morph effect) */
+@keyframes justifyEnter {
+  0% {
+    opacity: 0.8;
+    filter: blur(0.4px);
+    transform: scaleX(0.985);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: scaleX(1);
+  }
+}
+
+@keyframes justifyExit {
+  0% {
+    opacity: 0.8;
+    filter: blur(0.4px);
+    transform: scaleX(1.015);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: scaleX(1);
+  }
+}
+
+.justify-active p,
+.justify-active li,
+.justify-active blockquote,
+.justify-active td,
+.justify-active th {
+  transform-origin: left center;
+  animation: justifyEnter 0.35s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+}
+
+.justify-inactive p,
+.justify-inactive li,
+.justify-inactive blockquote,
+.justify-inactive td,
+.justify-inactive th {
+  transform-origin: left center;
+  animation: justifyExit 0.35s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+}
+
+/* Ensure preformatted code blocks do not inherit justification rules */
+.justify-text pre,
+.justify-text code,
+.justify-text .codeLine {
+  text-align: left !important;
+  text-justify: auto !important;
+  text-align-last: auto !important;
+}
+
+.lineNumbers,
+.lineNo {
+  text-align: right !important;
+}
+
 .printHeaderOnly {
   display: none;
 }
 
 @media print {
+  /* 0. Disable all animations and filters for fast PDF generation */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    filter: none !important;
+  }
 
   /* 1. Hide interactive elements, headers, sidebars, and editor textareas */
   .viewerHeader,
@@ -1827,12 +1907,100 @@
     max-width: 100% !important;
   }
 
-  .codeContainer  .lineNumbers {
+  /* ======================================================== */
+  /* [Normal Mode Code Print] - Wrapping with CSS Counter      */
+  /* ======================================================== */
+  .is-normal .codeContainer .lineNumbers {
+    display: none !important; /* Hide original static line numbers */
+  }
+
+  .is-normal .codeContainer {
+    counter-reset: line-counter;
+  }
+
+  .is-normal .codeContainer .codeLine {
+    counter-increment: line-counter;
+    position: relative !important;
+    padding-left: 50px !important;
+    text-align: left !important;
+    white-space: pre-wrap !important; /* Wrap code line text */
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    font-family: 'Fira Code', 'Courier New', Courier, monospace !important;
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+    height: auto !important;
+    min-height: 16.5px !important;
+  }
+
+  .is-normal .codeContainer .codeLine::before {
+    content: counter(line-counter);
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 35px !important;
+    text-align: right !important;
+    color: #71717a !important;
+    font-family: 'Fira Code', 'Courier New', Courier, monospace !important;
+    font-size: 11px !important;
+    user-select: none !important;
+    border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+    padding-right: 10px !important;
+    box-sizing: border-box !important;
+    display: inline-block !important;
+    line-height: 1.5 !important;
+    height: 100% !important;
+  }
+
+  .is-normal .codeContainer .codePre {
+    white-space: pre-wrap !important;
+    font-family: 'Fira Code', 'Courier New', Courier, monospace !important;
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  /* ======================================================== */
+  /* [Compare Mode Code Print] - Side-by-side with match     */
+  /* ======================================================== */
+  .is-compare .splitLayout {
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100% !important;
+    gap: 16px !important;
+  }
+
+  .is-compare .leftPane {
+    display: flex !important;
+    flex-direction: column !important;
+    width: calc(50% - 8px) !important;
+    max-width: calc(50% - 8px) !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: transparent !important;
+    box-sizing: border-box !important;
+  }
+
+  .is-compare .rightPane {
+    display: flex !important;
+    flex-direction: column !important;
+    width: calc(50% - 8px) !important;
+    max-width: calc(50% - 8px) !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: transparent !important;
+    box-sizing: border-box !important;
+  }
+
+  /* --- Default Compare Mode (for Code, Config, Text) --- */
+  .is-compare .codeContainer .lineNumbers {
     display: block !important;
     background: transparent !important;
     border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
     color: #71717a !important;
-    padding: 24px 12px 24px 16px !important;
+    padding: 0 12px 0 16px !important; /* Zero top/bottom padding to match code block alignment */
     position: static !important;
     margin-right: 12px !important;
     min-width: 45px !important;
@@ -1840,32 +2008,61 @@
     user-select: none !important;
   }
 
-  .lineNo {
-    font-size: 11px !important;
-    height: 16.5px !important;
-    line-height: 16.5px !important;
+  /* Disable text wrapping for structured code comparison to ensure line matching */
+  .is-compare .codeContainer .codePre,
+  .is-compare .codeContainer .codeLine {
+    white-space: pre !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    word-wrap: normal !important;
   }
 
-  /* 4. Wrap code text properly to prevent horizontal clipping & hide scrollbars */
-  .codePre, .codeLine {
-    white-space: pre-wrap !important;
+  .is-compare .codeContainer .lineNo,
+  .is-compare .codeContainer .codeLine {
+    font-family: 'Fira Code', 'Courier New', Courier, monospace !important;
+    font-size: 10px !important;
+    height: 18px !important;
+    line-height: 18px !important;
+    min-height: 18px !important;
+    box-sizing: border-box !important;
+  }
+
+  .is-compare .codeContainer .codePre {
+    flex: 1 !important;
+    min-width: 0 !important;
+    font-family: 'Fira Code', 'Courier New', Courier, monospace !important;
+    font-size: 10px !important;
+    line-height: 18px !important;
+    padding: 0 20px 0 16px !important; /* Zero top/bottom padding to perfectly match lineNumbers */
+  }
+
+  /* --- Specific Compare Mode Overrides for Markdown Source --- */
+  .cat-markdown.is-compare .codeContainer .lineNumbers {
+    display: none !important; /* Hide line numbers to avoid alignment mismatch on wrapped text */
+  }
+
+  .cat-markdown.is-compare .codeContainer .codePre,
+  .cat-markdown.is-compare .codeContainer .codeLine {
+    white-space: pre-wrap !important; /* Allow natural text wrapping for readable document diff */
     word-break: normal !important;
     overflow-wrap: break-word !important;
     word-wrap: break-word !important;
-    font-size: 11px !important;
+    height: auto !important;
+    min-height: 18px !important;
+    line-height: 1.5 !important;
+    font-family: 'Fira Code', 'Courier New', Courier, monospace !important;
+    font-size: 10px !important;
+  }
+
+  .cat-markdown.is-compare .codePre {
+    flex: 1 !important;
+    min-width: 0 !important;
     line-height: 1.5 !important;
   }
 
-  .codePre {
-    flex: 1 !important;
-    min-width: 0 !important;
-  }
-
-  .codeLine {
-    height: auto !important;
-    min-height: 16.5px !important;
-  }
-
+  /* ======================================================== */
+  /* [Markdown Preview Print Styles]                          */
+  /* ======================================================== */
   .previewContainer pre,
   .previewContainer pre code,
   .previewContainer code {
@@ -1877,7 +2074,7 @@
     overflow-x: visible !important;
   }
 
-  /* 5. Force background and text colors accuracy for syntax highlighting & hide scrollbars */
+  /* Force background and text colors accuracy for syntax highlighting & hide scrollbars */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -1931,59 +2128,13 @@
   .hljs-tag,
   .hljs-name { color: #22863a !important; }
 
-  /* 6. Compare mode side-by-side layout printing */
-  .is-compare .splitLayout {
-    display: flex !important;
-    flex-direction: row !important;
-    width: 100% !important;
-    gap: 16px !important;
-  }
-  .is-compare .leftPane {
-    display: flex !important;
-    flex-direction: column !important;
-    width: calc(50% - 8px) !important;
-    max-width: calc(50% - 8px) !important;
-    height: auto !important;
-    overflow: visible !important;
-    background: transparent !important;
-    box-sizing: border-box !important;
-  }
-  .is-compare .rightPane {
-    display: flex !important;
-    flex-direction: column !important;
-    width: calc(50% - 8px) !important;
-    max-width: calc(50% - 8px) !important;
-    height: auto !important;
-    overflow: visible !important;
-    background: transparent !important;
-    box-sizing: border-box !important;
-  }
-
-  .is-compare .codePre,
-  .is-compare .codeLine {
-    white-space: pre-wrap !important;
-    word-break: normal !important;
-    overflow-wrap: break-word !important;
-    word-wrap: break-word !important;
-    font-size: 10px !important;
-    line-height: 1.4 !important;
-  }
-  .is-compare .codeLine {
-    height: auto !important;
-    min-height: 14px !important;
-  }
-  .is-compare .lineNo {
-    font-size: 10px !important;
-    height: 14px !important;
-    line-height: 14px !important;
-  }
-
-  /* 7. Normal edit mode Markdown Source printing */
+  /* Normal edit mode Markdown Source printing */
   .is-normal.mode-edit .print-only-markdown-source {
     display: block !important;
     width: 100% !important;
     background: transparent !important;
   }
+
   .is-normal.mode-edit .print-only-markdown-source code {
     font-size: 11px !important;
     line-height: 1.5 !important;
