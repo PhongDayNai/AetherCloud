@@ -100,22 +100,7 @@ function DocViewerContent() {
   const { t } = useLanguage();
   const { resolvedTheme: globalTheme } = useTheme();
   const [docTheme, setDocTheme] = useState<'light' | 'dark'>('dark');
-  const [enableJustify, setEnableJustify] = useState(false);
-  const [justifyClass, setJustifyClass] = useState('');
-  const justifySupportedCategories = ['markdown'];
 
-  useEffect(() => {
-    if (enableJustify) {
-      setJustifyClass('justify-active justify-text');
-    } else {
-      setJustifyClass((prev) => prev.includes('justify-text') ? 'justify-inactive' : '');
-    }
-  }, [enableJustify]);
-
-  const getCodeContainerClass = (extraClasses = '') => {
-    const isSupported = justifySupportedCategories.includes(category);
-    return `codeContainer ${isSupported ? justifyClass : ''} ${extraClasses}`.trim();
-  };
   const tabId = useRef('');
   const { user, groups, addToast } = useCloud();
   const confirm = useConfirm();
@@ -228,6 +213,39 @@ function DocViewerContent() {
   const [conflictLocalContent, setConflictLocalContent] = useState<string>('');
 
   const category = asset ? docCategoryOf(asset) : 'other';
+
+  const [enableJustify, setEnableJustify] = useState(false);
+  const [justifyClass, setJustifyClass] = useState('');
+  const justifySupportedCategories = ['markdown'];
+
+  // Load justify state from localStorage when category changes
+  useEffect(() => {
+    if (category && category !== 'other') {
+      const saved = localStorage.getItem(`justify_${category}`);
+      setEnableJustify(saved === 'on');
+    }
+  }, [category]);
+
+  const handleToggleJustify = () => {
+    const nextVal = !enableJustify;
+    setEnableJustify(nextVal);
+    if (category && category !== 'other') {
+      localStorage.setItem(`justify_${category}`, nextVal ? 'on' : 'off');
+    }
+  };
+
+  useEffect(() => {
+    if (enableJustify) {
+      setJustifyClass('justify-active justify-text');
+    } else {
+      setJustifyClass((prev) => prev.includes('justify-text') ? 'justify-inactive' : '');
+    }
+  }, [enableJustify]);
+
+  const getCodeContainerClass = (extraClasses = '') => {
+    const isSupported = justifySupportedCategories.includes(category);
+    return `codeContainer ${isSupported ? justifyClass : ''} ${extraClasses}`.trim();
+  };
   const isDirty = category === 'markdown' ? (markdownText !== originalMarkdown) : (codeText !== originalCode);
   const isWritable = asset ? hasWritePermission(asset, user, groups) : false;
 
@@ -1418,7 +1436,7 @@ function DocViewerContent() {
               </button>
               {justifySupportedCategories.includes(category) && (
                 <button
-                  onClick={() => setEnableJustify(!enableJustify)}
+                  onClick={handleToggleJustify}
                   title={enableJustify ? "Disable Justify Text" : "Enable Justify Text"}
                   className="no-print"
                   style={{
@@ -1495,7 +1513,7 @@ function DocViewerContent() {
               </button>
               {justifySupportedCategories.includes(category) && (
                 <button
-                  onClick={() => setEnableJustify(!enableJustify)}
+                  onClick={handleToggleJustify}
                   title={enableJustify ? "Disable Justify Text" : "Enable Justify Text"}
                   className="no-print"
                   style={{
