@@ -15,6 +15,9 @@ import hljs from 'highlight.js';
 import mermaid from 'mermaid';
 import DOMPurify from 'isomorphic-dompurify';
 import * as Icons from '../../components/Icons';
+import { docViewerTips, getLocalizedText, TipIcon } from './tipsViewerTips';
+
+import MascotTipsWidget from '../../components/MascotTipsWidget';
 
 import './docViewer.css';
 import 'highlight.js/styles/github-dark.css';
@@ -97,9 +100,11 @@ function renderFileIcon(file: Asset, size = 18) {
 function DocViewerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { resolvedTheme: globalTheme } = useTheme();
   const [docTheme, setDocTheme] = useState<'light' | 'dark'>('dark');
+
+  const currentLang = (language === 'vi' || language === 'en') ? language : 'vi';
 
   const tabId = useRef('');
   const { user, groups, addToast } = useCloud();
@@ -1699,7 +1704,13 @@ function DocViewerContent() {
               </div>
             )}
           </div>
+
+          {/* Bottom spacer for overlay tips widget */}
+          {!isSidebarCollapsed && <div className="sidebarBottomSpacer" />}
         </aside>
+
+        {/* Floating Tips Overlay */}
+        <MascotTipsWidget tips={docViewerTips} theme={docTheme} language={currentLang} />
 
         <main className="viewerContent">
           {isLoading ? (

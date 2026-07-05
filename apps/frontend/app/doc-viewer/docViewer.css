@@ -2206,3 +2206,9 @@
     word-wrap: break-word !important;
   }
 }
+
+.sidebarBottomSpacer {
+  height: 210px;
+  flex-shrink: 0;
+  transition: height 0.25s ease;
+}
