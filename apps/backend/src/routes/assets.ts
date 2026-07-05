@@ -464,7 +464,8 @@ router.get('/_media/original/:id', requireAuth, checkAssetOwnership, async (req:
     if (!fs.existsSync(abs)) return res.status(404).json({ message: 'File missing' });
 
     res.setHeader('Content-Type', asset.mime || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${path.basename(asset.originalName || 'file')}"`);
+    const isDownload = req.query.download === 'true';
+    res.setHeader('Content-Disposition', `${isDownload ? 'attachment' : 'inline'}; filename="${path.basename(asset.originalName || 'file')}"`);
     res.setHeader('Cache-Control', 'private, max-age=3600');
     return res.sendFile(abs);
   } catch (e: any) {
