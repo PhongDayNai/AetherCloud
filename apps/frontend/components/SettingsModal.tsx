@@ -119,6 +119,7 @@ export default function SettingsModal({
   // State cho quản lý mã mời (Admin)
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [maxUsesInput, setMaxUsesInput] = useState<number | string>(1);
+  const [isUnlimitedUses, setIsUnlimitedUses] = useState<boolean>(false);
   const [expiresType, setExpiresType] = useState<'hours' | 'date'>('hours');
   const [expiresInHoursInput, setExpiresInHoursInput] = useState<number | string>('');
   const [expiresDateInput, setExpiresDateInput] = useState<string>('');
@@ -131,6 +132,28 @@ export default function SettingsModal({
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [changePasswordMsg, setChangePasswordMsg] = useState<string>('');
   const [showLogoutOthersConfirm, setShowLogoutOthersConfirm] = useState<boolean>(false);
+
+  // Tự động xóa thông báo sau 4 giây
+  useEffect(() => {
+    if (createInviteMsg) {
+      const timer = setTimeout(() => setCreateInviteMsg(''), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [createInviteMsg]);
+
+  useEffect(() => {
+    if (updateProfileMsg) {
+      const timer = setTimeout(() => setUpdateProfileMsg(''), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [updateProfileMsg]);
+
+  useEffect(() => {
+    if (changePasswordMsg) {
+      const timer = setTimeout(() => setChangePasswordMsg(''), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [changePasswordMsg]);
 
   useEffect(() => {
     if (isOpen) {
@@ -211,7 +234,7 @@ export default function SettingsModal({
     setCreateInviteMsg('');
     try {
       const body: any = {
-        max_uses: maxUsesInput ? parseInt(String(maxUsesInput), 10) : 1
+        max_uses: isUnlimitedUses ? 0 : (maxUsesInput ? parseInt(String(maxUsesInput), 10) : 1)
       };
       if (expiresType === 'hours') {
         if (expiresInHoursInput) {
@@ -232,6 +255,7 @@ export default function SettingsModal({
       if (res.ok) {
         setCreateInviteMsg(t('invite.createSuccess'));
         setMaxUsesInput(1);
+        setIsUnlimitedUses(false);
         setExpiresInHoursInput('');
         setExpiresDateInput('');
         loadInvitations();
@@ -366,6 +390,28 @@ export default function SettingsModal({
             }
             .tableRowHover:hover {
               background: var(--bg-item-hover);
+            }
+            input.no-spinner::-webkit-outer-spin-button,
+            input.no-spinner::-webkit-inner-spin-button {
+              -webkit-appearance: none;
+              margin: 0;
+            }
+            input.no-spinner[type=number] {
+              -moz-appearance: textfield;
+            }
+            @keyframes alertFadeIn {
+              from { opacity: 0; transform: translateY(4px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .alert-animation {
+              animation: alertFadeIn 0.22s ease-out forwards;
+            }
+            @keyframes tabContentFade {
+              from { opacity: 0; transform: translateY(4px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .tab-content-fade {
+              animation: tabContentFade 0.22s ease-out forwards;
             }
           `}</style>
           <div style={{
@@ -729,18 +775,23 @@ export default function SettingsModal({
                           </div>
                         </div>
 
-                        {updateProfileMsg && (
+                        <div style={{
+                          maxHeight: updateProfileMsg ? '80px' : '0px',
+                          opacity: updateProfileMsg ? 1 : 0,
+                          transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                          overflow: 'hidden'
+                        }}>
                           <div style={{
                             padding: '8px 12px',
                             borderRadius: '6px',
-                            backgroundColor: updateProfileMsg.startsWith(t('messages.error')) ? 'rgba(244, 63, 94, 0.08)' : 'rgba(16, 185, 129, 0.08)',
-                            color: updateProfileMsg.startsWith(t('messages.error')) ? '#fca5a5' : '#a7f3d0',
+                            backgroundColor: updateProfileMsg?.startsWith(t('messages.error')) ? 'rgba(244, 63, 94, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                            color: updateProfileMsg?.startsWith(t('messages.error')) ? '#fca5a5' : '#a7f3d0',
                             fontSize: '13px',
-                            border: `1px solid ${updateProfileMsg.startsWith(t('messages.error')) ? 'rgba(244, 63, 94, 0.12)' : 'rgba(16, 185, 129, 0.12)'}`
+                            border: `1px solid ${updateProfileMsg?.startsWith(t('messages.error')) ? 'rgba(244, 63, 94, 0.12)' : 'rgba(16, 185, 129, 0.12)'}`
                           }}>
                             {updateProfileMsg}
                           </div>
-                        )}
+                        </div>
 
                         <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                           <button 
@@ -806,11 +857,16 @@ export default function SettingsModal({
                           />
                         </div>
 
-                        {changePasswordMsg && (
+                        <div style={{
+                          maxHeight: changePasswordMsg ? '80px' : '0px',
+                          opacity: changePasswordMsg ? 1 : 0,
+                          transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                          overflow: 'hidden'
+                        }}>
                           <div style={{ padding: '8px 12px', borderRadius: '6px', backgroundColor: 'rgba(244, 63, 94, 0.08)', color: '#fca5a5', fontSize: '12.5px', border: '1px solid rgba(244, 63, 94, 0.12)' }}>
                             {changePasswordMsg}
                           </div>
-                        )}
+                        </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
                           <button 
@@ -849,7 +905,7 @@ export default function SettingsModal({
                 <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'visible', animation: 'tabSlideIn 0.2s ease-out' }}>
                   <h3 style={{ margin: '0 0 16px 0', fontSize: '17px', color: 'var(--text-primary)', fontWeight: '600' }}>{t('invite.title')}</h3>
                   
-                  <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch', flex: 1, overflow: 'visible' }}>
+                  <div style={{ display: 'flex', gap: '24px', alignItems: 'stretch', flex: 1, minHeight: 0, overflow: 'visible' }}>
                     {/* Cột trái: Form tạo mã mời */}
                     <div style={{
                       width: '180px',
@@ -862,15 +918,55 @@ export default function SettingsModal({
                     }}>
                       <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{t('invite.createTitle')}</h4>
                       <form onSubmit={handleCreateInvitation} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '10.5px', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('invite.maxUses')}</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ display: 'block', fontSize: '10.5px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('invite.maxUses')}</label>
+                          
+                          {/* Premium Switch Toggle */}
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none', width: 'fit-content' }}>
+                            <div style={{
+                              width: '28px',
+                              height: '16px',
+                              backgroundColor: isUnlimitedUses ? '#4f46e5' : 'var(--border-input)',
+                              borderRadius: '99px',
+                              padding: '2px',
+                              transition: 'background-color 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: isUnlimitedUses ? 'flex-end' : 'flex-start',
+                              boxSizing: 'border-box'
+                            }}>
+                              <div style={{
+                                width: '12px',
+                                height: '12px',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '50%',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                                transition: 'all 0.2s'
+                              }} />
+                            </div>
+                            <input 
+                              type="checkbox" 
+                              checked={isUnlimitedUses} 
+                              onChange={(e) => {
+                                setIsUnlimitedUses(e.target.checked);
+                                if (e.target.checked) setMaxUsesInput('');
+                                else setMaxUsesInput(1);
+                              }}
+                              style={{ display: 'none' }}
+                            />
+                            <span>{t('invite.unlimited')}</span>
+                          </label>
+                          
                           <input 
                             type="number" 
                             min="1" 
-                            value={maxUsesInput} 
+                            placeholder={isUnlimitedUses ? '∞' : '1'}
+                            disabled={isUnlimitedUses}
+                            value={isUnlimitedUses ? '' : maxUsesInput} 
                             onChange={(e) => setMaxUsesInput(e.target.value)} 
-                            required 
-                            style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border-input)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', transition: 'all 0.15s ease', boxSizing: 'border-box' }}
+                            required={!isUnlimitedUses}
+                            className="no-spinner"
+                            style={{ width: '100%', background: isUnlimitedUses ? 'var(--bg-item-hover)' : 'var(--bg-input)', border: '1px solid var(--border-input)', borderRadius: '6px', padding: '7px 10px', color: isUnlimitedUses ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: '13px', outline: 'none', transition: 'all 0.15s ease', boxSizing: 'border-box', opacity: isUnlimitedUses ? 0.6 : 1 }}
                             onFocus={(e: any) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
                             onBlur={(e: any) => { e.target.style.borderColor = 'var(--border-input)'; e.target.style.boxShadow = 'none'; }}
                           />
@@ -919,17 +1015,19 @@ export default function SettingsModal({
                           
                           {expiresType === 'hours' ? (
                             <input 
+                              key="hours-input"
                               type="number" 
                               min="1" 
                               placeholder={t('invite.noExpiry')}
                               value={expiresInHoursInput} 
                               onChange={(e) => setExpiresInHoursInput(e.target.value)} 
+                              className="no-spinner tab-content-fade"
                               style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border-input)', borderRadius: '6px', padding: '7px 10px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', transition: 'all 0.15s ease', boxSizing: 'border-box' }}
                               onFocus={(e: any) => { e.target.style.borderColor = '#6366f1'; e.target.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.15)'; }}
                               onBlur={(e: any) => { e.target.style.borderColor = 'var(--border-input)'; e.target.style.boxShadow = 'none'; }}
                             />
                           ) : (
-                            <div>
+                            <div key="date-input" className="tab-content-fade">
                               <CustomDatePicker 
                                 value={expiresDateInput} 
                                 onChange={setExpiresDateInput} 
@@ -964,38 +1062,48 @@ export default function SettingsModal({
                           {t('invite.createBtn')}
                         </button>
 
-                        {createInviteMsg && (
+                        <div style={{
+                          maxHeight: createInviteMsg ? '80px' : '0px',
+                          opacity: createInviteMsg ? 1 : 0,
+                          transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                          overflow: 'hidden',
+                          marginTop: createInviteMsg ? '8px' : '0px'
+                        }}>
                           <div style={{
                             fontSize: '11.5px',
-                            color: createInviteMsg.startsWith(t('messages.error')) ? '#fca5a5' : '#a7f3d0',
+                            color: createInviteMsg?.startsWith(t('messages.error')) ? '#fca5a5' : '#a7f3d0',
                             padding: '6px 10px',
                             borderRadius: '6px',
-                            background: createInviteMsg.startsWith(t('messages.error')) ? 'rgba(244, 63, 94, 0.08)' : 'rgba(16, 185, 129, 0.08)',
-                            border: `1px solid ${createInviteMsg.startsWith(t('messages.error')) ? 'rgba(244, 63, 94, 0.12)' : 'rgba(16, 185, 129, 0.12)'}`,
+                            background: createInviteMsg?.startsWith(t('messages.error')) ? 'rgba(244, 63, 94, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                            border: `1px solid ${createInviteMsg?.startsWith(t('messages.error')) ? 'rgba(244, 63, 94, 0.12)' : 'rgba(16, 185, 129, 0.12)'}`,
                             wordBreak: 'break-word'
                           }}>
                             {createInviteMsg}
                           </div>
-                        )}
+                        </div>
                       </form>
                     </div>
 
                     {/* Cột phải: Danh sách mã mời */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{t('invite.listTitle')}</h4>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+                      <h4 style={{ margin: '0', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{t('invite.listTitle')}</h4>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', marginBottom: '12px', lineHeight: '1.4' }}>
+                        {t('invite.clickToCopyHint')}
+                      </div>
                       <div style={{
                         flex: 1,
                         border: '1px solid var(--border-color)',
                         borderRadius: '8px',
                         overflowY: 'auto',
-                        background: 'var(--bg-input)'
+                        background: 'var(--bg-input)',
+                        overflowX: 'hidden'
                       }}>
                         {invitations.length === 0 ? (
                           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12.5px' }}>
                             {t('invite.emptyList')}
                           </div>
                         ) : (
-                          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12.5px', color: 'var(--text-primary)' }}>
+                          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left', fontSize: '12.5px', color: 'var(--text-primary)' }}>
                             <thead>
                               <tr style={{ background: 'var(--bg-item-hover)', borderBottom: '1px solid var(--border-color)' }}>
                                 <th style={{ padding: '8px 10px', fontWeight: '600', color: 'var(--text-muted)' }}>{t('invite.colCode')}</th>

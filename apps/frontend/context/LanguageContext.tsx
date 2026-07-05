@@ -306,6 +306,8 @@ const translations = {
     'invite.createSuccess': 'Tạo mã mời thành công!',
     'invite.createError': 'Không tạo được mã mời',
     'invite.expiryDateHint': '* Hết hạn vào lúc 23:59:59 của ngày được chọn.',
+    'invite.unlimited': 'Không giới hạn',
+    'invite.clickToCopyHint': '* Nhấp vào mã mời để sao chép nhanh.',
 
     'topbar.searchPlaceholder': 'Tìm theo tên file...',
     'actions.upload': 'Tải lên',
@@ -823,6 +825,8 @@ const translations = {
     'invite.createSuccess': 'Invite code created successfully!',
     'invite.createError': 'Failed to create invite code',
     'invite.expiryDateHint': '* Expires at 23:59:59 of the selected date.',
+    'invite.unlimited': 'Unlimited',
+    'invite.clickToCopyHint': '* Click on the code to copy it quickly.',
 
     // Main Topbar & Actions
     'topbar.searchPlaceholder': 'Search file name...',

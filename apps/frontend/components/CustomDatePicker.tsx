@@ -213,6 +213,20 @@ export default function CustomDatePicker({
 
   return (
     <div style={{ position: "relative", width: "100%" }} ref={containerRef}>
+      <style>{`
+        .datepicker-popup {
+          opacity: 0;
+          transform: translateY(6px) scale(0.97);
+          transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.15s;
+          visibility: hidden;
+          transform-origin: top left;
+        }
+        .datepicker-popup.show {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+          visibility: visible;
+        }
+      `}</style>
       <div 
         onClick={() => setIsOpen(!isOpen)}
         style={{
@@ -242,9 +256,9 @@ export default function CustomDatePicker({
           <CalendarIcon size={14} />
         </span>
       </div>
-
-      {isOpen && (
-        <div style={{
+      <div 
+        className={`datepicker-popup ${isOpen ? 'show' : ''}`}
+        style={{
           position: "absolute",
           zIndex: 99,
           marginTop: "6px",
@@ -255,205 +269,206 @@ export default function CustomDatePicker({
           borderRadius: "12px",
           boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
           width: "250px",
-          boxSizing: "border-box"
-        }}>
-          {viewMode === "days" && (
-            <>
-              {/* Header */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                <button 
+          boxSizing: "border-box",
+          pointerEvents: isOpen ? "auto" : "none"
+        }}
+      >
+        {viewMode === "days" && (
+          <>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+              <button 
+                type="button"
+                onClick={handlePrevMonth}
+                style={{ background: "transparent", border: 0, color: "var(--text-secondary)", cursor: "pointer", padding: "4px", borderRadius: "4px", display: "flex", alignItems: "center" }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-item-hover)"; e.currentTarget.style.color = "var(--text-primary)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "var(--text-secondary)"; }}
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <button
                   type="button"
-                  onClick={handlePrevMonth}
-                  style={{ background: "transparent", border: 0, color: "var(--text-secondary)", cursor: "pointer", padding: "4px", borderRadius: "4px", display: "flex", alignItems: "center" }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-item-hover)"; e.currentTarget.style.color = "var(--text-primary)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "var(--text-secondary)"; }}
+                  onClick={() => setViewMode("months")}
+                  style={{ background: "transparent", border: 0, color: "var(--text-primary)", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", cursor: "pointer", padding: "2px 6px", borderRadius: "4px" }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = "var(--accent-color)"}
+                  onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-primary)"}
                 >
-                  <ChevronLeft size={14} />
+                  {months[month]}
                 </button>
-                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("months")}
-                    style={{ background: "transparent", border: 0, color: "var(--text-primary)", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", cursor: "pointer", padding: "2px 6px", borderRadius: "4px" }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = "var(--accent-color)"}
-                    onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-primary)"}
-                  >
-                    {months[month]}
-                  </button>
-                  <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>•</span>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("years")}
-                    style={{ background: "transparent", border: 0, color: "var(--text-primary)", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", cursor: "pointer", padding: "2px 6px", borderRadius: "4px" }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = "var(--accent-color)"}
-                    onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-primary)"}
-                  >
-                    {year}
-                  </button>
-                </div>
-                <button 
-                  type="button"
-                  onClick={handleNextMonth}
-                  style={{ background: "transparent", border: 0, color: "var(--text-secondary)", cursor: "pointer", padding: "4px", borderRadius: "4px", display: "flex", alignItems: "center" }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-item-hover)"; e.currentTarget.style.color = "var(--text-primary)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "var(--text-secondary)"; }}
-                >
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-
-              {/* Grid header (days names) */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px", textAlign: "center", marginBottom: "6px" }}>
-                {daysHeader.map((d) => (
-                  <span key={d} style={{ fontSize: "9.5px", fontWeight: "700", color: "var(--text-muted)" }}>
-                    {d}
-                  </span>
-                ))}
-              </div>
-
-              {/* Grid days */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px", textAlign: "center" }}>
-                {blanks.map((_, i) => (
-                  <div key={`blank-${i}`} style={{ width: "28px", height: "28px" }} />
-                ))}
-                {days.map((day) => {
-                  const isSelected = selectedDate.getDate() === day && 
-                                     selectedDate.getMonth() === month && 
-                                     selectedDate.getFullYear() === year &&
-                                     value !== "";
-                  const isToday = new Date().getDate() === day &&
-                                  new Date().getMonth() === month &&
-                                  new Date().getFullYear() === year;
-                  const disabled = isDateDisabled(year, month, day);
-
-                  return (
-                    <button
-                      key={`day-${day}`}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => !disabled && handleSelectDay(day)}
-                      style={{
-                        width: "28px",
-                        height: "28px",
-                        borderRadius: "6px",
-                        border: 0,
-                        fontSize: "11px",
-                        fontWeight: "700",
-                        cursor: disabled ? "not-allowed" : "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.1s ease",
-                        backgroundColor: isSelected 
-                          ? "var(--button-primary-bg)" 
-                          : isToday 
-                            ? "rgba(59, 130, 246, 0.15)" 
-                            : "transparent",
-                        color: isSelected 
-                          ? "var(--button-primary-text)" 
-                          : disabled
-                            ? "var(--text-muted)"
-                            : isToday 
-                              ? "var(--accent-color)" 
-                              : "var(--text-secondary)",
-                        opacity: disabled ? 0.3 : 1
-                      }}
-                      onMouseEnter={(e) => { if (!isSelected && !disabled) { e.currentTarget.style.backgroundColor = "var(--bg-item-hover)"; e.currentTarget.style.color = "var(--text-primary)"; } }}
-                      onMouseLeave={(e) => { if (!isSelected && !disabled) { e.currentTarget.style.backgroundColor = isToday ? "rgba(59, 130, 246, 0.15)" : "transparent"; e.currentTarget.style.color = isToday ? "var(--accent-color)" : "var(--text-secondary)"; } }}
-                    >
-                      {day}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {viewMode === "months" && (
-            <>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", borderBottom: "1px solid var(--border-color)", paddingBottom: "6px" }}>
-                <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase" }}>{lang === "vi" ? "Chọn Tháng" : "Select Month"}</span>
+                <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>•</span>
                 <button
                   type="button"
                   onClick={() => setViewMode("years")}
-                  style={{ background: "transparent", border: 0, color: "var(--accent-color)", fontWeight: "700", fontSize: "11px", cursor: "pointer" }}
+                  style={{ background: "transparent", border: 0, color: "var(--text-primary)", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", cursor: "pointer", padding: "2px 6px", borderRadius: "4px" }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = "var(--accent-color)"}
+                  onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-primary)"}
                 >
                   {year}
                 </button>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
-                {shortMonths.map((mName, mIdx) => {
-                  const isCurrentSelected = month === mIdx;
-                  return (
-                    <button
-                      key={mName}
-                      type="button"
-                      onClick={() => handleSelectMonth(mIdx)}
-                      style={{
-                        padding: "8px 0",
-                        borderRadius: "8px",
-                        border: 0,
-                        fontSize: "11px",
-                        fontWeight: "700",
-                        cursor: "pointer",
-                        backgroundColor: isCurrentSelected ? "var(--button-primary-bg)" : "transparent",
-                        color: isCurrentSelected ? "var(--button-primary-text)" : "var(--text-secondary)",
-                        transition: "all 0.1s ease"
-                      }}
-                      onMouseEnter={(e) => { if (!isCurrentSelected) e.currentTarget.style.backgroundColor = "var(--bg-item-hover)"; }}
-                      onMouseLeave={(e) => { if (!isCurrentSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
-                    >
-                      {mName}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
+              <button 
+                type="button"
+                onClick={handleNextMonth}
+                style={{ background: "transparent", border: 0, color: "var(--text-secondary)", cursor: "pointer", padding: "4px", borderRadius: "4px", display: "flex", alignItems: "center" }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-item-hover)"; e.currentTarget.style.color = "var(--text-primary)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "var(--text-secondary)"; }}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
 
-          {viewMode === "years" && (
-            <>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", borderBottom: "1px solid var(--border-color)", paddingBottom: "6px" }}>
-                <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase" }}>{lang === "vi" ? "Chọn Năm" : "Select Year"}</span>
-                <button
-                  type="button"
-                  onClick={() => setViewMode(onlyMonth ? "months" : "days")}
-                  style={{ background: "transparent", border: 0, color: "var(--accent-color)", fontWeight: "700", fontSize: "11px", cursor: "pointer" }}
-                >
-                  {lang === "vi" ? "Quay lại" : "Back"}
-                </button>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "4px", maxHeight: "150px", overflowY: "auto", paddingRight: "4px" }}>
-                {yearsList.map((yNum) => {
-                  const isCurrentSelected = year === yNum;
-                  return (
-                    <button
-                      key={yNum}
-                      type="button"
-                      onClick={() => handleSelectYear(yNum)}
-                      style={{
-                        padding: "6px 0",
-                        borderRadius: "6px",
-                        border: 0,
-                        fontSize: "11px",
-                        fontWeight: "700",
-                        cursor: "pointer",
-                        backgroundColor: isCurrentSelected ? "var(--button-primary-bg)" : "transparent",
-                        color: isCurrentSelected ? "var(--button-primary-text)" : "var(--text-secondary)",
-                        transition: "all 0.1s ease"
-                      }}
-                      onMouseEnter={(e) => { if (!isCurrentSelected) e.currentTarget.style.backgroundColor = "var(--bg-item-hover)"; }}
-                      onMouseLeave={(e) => { if (!isCurrentSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
-                    >
-                      {yNum}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      )}
+            {/* Grid header (days names) */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px", textAlign: "center", marginBottom: "6px" }}>
+              {daysHeader.map((d) => (
+                <span key={d} style={{ fontSize: "9.5px", fontWeight: "700", color: "var(--text-muted)" }}>
+                  {d}
+                </span>
+              ))}
+            </div>
+
+            {/* Grid days */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px", textAlign: "center" }}>
+              {blanks.map((_, i) => (
+                <div key={`blank-${i}`} style={{ width: "28px", height: "28px" }} />
+              ))}
+              {days.map((day) => {
+                const isSelected = selectedDate.getDate() === day && 
+                                   selectedDate.getMonth() === month && 
+                                   selectedDate.getFullYear() === year &&
+                                   value !== "";
+                const isToday = new Date().getDate() === day &&
+                                new Date().getMonth() === month &&
+                                new Date().getFullYear() === year;
+                const disabled = isDateDisabled(year, month, day);
+
+                return (
+                  <button
+                    key={`day-${day}`}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => !disabled && handleSelectDay(day)}
+                    style={{
+                      width: "28px",
+                      height: "28px",
+                      borderRadius: "6px",
+                      border: 0,
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      transition: "all 0.1s ease",
+                      backgroundColor: isSelected 
+                        ? "var(--button-primary-bg)" 
+                        : isToday 
+                          ? "rgba(59, 130, 246, 0.15)" 
+                          : "transparent",
+                      color: isSelected 
+                        ? "var(--button-primary-text)" 
+                        : disabled
+                          ? "var(--text-muted)"
+                          : isToday 
+                            ? "var(--accent-color)" 
+                            : "var(--text-secondary)",
+                      opacity: disabled ? 0.3 : 1
+                    }}
+                    onMouseEnter={(e) => { if (!isSelected && !disabled) { e.currentTarget.style.backgroundColor = "var(--bg-item-hover)"; e.currentTarget.style.color = "var(--text-primary)"; } }}
+                    onMouseLeave={(e) => { if (!isSelected && !disabled) { e.currentTarget.style.backgroundColor = isToday ? "rgba(59, 130, 246, 0.15)" : "transparent"; e.currentTarget.style.color = isToday ? "var(--accent-color)" : "var(--text-secondary)"; } }}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {viewMode === "months" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", borderBottom: "1px solid var(--border-color)", paddingBottom: "6px" }}>
+              <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase" }}>{lang === "vi" ? "Chọn Tháng" : "Select Month"}</span>
+              <button
+                type="button"
+                onClick={() => setViewMode("years")}
+                style={{ background: "transparent", border: 0, color: "var(--accent-color)", fontWeight: "700", fontSize: "11px", cursor: "pointer" }}
+              >
+                {year}
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
+              {shortMonths.map((mName, mIdx) => {
+                const isCurrentSelected = month === mIdx;
+                return (
+                  <button
+                    key={mName}
+                    type="button"
+                    onClick={() => handleSelectMonth(mIdx)}
+                    style={{
+                      padding: "8px 0",
+                      borderRadius: "8px",
+                      border: 0,
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      backgroundColor: isCurrentSelected ? "var(--button-primary-bg)" : "transparent",
+                      color: isCurrentSelected ? "var(--button-primary-text)" : "var(--text-secondary)",
+                      transition: "all 0.1s ease"
+                    }}
+                    onMouseEnter={(e) => { if (!isCurrentSelected) e.currentTarget.style.backgroundColor = "var(--bg-item-hover)"; }}
+                    onMouseLeave={(e) => { if (!isCurrentSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
+                  >
+                    {mName}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {viewMode === "years" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", borderBottom: "1px solid var(--border-color)", paddingBottom: "6px" }}>
+              <span style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-muted)", textTransform: "uppercase" }}>{lang === "vi" ? "Chọn Năm" : "Select Year"}</span>
+              <button
+                type="button"
+                onClick={() => setViewMode(onlyMonth ? "months" : "days")}
+                style={{ background: "transparent", border: 0, color: "var(--accent-color)", fontWeight: "700", fontSize: "11px", cursor: "pointer" }}
+              >
+                {lang === "vi" ? "Quay lại" : "Back"}
+              </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "4px", maxHeight: "150px", overflowY: "auto", paddingRight: "4px" }}>
+              {yearsList.map((yNum) => {
+                const isCurrentSelected = year === yNum;
+                return (
+                  <button
+                    key={yNum}
+                    type="button"
+                    onClick={() => handleSelectYear(yNum)}
+                    style={{
+                      padding: "6px 0",
+                      borderRadius: "6px",
+                      border: 0,
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      backgroundColor: isCurrentSelected ? "var(--button-primary-bg)" : "transparent",
+                      color: isCurrentSelected ? "var(--button-primary-text)" : "var(--text-secondary)",
+                      transition: "all 0.1s ease"
+                    }}
+                    onMouseEnter={(e) => { if (!isCurrentSelected) e.currentTarget.style.backgroundColor = "var(--bg-item-hover)"; }}
+                    onMouseLeave={(e) => { if (!isCurrentSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
+                  >
+                    {yNum}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
