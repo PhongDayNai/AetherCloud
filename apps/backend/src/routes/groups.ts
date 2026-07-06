@@ -75,7 +75,7 @@ router.get('/invitations/:token', async (req: Request, res: Response) => {
     return res.json({ ok: true, ...details });
   } catch (err: any) {
     if (err instanceof DomainError) {
-      return res.status(err.statusCode).json({ message: err.message });
+      return res.status(err.statusCode).json({ message: err.message, code: err.code });
     }
     return res.status(500).json({ message: err.message });
   }
@@ -108,7 +108,7 @@ router.post('/invitations/:token/accept', requireAuth, async (req: Request, res:
           // Bỏ qua lỗi phụ
         }
       }
-      return res.status(err.statusCode).json({ message: err.message });
+      return res.status(err.statusCode).json({ message: err.message, code: err.code });
     }
     return res.status(500).json({ message: err.message });
   }
@@ -141,7 +141,7 @@ router.post('/invitations/:token/decline', requireAuth, async (req: Request, res
           // Bỏ qua lỗi phụ
         }
       }
-      return res.status(err.statusCode).json({ message: err.message });
+      return res.status(err.statusCode).json({ message: err.message, code: err.code });
     }
     return res.status(500).json({ message: err.message });
   }
@@ -326,7 +326,35 @@ router.post('/:groupId/invite-email', requireAuth, requireGroupMember, async (re
     return res.json({ ok: true, ...result });
   } catch (err: any) {
     if (err instanceof DomainError) {
+      return res.status(err.statusCode).json({ message: err.message, code: err.code });
+    }
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// 15a. GET danh sách lời mời đang chờ phản hồi
+router.get('/:groupId/pending-invites', requireAuth, requireGroupMember, async (req: Request, res: Response) => {
+  const { groupId } = req.params;
+  try {
+    const result = await groupUsecase.getGroupPendingInvites(groupId, req.user!.sub);
+    return res.json({ ok: true, ...result });
+  } catch (err: any) {
+    if (err instanceof DomainError) {
       return res.status(err.statusCode).json({ message: err.message });
+    }
+    return res.status(500).json({ message: err.message });
+  }
+});
+
+// 15b. DELETE hủy lời mời đang chờ phản hồi
+router.delete('/:groupId/pending-invites/:notiId', requireAuth, requireGroupMember, async (req: Request, res: Response) => {
+  const { groupId, notiId } = req.params;
+  try {
+    const result = await groupUsecase.revokeGroupInvitation(groupId, notiId, req.user!.sub);
+    return res.json({ ok: true, ...result });
+  } catch (err: any) {
+    if (err instanceof DomainError) {
+      return res.status(err.statusCode).json({ message: err.message, code: err.code });
     }
     return res.status(500).json({ message: err.message });
   }

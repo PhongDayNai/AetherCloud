@@ -15,3 +15,5 @@ export * from './acceptGroupInvitation';
 export * from './declineGroupInvitation';
 export * from './inviteMemberByEmail';
 export * from './leaveGroup';
+export * from './getGroupPendingInvites';
+export * from './revokeGroupInvitation';
