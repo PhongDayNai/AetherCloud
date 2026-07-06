@@ -22,7 +22,19 @@ export function initWebSocket(server: Server) {
         return;
       }
 
-      const token = parsedUrl.query.token as string;
+      let token = parsedUrl.query.token as string;
+      
+      // Nếu không có token trong query, tự động parse từ Cookie của trình duyệt (HttpOnly cookie)
+      if (!token && req.headers.cookie) {
+        const rawCookies = req.headers.cookie.split(';');
+        for (const cookie of rawCookies) {
+          const [key, val] = cookie.trim().split('=');
+          if (key === 'aethercloud_access') {
+            token = decodeURIComponent(val);
+            break;
+          }
+        }
+      }
       
       if (!token) {
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -84,6 +96,10 @@ export function initWebSocket(server: Server) {
             userSockets.delete(userId);
           }
         }
+      });
+
+      socket.on('error', (err) => {
+        console.warn(`[WebSocket] Socket error for user ${userId}:`, err.message);
       });
       
       // Lắng nghe dữ liệu (nếu client gửi ping hoặc data, tránh rò rỉ bộ nhớ hoặc ngắt kết nối)

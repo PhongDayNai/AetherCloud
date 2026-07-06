@@ -100,6 +100,13 @@ router.get('/me', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// Lấy raw Access Token cho WebSocket client (vì WebSocket không hỗ trợ credentials cross-origin)
+router.get('/token', requireAuth, (req: Request, res: Response) => {
+  const token = req.cookies?.[ACCESS_COOKIE];
+  if (!token) return res.status(401).json({ message: 'Unauthorized' });
+  return res.json({ ok: true, token });
+});
+
 // 6. Đổi mật khẩu
 router.post('/change-password', requireAuth, async (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
