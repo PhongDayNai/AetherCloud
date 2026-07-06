@@ -14,9 +14,11 @@ import assetsRoutes from './routes/assets';
 import adminRoutes from './routes/admin';
 import spacesRoutes from './routes/spaces';
 import groupsRoutes from './routes/groups';
+import notificationRoutes from './routes/notifications';
 
 import { resolveStoragePath } from './lib/assets';
 import { runOrphanedCleanup } from './lib/cleaner';
+import { initWebSocket } from './lib/websocket';
 
 const app = express();
 const port = Number(process.env.BE_PORT || 45174);
@@ -68,6 +70,7 @@ app.use('/api/assets', assetsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/spaces', spacesRoutes);
 app.use('/api/groups', groupsRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/api', (_req: Request, res: Response) => {
   res.json({
@@ -77,7 +80,7 @@ app.get('/api', (_req: Request, res: Response) => {
   });
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`aethercloud-be listening on :${port}`);
   
   // Chạy tự động dọn dẹp file mồ côi (thực hiện xóa thật) khi khởi động server
@@ -85,3 +88,7 @@ app.listen(port, () => {
     console.error('[Startup] Error running automatic orphaned files cleanup:', err.message);
   });
 });
+
+// Khởi chạy máy chủ WebSocket realtime
+initWebSocket(server);
+
