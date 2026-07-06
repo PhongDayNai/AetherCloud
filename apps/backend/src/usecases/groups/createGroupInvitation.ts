@@ -28,18 +28,19 @@ export async function createGroupInvitation(
     expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + hours);
   } else if (expiresDate) {
-    // Đặt hạn sử dụng là 23:59:59 của ngày được chọn
     const dateParts = expiresDate.split('-');
     if (dateParts.length === 3) {
-      expiresAt = new Date(
-        parseInt(dateParts[0], 10),
-        parseInt(dateParts[1], 10) - 1,
-        parseInt(dateParts[2], 10),
-        23,
-        59,
-        59,
-        999
-      );
+      const year = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10);
+      const day = parseInt(dateParts[2], 10);
+      
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day) && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        expiresAt = new Date(year, month - 1, day, 23, 59, 59, 999);
+      } else {
+        throw new ValidationError('Invalid expiresDate format. Must be YYYY-MM-DD');
+      }
+    } else {
+      throw new ValidationError('Invalid expiresDate format. Must be YYYY-MM-DD');
     }
   }
 
