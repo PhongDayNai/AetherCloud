@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useLanguage } from '../context/LanguageContext';
 import { useCloud } from '../context/CloudContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -19,9 +20,22 @@ export default function GroupSettingsModal({
   onClose,
   group
 }: GroupSettingsModalProps): React.JSX.Element | null {
+  const router = useRouter();
   const { t, language } = useLanguage();
   const { api, user, addToast, loadData } = useCloud();
   const confirm = useConfirm();
+
+  const getRoleLabel = (role: string) => {
+    if (role === 'owner') return t('groups.roleOwner') || 'Owner';
+    if (role === 'admin') return t('groups.roleAdmin') || 'Admin';
+    return t('groups.roleMember') || 'Member';
+  };
+
+  const getTabTitle = () => {
+    if (activeTab === 'members') return t('groups.membersListTitle') || 'Members List';
+    if (activeTab === 'pending') return t('groups.pendingTab') || 'Pending Invites';
+    return t('groups.invitesTab') || 'Group Invites';
+  };
 
   // Tab State: 'members' | 'pending' | 'invites'
   const [activeTab, setActiveTab] = useState<'members' | 'pending' | 'invites'>('members');
@@ -51,25 +65,45 @@ export default function GroupSettingsModal({
   const [createInviteMsg, setCreateInviteMsg] = useState<string>('');
   const [createInviteErr, setCreateInviteErr] = useState<string>('');
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [isSubmittingInvite, setIsSubmittingInvite] = useState<boolean>(false);
 
-  // Lấy vai trò của người dùng hiện tại trong nhóm này
-  const myRole = group?.role || 'member';
+  // Lấy vai trò của người dùng hiện tại trong nhóm này (realtime dynamic state)
+  const [localRole, setLocalRole] = useState<'owner' | 'admin' | 'member'>((group?.role as any) || 'member');
+
+  useEffect(() => {
+    if (group?.role) {
+      setLocalRole(group.role);
+    }
+  }, [group?.role]);
 
   const fetchMembers = async () => {
     if (!group) return;
     setLoading(true);
     try {
       const res = await fetch(`${api}/api/groups/${group.id}/members`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        // Sắp xếp thứ tự: Owner -> Admin -> Member
-        const sorted = (data.members || []).sort((a: any, b: any) => {
-          const roleWeights = { owner: 3, admin: 2, member: 1 };
-          const wA = roleWeights[a.role as keyof typeof roleWeights] || 0;
-          const wB = roleWeights[b.role as keyof typeof roleWeights] || 0;
-          return wB - wA;
-        });
-        setMembers(sorted);
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 401) {
+          addToast(t('groups.error.noPermission') || (language === 'en' ? 'You no longer have permission to access this group.' : 'Bạn không còn quyền truy cập nhóm này.'), 'error');
+          onClose();
+          await loadData();
+          return;
+        }
+        throw new Error('Failed to fetch members');
+      }
+      const data = await res.json();
+      // Sắp xếp thứ tự: Owner -> Admin -> Member
+      const sorted = (data.members || []).sort((a: any, b: any) => {
+        const roleWeights = { owner: 3, admin: 2, member: 1 };
+        const wA = roleWeights[a.role as keyof typeof roleWeights] || 0;
+        const wB = roleWeights[b.role as keyof typeof roleWeights] || 0;
+        return wB - wA;
+      });
+      setMembers(sorted);
+
+      // Cập nhật vai trò cục bộ realtime của chính mình
+      const me = sorted.find((m: any) => m.user_id === user?.sub);
+      if (me) {
+        setLocalRole(me.role);
       }
     } catch (err) {
       console.error(err);
@@ -83,10 +117,17 @@ export default function GroupSettingsModal({
     setInvitesLoading(true);
     try {
       const res = await fetch(`${api}/api/groups/${group.id}/invitations`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setInvites(data.invitations || []);
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 401) {
+          addToast(t('groups.error.noPermission') || (language === 'en' ? 'You no longer have permission to access this group.' : 'Bạn không còn quyền truy cập nhóm này.'), 'error');
+          onClose();
+          await loadData();
+          return;
+        }
+        throw new Error('Failed to fetch invites');
       }
+      const data = await res.json();
+      setInvites(data.invitations || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -98,11 +139,18 @@ export default function GroupSettingsModal({
     if (!group) return;
     try {
       const res = await fetch(`${api}/api/groups/${group.id}/pending-invites`, { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok) {
-          setPendingInvites(data.pending || []);
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 401) {
+          addToast(t('groups.error.noPermission') || (language === 'en' ? 'You no longer have permission to access this group.' : 'Bạn không còn quyền truy cập nhóm này.'), 'error');
+          onClose();
+          await loadData();
+          return;
         }
+        throw new Error('Failed to fetch pending invites');
+      }
+      const data = await res.json();
+      if (data.ok) {
+        setPendingInvites(data.pending || []);
       }
     } catch (err) {
       console.error(err);
@@ -110,9 +158,7 @@ export default function GroupSettingsModal({
   };
 
   const handleRevokeInvite = async (notiId: string) => {
-    const msg = language === 'vi'
-      ? 'Bạn có chắc chắn muốn hủy lời mời này không?'
-      : 'Are you sure you want to revoke this invitation?';
+    const msg = t('groups.confirmRevoke') || (language === 'en' ? 'Are you sure you want to revoke this invitation?' : 'Bạn có chắc chắn muốn hủy lời mời này không?');
     if (!await confirm(msg, { isDanger: true })) return;
     try {
       const res = await fetch(`${api}/api/groups/${group.id}/pending-invites/${notiId}`, {
@@ -121,14 +167,14 @@ export default function GroupSettingsModal({
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        const successMsg = language === 'vi' ? 'Đã hủy lời mời thành công' : 'Invitation revoked successfully';
+        const successMsg = t('groups.inviteRevokedSuccess') || (language === 'en' ? 'Invitation revoked successfully' : 'Đã hủy lời mời thành công');
         addToast(successMsg, 'info');
         fetchPendingInvites();
       } else {
         if (data.code === 'INVITATION_ALREADY_RESOLVED') {
-          throw new Error(t('groups.error.invitationAlreadyResolved') || 'Lời mời này đã được chấp nhận hoặc từ chối.');
+          throw new Error(t('groups.error.invitationAlreadyResolved') || (language === 'en' ? 'This invitation has already been accepted or declined.' : 'Lời mời này đã được chấp nhận hoặc từ chối.'));
         }
-        throw new Error(data.message || 'Hủy thất bại');
+        throw new Error(data.message || (language === 'en' ? 'Revocation failed' : 'Hủy thất bại'));
       }
     } catch (err: any) {
       addToast(err.message, 'error');
@@ -141,6 +187,7 @@ export default function GroupSettingsModal({
       setInviteRole('member');
       setErrorMsg('');
       setActiveTab('members');
+      setKickedUserIds([]);
       fetchMembers();
 
       // Reset form invites
@@ -157,18 +204,22 @@ export default function GroupSettingsModal({
   }, [isOpen, group]);
 
   useEffect(() => {
-    if (myRole === 'member' && activeTab === 'pending') {
+    if (localRole === 'member' && activeTab === 'pending') {
       setActiveTab('members');
     }
-  }, [myRole, activeTab]);
+  }, [localRole, activeTab]);
 
   useEffect(() => {
-    if (isOpen && group && activeTab === 'invites') {
-      fetchInvites();
-      setCreateInviteMsg('');
-      setCreateInviteErr('');
+    if (isOpen && group) {
+      if (activeTab === 'invites') {
+        fetchInvites();
+        setCreateInviteMsg('');
+        setCreateInviteErr('');
+      } else if (activeTab === 'pending') {
+        fetchPendingInvites();
+      }
     }
-  }, [activeTab]);
+  }, [activeTab, isOpen, group]);
 
   useEffect(() => {
     if (!isOpen || !group) return;
@@ -192,6 +243,19 @@ export default function GroupSettingsModal({
     };
   }, [isOpen, group, activeTab]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen || !group) return null;
 
   // 1. Mời thành viên trực tiếp qua Email dạng Notification
@@ -209,17 +273,17 @@ export default function GroupSettingsModal({
       const data = await res.json();
       if (!res.ok) {
         if (data.code === 'USER_NOT_FOUND') {
-          throw new Error(t('groups.error.userNotFound') || 'Người dùng với email này không tồn tại.');
+          throw new Error(t('groups.error.userNotFound') || (language === 'en' ? 'User with this email does not exist.' : 'Người dùng với email này không tồn tại.'));
         }
         if (data.code === 'ALREADY_MEMBER') {
-          throw new Error(t('groups.error.alreadyMember') || 'Người dùng này đã là thành viên của nhóm.');
+          throw new Error(t('groups.error.alreadyMember') || (language === 'en' ? 'This user is already a member of the group.' : 'Người dùng này đã là thành viên của nhóm.'));
         }
         if (data.code === 'PENDING_INVITE_EXISTS') {
-          throw new Error(t('groups.error.pendingInviteExists') || 'Người dùng này đã có một lời mời đang chờ phản hồi.');
+          throw new Error(t('groups.error.pendingInviteExists') || (language === 'en' ? 'This user already has a pending invitation.' : 'Người dùng này đã có một lời mời đang chờ phản hồi.'));
         }
-        throw new Error(data.message || t('groups.inviteFailed') || 'Mời thành viên thất bại');
+        throw new Error(data.message || t('groups.inviteFailed') || (language === 'en' ? 'Failed to invite member' : 'Mời thành viên thất bại'));
       }
-      addToast(t('groups.inviteSuccess') || 'Gửi lời mời thành công!', 'info');
+      addToast(t('groups.inviteSuccess') || (language === 'en' ? 'Invitation sent successfully!' : 'Gửi lời mời thành công!'), 'info');
       setInviteEmail('');
       fetchMembers();
       fetchPendingInvites();
@@ -243,7 +307,7 @@ export default function GroupSettingsModal({
         throw new Error(errData.message || t('groups.promoteFailed'));
       }
       const msgKey = newRole === 'admin' ? 'groups.promoteSuccess' : 'groups.demoteSuccess';
-      addToast(t(msgKey) || 'Cập nhật chức vụ thành công', 'info');
+      addToast(t(msgKey) || (language === 'en' ? 'Role updated successfully' : 'Cập nhật chức vụ thành công'), 'info');
       fetchMembers();
     } catch (err: any) {
       addToast(err.message, 'error');
@@ -254,7 +318,7 @@ export default function GroupSettingsModal({
 
   // 3. Trục xuất thành viên
   const handleKick = async (userId: string) => {
-    if (!await confirm(t('groups.confirmKick') || 'Bạn có chắc chắn muốn trục xuất thành viên này?', { isDanger: true })) return;
+    if (!await confirm(t('groups.confirmKick') || (language === 'en' ? 'Are you sure you want to expel this member?' : 'Bạn có chắc chắn muốn trục xuất thành viên này?'), { isDanger: true })) return;
     setActionLoadingId(userId);
     try {
       const res = await fetch(`${api}/api/groups/${group.id}/members/${userId}`, {
@@ -275,7 +339,7 @@ export default function GroupSettingsModal({
         setKickedUserIds((prev) => prev.filter((id) => id !== userId));
       }, 400);
 
-      addToast(t('groups.kickSuccess') || 'Đã trục xuất thành viên', 'info');
+      addToast(t('groups.kickSuccess') || (language === 'en' ? 'Member expelled successfully' : 'Đã trục xuất thành viên'), 'info');
     } catch (err: any) {
       addToast(err.message, 'error');
     } finally {
@@ -285,7 +349,7 @@ export default function GroupSettingsModal({
 
   // 4. Nhượng quyền Owner
   const handleTransferOwnership = async (userId: string) => {
-    if (!await confirm(t('groups.confirmTransfer') || 'CẢNH BÁO: Bạn sẽ mất quyền Chủ nhóm sau khi chuyển nhượng. Tiếp tục?', { isDanger: true })) return;
+    if (!await confirm(t('groups.confirmTransfer') || (language === 'en' ? 'WARNING: You will lose Group Owner privileges after transferring. Do you want to proceed?' : 'CẢNH BÁO: Bạn sẽ mất quyền Chủ nhóm sau khi chuyển nhượng. Tiếp tục?'), { isDanger: true })) return;
     setActionLoadingId(userId);
     try {
       const res = await fetch(`${api}/api/groups/${group.id}/owner`, {
@@ -298,7 +362,7 @@ export default function GroupSettingsModal({
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || t('groups.transferFailed'));
       }
-      addToast(t('groups.transferSuccess') || 'Đã chuyển nhượng nhóm thành công', 'info');
+      addToast(t('groups.transferSuccess') || (language === 'en' ? 'Group ownership transferred successfully' : 'Đã chuyển nhượng nhóm thành công'), 'info');
       onClose();
       await loadData();
     } catch (err: any) {
@@ -310,7 +374,7 @@ export default function GroupSettingsModal({
 
   // 5. Rời nhóm
   const handleLeaveGroup = async () => {
-    if (!await confirm(t('groups.confirmLeave') || 'Bạn có chắc muốn rời khỏi nhóm này không?', { isDanger: true })) return;
+    if (!await confirm(t('groups.confirmLeave') || (language === 'en' ? 'Are you sure you want to leave this group?' : 'Bạn có chắc muốn rời khỏi nhóm này không?'), { isDanger: true })) return;
     try {
       const res = await fetch(`${api}/api/groups/${group.id}/leave`, {
         method: 'POST',
@@ -320,9 +384,9 @@ export default function GroupSettingsModal({
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || t('groups.leaveFailed'));
       }
-      addToast(t('groups.leaveSuccess') || 'Rời nhóm thành công', 'info');
+      addToast(t('groups.leaveSuccess') || (language === 'en' ? 'Left group successfully' : 'Rời nhóm thành công'), 'info');
       onClose();
-      window.location.href = '/cloud/dashboard';
+      router.push('/cloud/dashboard');
     } catch (err: any) {
       addToast(err.message, 'error');
     }
@@ -330,7 +394,7 @@ export default function GroupSettingsModal({
 
   // 6. Giải tán nhóm (Owner chỉ định)
   const handleDisbandGroup = async () => {
-    if (!await confirm(t('groups.confirmDisband') || 'HÀNH ĐỘNG NÀY KHÔNG THỂ PHỤC HỒI! Bạn có chắc chắn giải tán nhóm này?', { isDanger: true })) return;
+    if (!await confirm(t('groups.confirmDisband') || (language === 'en' ? 'THIS ACTION CANNOT BE UNDONE! Are you sure you want to disband this group?' : 'HÀNH ĐỘNG NÀY KHÔNG THỂ PHỤC HỒI! Bạn có chắc chắn giải tán nhóm này?'), { isDanger: true })) return;
     try {
       const res = await fetch(`${api}/api/groups/${group.id}`, {
         method: 'DELETE',
@@ -340,9 +404,9 @@ export default function GroupSettingsModal({
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || t('groups.deleteFailed'));
       }
-      addToast(t('groups.deleteSuccess') || 'Đã giải tán nhóm thành công', 'info');
+      addToast(t('groups.deleteSuccess') || (language === 'en' ? 'Disbanded group successfully' : 'Đã giải tán nhóm thành công'), 'info');
       onClose();
-      window.location.href = '/cloud/dashboard';
+      router.push('/cloud/dashboard');
     } catch (err: any) {
       addToast(err.message, 'error');
     }
@@ -351,8 +415,27 @@ export default function GroupSettingsModal({
   // 7. Tạo mã mời nhóm mới
   const handleCreateInvite = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingInvite) return;
     setCreateInviteMsg('');
     setCreateInviteErr('');
+
+    // Frontend validation
+    if (!isUnlimitedUses && (maxUses === null || maxUses <= 0)) {
+      setCreateInviteErr(t('invite.validation.maxUsesRequired') || (language === 'en' ? 'Please enter a maximum number of uses.' : 'Vui lòng nhập số lượt sử dụng tối đa.'));
+      return;
+    }
+    if (!isNoExpiry) {
+      if (expiryType === 'hours' && (expiresInHours === null || expiresInHours <= 0)) {
+        setCreateInviteErr(t('invite.validation.hoursRequired') || (language === 'en' ? 'Please enter the number of expiration hours.' : 'Vui lòng nhập số giờ hết hạn.'));
+        return;
+      }
+      if (expiryType === 'date' && !expiresDate) {
+        setCreateInviteErr(t('invite.validation.dateRequired') || (language === 'en' ? 'Please select an expiration date.' : 'Vui lòng chọn ngày hết hạn.'));
+        return;
+      }
+    }
+
+    setIsSubmittingInvite(true);
     try {
       const body = {
         maxUses: isUnlimitedUses ? null : maxUses,
@@ -367,18 +450,20 @@ export default function GroupSettingsModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || t('invite.createError') || 'Không tạo được mã mời');
+        throw new Error(data.message || t('invite.createError') || (language === 'en' ? 'Failed to create invite code' : 'Không tạo được mã mời'));
       }
-      setCreateInviteMsg(t('invite.createSuccess') || 'Tạo mã mời thành công!');
+      setCreateInviteMsg(t('invite.createSuccess') || (language === 'en' ? 'Invite code created successfully!' : 'Tạo mã mời thành công!'));
       fetchInvites();
     } catch (err: any) {
       setCreateInviteErr(err.message);
+    } finally {
+      setIsSubmittingInvite(false);
     }
   };
 
   // 8. Khóa thủ công mã mời nhóm
   const handleDeactivateInvite = async (inviteId: string) => {
-    if (!await confirm(t('invite.confirmLock') || 'Bạn có chắc chắn muốn vô hiệu hóa mã mời này không?', { isDanger: true })) return;
+    if (!await confirm(t('invite.confirmLock') || (language === 'en' ? 'Are you sure you want to deactivate this invite code?' : 'Bạn có chắc chắn muốn vô hiệu hóa mã mời này không?'), { isDanger: true })) return;
     try {
       const res = await fetch(`${api}/api/groups/invitations/${inviteId}/deactivate`, {
         method: 'PUT',
@@ -386,9 +471,9 @@ export default function GroupSettingsModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || 'Khóa mã mời thất bại');
+        throw new Error(data.message || (language === 'en' ? 'Deactivation failed' : 'Khóa mã mời thất bại'));
       }
-      addToast(t('invite.deactivateSuccess') || 'Đã khóa mã mời', 'info');
+      addToast(t('invite.deactivateSuccess') || (language === 'en' ? 'Invite code deactivated successfully' : 'Đã khóa mã mời'), 'info');
       fetchInvites();
     } catch (err: any) {
       addToast(err.message, 'error');
@@ -398,13 +483,13 @@ export default function GroupSettingsModal({
   // 9. Copy nhanh mã mời
   const copyToClipboard = (token: string, isActive: boolean) => {
     if (!isActive) {
-      addToast(t('invite.copyLocked') || 'Mã đã khóa, không thể sử dụng!', 'error');
+      addToast(t('invite.copyLocked') || (language === 'en' ? 'Invite code is locked and cannot be used!' : 'Mã đã khóa, không thể sử dụng!'), 'error');
       return;
     }
     const inviteUrl = `${window.location.origin}/invite/group?code=${token}`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedToken(token);
-    addToast(t('invite.copySuccess', { token }) || `Đã sao chép liên kết vào clipboard!`, 'info');
+    addToast(t('invite.copySuccess', { token }) || (language === 'en' ? 'Copied link to clipboard!' : 'Đã sao chép liên kết vào clipboard!'), 'info');
     setTimeout(() => {
       setCopiedToken(null);
     }, 2000);
@@ -422,7 +507,7 @@ export default function GroupSettingsModal({
             </div>
             <div className="groupMeta">
               <span className="groupName" title={group.name}>{group.name}</span>
-              <span className="groupRole">{myRole === 'owner' ? 'Chủ nhóm' : myRole === 'admin' ? 'Quản trị viên' : 'Thành viên'}</span>
+              <span className="groupRole">{getRoleLabel(localRole)}</span>
             </div>
           </div>
 
@@ -432,15 +517,15 @@ export default function GroupSettingsModal({
               onClick={() => setActiveTab('members')}
             >
               <Icons.User size={16} />
-              <span>{t('groups.membersTab') || 'Thành viên'}</span>
+              <span>{t('groups.membersTab') || (language === 'en' ? 'Members' : 'Thành viên')}</span>
             </button>
-            {myRole !== 'member' && (
+            {localRole !== 'member' && (
               <button
                 className={`verticalTabButton ${activeTab === 'pending' ? 'active' : ''}`}
                 onClick={() => setActiveTab('pending')}
               >
                 <Icons.Info size={16} />
-                <span>{language === 'vi' ? 'Lời mời đang chờ' : 'Pending Invites'}</span>
+                <span>{t('groups.pendingTab') || (language === 'en' ? 'Pending Invites' : 'Lời mời đang chờ')}</span>
               </button>
             )}
             <button
@@ -448,20 +533,20 @@ export default function GroupSettingsModal({
               onClick={() => setActiveTab('invites')}
             >
               <Icons.Documents size={16} />
-              <span>{t('groups.invitesTab') || 'Mã mời nhóm'}</span>
+              <span>{t('groups.invitesTab') || (language === 'en' ? 'Group Invites' : 'Mã mời nhóm')}</span>
             </button>
           </div>
 
           <div className="sidebarFooter">
-            {myRole === 'owner' ? (
+            {localRole === 'owner' ? (
               <button onClick={handleDisbandGroup} className="sidebarActionBtn disband">
                 <Icons.Trash size={13} />
-                <span>{t('groups.disbandBtn') || 'Giải tán nhóm'}</span>
+                <span>{t('groups.disbandBtn') || (language === 'en' ? 'Disband Group' : 'Giải tán nhóm')}</span>
               </button>
             ) : (
               <button onClick={handleLeaveGroup} className="sidebarActionBtn leave">
                 <Icons.LogOut size={13} />
-                <span>{t('groups.leaveBtn') || 'Rời khỏi nhóm'}</span>
+                <span>{t('groups.leaveBtn') || (language === 'en' ? 'Leave Group' : 'Rời khỏi nhóm')}</span>
               </button>
             )}
           </div>
@@ -470,14 +555,7 @@ export default function GroupSettingsModal({
         {/* NỘI DUNG PANEL CHÍNH BÊN PHẢI */}
         <div className="mainContentPanel">
           <div className="panelHeader">
-            <h2>
-              {activeTab === 'members'
-                ? (t('groups.membersTab') || 'Thành viên nhóm')
-                : activeTab === 'pending'
-                  ? (language === 'vi' ? 'Lời mời đang chờ' : 'Pending Invites')
-                  : (t('groups.invitesTab') || 'Quản lý mã mời')
-              }
-            </h2>
+            <h2>{getTabTitle()}</h2>
             <button className="closeBtn" onClick={onClose}>
               <Icons.Close size={16} />
             </button>
@@ -487,15 +565,15 @@ export default function GroupSettingsModal({
           {activeTab === 'members' && (
             <div className="panelBody scrollable custom-scrollbar">
               {/* Form mời email */}
-              {myRole !== 'member' && (
+              {localRole !== 'member' && (
                 <div className="inviteSection">
-                  <h3 className="sectionSubtitle">{language === 'vi' ? 'Mời thành viên mới' : 'Invite new member'}</h3>
+                  <h3 className="sectionSubtitle">{t('groups.inviteSectionTitle') || (language === 'en' ? 'Invite new member' : 'Mời thành viên mới')}</h3>
                   <form onSubmit={handleInviteEmailDirect} className="inviteForm">
                     {errorMsg && <div className="errorBanner">{errorMsg}</div>}
                     <div className="inviteRow">
                       <input
                         type="email"
-                        placeholder={t('groups.inviteEmail') || 'Email người nhận...'}
+                        placeholder={t('groups.inviteEmail') || (language === 'en' ? "Recipient's email..." : 'Email người nhận...')}
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
                         required
@@ -504,16 +582,16 @@ export default function GroupSettingsModal({
                       <CustomSelect
                         value={inviteRole}
                         options={[
-                          { value: 'member', label: 'Member' },
-                          { value: 'admin', label: 'Admin' }
+                          { value: 'member', label: t('groups.roleMember') || (language === 'en' ? 'Member' : 'Thành viên') },
+                          { value: 'admin', label: t('groups.roleAdmin') || (language === 'en' ? 'Admin' : 'Quản trị viên') }
                         ]}
                         onChange={(val) => setInviteRole(val as any)}
-                        disabled={myRole === 'admin' || loading}
-                        width="110px"
+                        disabled={localRole === 'admin' || loading}
+                        width="135px"
                       />
                       <button type="submit" disabled={!inviteEmail.trim() || loading} className="inviteBtn">
                         <Icons.Plus size={14} style={{ marginRight: '4px' }} />
-                        {t('groups.inviteBtn') || 'Mời'}
+                        {t('groups.inviteBtn') || (language === 'en' ? 'Invite' : 'Mời')}
                       </button>
                     </div>
                   </form>
@@ -522,9 +600,9 @@ export default function GroupSettingsModal({
 
               {/* Danh sách thành viên */}
               <div className="membersListContainer">
-                <h3 className="sectionSubtitle">{language === 'vi' ? 'Danh sách thành viên' : 'Members List'}</h3>
+                <h3 className="sectionSubtitle">{t('groups.membersListTitle') || (language === 'en' ? 'Members list' : 'Danh sách thành viên')}</h3>
                 {loading && members.length === 0 ? (
-                  <div className="loadingText">{t('sidebar.loading') || 'Đang tải...'}</div>
+                  <div className="loadingText">{t('sidebar.loading') || (language === 'en' ? 'Loading...' : 'Đang tải...')}</div>
                 ) : (
                   <div className="membersList">
                     {members.map((member) => {
@@ -538,22 +616,22 @@ export default function GroupSettingsModal({
                           <div className="meta">
                             <div className="name">
                               {member.name || member.email}
-                              {isMe && <span className="meTag">{language === 'vi' ? '(Tôi)' : '(Me)'}</span>}
+                              {isMe && <span className="meTag">{t('groups.meTag') || '(Tôi)'}</span>}
                             </div>
                             <div className="email">{member.email}</div>
                           </div>
 
                           <div className="roleActions">
-                            <span className={`roleBadge ${member.role}`}>{member.role}</span>
+                            <span className={`roleBadge ${member.role}`}>{getRoleLabel(member.role).toUpperCase()}</span>
 
-                            {!isMe && myRole !== 'member' && member.role !== 'owner' && actionLoadingId !== member.user_id && (
+                            {!isMe && localRole !== 'member' && member.role !== 'owner' && actionLoadingId !== member.user_id && !isLeaving && (
                               <div className="actionButtons">
-                                {myRole === 'owner' && (
+                                {localRole === 'owner' && (
                                   <>
                                     {member.role === 'admin' ? (
                                       <button
                                         onClick={() => handleUpdateRole(member.user_id, 'member')}
-                                        title={t('groups.demoteBtn') || 'Hạ xuống thành viên'}
+                                        title={t('groups.demoteBtn') || (language === 'en' ? 'Demote to Member' : 'Hạ xuống thành viên')}
                                         className="actionIconBtn"
                                       >
                                         <Icons.ChevronDown size={14} />
@@ -561,7 +639,7 @@ export default function GroupSettingsModal({
                                     ) : (
                                       <button
                                         onClick={() => handleUpdateRole(member.user_id, 'admin')}
-                                        title={t('groups.promoteBtn') || 'Thăng cấp Quản trị viên'}
+                                        title={t('groups.promoteBtn') || (language === 'en' ? 'Promote to Admin' : 'Thăng cấp Quản trị viên')}
                                         className="actionIconBtn"
                                       >
                                         <Icons.ChevronUp size={14} />
@@ -570,7 +648,7 @@ export default function GroupSettingsModal({
 
                                     <button
                                       onClick={() => handleTransferOwnership(member.user_id)}
-                                      title={t('groups.transferBtn') || 'Nhượng chức Chủ nhóm'}
+                                       title={t('groups.transferBtn') || (language === 'en' ? 'Transfer Ownership' : 'Nhượng chức Chủ nhóm')}
                                       className="actionIconBtn ownershipBtn"
                                     >
                                       <Icons.Transfer size={14} />
@@ -579,10 +657,10 @@ export default function GroupSettingsModal({
                                 )}
 
                                 {/* Owner có quyền kick bất kỳ ai, Admin có quyền kick member thường */}
-                                {(myRole === 'owner' || (myRole === 'admin' && member.role === 'member')) && (
+                                {(localRole === 'owner' || (localRole === 'admin' && member.role === 'member')) && (
                                   <button
                                     onClick={() => handleKick(member.user_id)}
-                                    title={t('groups.kickBtn') || 'Trục xuất'}
+                                    title={t('groups.kickBtn') || (language === 'en' ? 'Kick' : 'Trục xuất')}
                                     className="actionIconBtn kickBtn"
                                   >
                                     <Icons.Close size={12} />
@@ -592,7 +670,7 @@ export default function GroupSettingsModal({
                             )}
 
                             {actionLoadingId === member.user_id && (
-                              <span className="spinner">⌛</span>
+                              <Icons.Refresh size={14} className="spinner" style={{ color: 'var(--text-muted, #71717a)' }} />
                             )}
                           </div>
                         </div>
@@ -606,9 +684,10 @@ export default function GroupSettingsModal({
           )}
 
           {/* TAB CONTENT: PENDING INVITES */}
-          {activeTab === 'pending' && myRole !== 'member' && (
+          {activeTab === 'pending' && localRole !== 'member' && (
             <div className="panelBody scrollable custom-scrollbar">
               <div className="pendingInvitesContainer">
+                <h3 className="sectionSubtitle">{t('groups.pendingInvitesTitle') || 'DANH SÁCH LỜI MỜI EMAIL ĐANG CHỜ PHẢN HỒI'}</h3>
                 {pendingInvites.length === 0 ? (
                   <div className="emptyPendingText" style={{
                     fontSize: '13.5px',
@@ -621,7 +700,7 @@ export default function GroupSettingsModal({
                     textAlign: 'center',
                     marginTop: '8px'
                   }}>
-                    {language === 'vi' ? 'Không có lời mời nào đang chờ phản hồi' : 'No pending invitations'}
+                    {t('groups.pendingEmpty') || 'Không có lời mời nào đang chờ phản hồi'}
                   </div>
                 ) : (
                   <div className="membersList" style={{ marginTop: '8px' }}>
@@ -634,20 +713,24 @@ export default function GroupSettingsModal({
                           <div className="name">
                             {invite.name || invite.email}
                             <span className="pendingTag" style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--text-muted, #71717a)', fontStyle: 'italic' }}>
-                              {language === 'vi' ? '(Đang chờ)' : '(Pending)'}
+                              {t('groups.pendingTag') || '(Đang chờ)'}
                             </span>
                           </div>
                           <div className="email">{invite.email}</div>
                         </div>
                         <div className="roleActions">
-                          <span className={`roleBadge ${invite.role}`}>{invite.role}</span>
-                          <button
-                            onClick={() => handleRevokeInvite(invite.id)}
-                            title={language === 'vi' ? 'Hủy lời mời' : 'Revoke invitation'}
-                            className="actionIconBtn kickBtn"
-                          >
-                            <Icons.Close size={12} />
-                          </button>
+                          <span className={`roleBadge ${invite.role}`}>{getRoleLabel(invite.role).toUpperCase()}</span>
+                          {actionLoadingId === invite.id ? (
+                            <Icons.Refresh size={14} className="spinner" style={{ color: 'var(--text-muted, #71717a)' }} />
+                          ) : (
+                            <button
+                              onClick={() => handleRevokeInvite(invite.id)}
+                              title={t('groups.actionRevokeTooltip') || (language === 'en' ? 'Revoke invitation' : 'Hủy lời mời')}
+                              className="actionIconBtn kickBtn"
+                            >
+                              <Icons.Close size={12} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -664,9 +747,9 @@ export default function GroupSettingsModal({
 
                 {/* CỘT TRÁI: TẠO MÃ MỚI */}
                 <div className="invitesFormColumn">
-                  <h3 className="sectionSubtitle">{language === 'vi' ? 'Tạo mã mời mới' : 'Create Invite Code'}</h3>
+                  <h3 className="sectionSubtitle">{t('groups.createInviteTitle') || (language === 'en' ? 'Create Invite Code' : 'Tạo mã mời mới')}</h3>
 
-                  {myRole !== 'member' ? (
+                  {localRole !== 'member' ? (
                     <form onSubmit={handleCreateInvite} className="createInviteForm">
                       <div className="alertContainer">
                         {createInviteMsg && <div className="alertMsg successMsg">{createInviteMsg}</div>}
@@ -676,9 +759,9 @@ export default function GroupSettingsModal({
                       {/* Lượt dùng */}
                       <div className="formField">
                         <div className="formFieldHeader">
-                          <label>{t('invite.maxUsesLabel') || 'Số lượt sử dụng tối đa'}</label>
+                          <label>{t('invite.maxUsesLabel') || (language === 'en' ? 'Maximum uses' : 'Số lượt sử dụng tối đa')}</label>
                           <div className="toggleWrapper">
-                            <span className="toggleLabel">{t('invite.unlimited') || 'Không giới hạn'}</span>
+                            <span className="toggleLabel">{t('invite.unlimited') || (language === 'en' ? 'Unlimited' : 'Không giới hạn')}</span>
                             <button
                               type="button"
                               className={`premiumSwitch ${isUnlimitedUses ? 'active' : ''}`}
@@ -695,7 +778,7 @@ export default function GroupSettingsModal({
                           <input
                             type="number"
                             min="1"
-                            placeholder="Ví dụ: 10"
+                            placeholder={t('placeholders.exampleNum') || (language === 'en' ? 'E.g., 10' : 'Ví dụ: 10')}
                             value={maxUses || ''}
                             onChange={(e) => setMaxUses(parseInt(e.target.value) || null)}
                             disabled={isUnlimitedUses}
@@ -707,9 +790,9 @@ export default function GroupSettingsModal({
                       {/* Hạn dùng */}
                       <div className="formField">
                         <div className="formFieldHeader">
-                          <label>{t('invite.expiresLabel') || 'Thời hạn hết hạn'}</label>
+                          <label>{t('invite.expiresLabel') || (language === 'en' ? 'Expiration time' : 'Thời hạn hết hạn')}</label>
                           <div className="toggleWrapper">
-                            <span className="toggleLabel">{t('invite.noExpiry') || 'Không hết hạn'}</span>
+                            <span className="toggleLabel">{t('invite.noExpiry') || (language === 'en' ? 'No expiry' : 'Không hết hạn')}</span>
                             <button
                               type="button"
                               className={`premiumSwitch ${isNoExpiry ? 'active' : ''}`}
@@ -730,7 +813,7 @@ export default function GroupSettingsModal({
                                 setExpiresDate('');
                               }}
                             >
-                              {language === 'vi' ? 'Theo giờ' : 'By hours'}
+                              {t('invite.byHour') || (language === 'en' ? 'By hours' : 'Theo giờ')}
                             </button>
                             <button
                               type="button"
@@ -740,7 +823,7 @@ export default function GroupSettingsModal({
                                 setExpiresInHours(null);
                               }}
                             >
-                              {language === 'vi' ? 'Theo ngày' : 'By date'}
+                              {t('invite.byDay') || (language === 'en' ? 'By date' : 'Theo ngày')}
                             </button>
                           </div>
 
@@ -749,7 +832,7 @@ export default function GroupSettingsModal({
                               <input
                                 type="number"
                                 min="1"
-                                placeholder={t('invite.hoursPlaceholder') || 'Số giờ (ví dụ: 24)'}
+                                placeholder={t('invite.hoursPlaceholder') || (language === 'en' ? 'Hours (e.g., 24)' : 'Số giờ (ví dụ: 24)')}
                                 value={expiresInHours || ''}
                                 onChange={(e) => setExpiresInHours(parseInt(e.target.value) || null)}
                                 className="no-spinner textInput"
@@ -758,23 +841,24 @@ export default function GroupSettingsModal({
                               <CustomDatePicker
                                 value={expiresDate}
                                 onChange={(val) => setExpiresDate(val)}
-                                placeholder={t('invite.datePlaceholder') || 'Chọn ngày...'}
+                                placeholder={t('invite.datePlaceholder') || (language === 'en' ? 'Select date...' : 'Chọn ngày...')}
+                                lang={language === 'en' ? 'en' : 'vi'}
                               />
                             )}
                           </div>
                           {expiryType === 'date' && (
-                            <span className="fieldHint">{t('invite.expiryDateHint') || '* Hết hạn vào lúc 23:59:59 của ngày được chọn.'}</span>
+                            <span className="fieldHint">{t('invite.expiryDateHint') || (language === 'en' ? '* Expires at 23:59:59 of the selected date.' : '* Hết hạn vào lúc 23:59:59 của ngày được chọn.')}</span>
                           )}
                         </div>
                       </div>
 
-                      <button type="submit" className="createBtn">
-                        {t('invite.createBtn') || 'Tạo mã mời'}
+                      <button type="submit" className="createBtn" disabled={isSubmittingInvite}>
+                        {isSubmittingInvite ? (t('buttons.processing') || 'Processing...') : (t('invite.createBtn') || (language === 'en' ? 'Create Invite' : 'Tạo mã mời'))}
                       </button>
                     </form>
                   ) : (
                     <div className="memberInviteInfo">
-                      {t('invite.membersOnlyView') || 'Chỉ Quản trị viên mới được phép tạo mã mời.'}
+                      {t('invite.membersOnlyView') || (language === 'en' ? 'Only group administrators can create invite codes.' : 'Chỉ Quản trị viên mới được phép tạo mã mời.')}
                     </div>
                   )}
                 </div>
@@ -782,24 +866,24 @@ export default function GroupSettingsModal({
                 {/* CỘT PHẢI: BẢNG DANH SÁCH MÃ MỜI */}
                 <div className="invitesListColumn">
                   <div className="listHeader">
-                    <h3 className="sectionSubtitle">{t('invite.listTitle') || 'Danh sách mã mời đã tạo'}</h3>
-                    <p className="copyHint">{t('invite.clickToCopyHint') || '* Nhấp vào mã mời để sao chép nhanh.'}</p>
+                    <h3 className="sectionSubtitle">{t('groups.createdInvitesTitle') || (language === 'en' ? 'List of created invitations' : 'Danh sách mã mời đã tạo')}</h3>
+                    <p className="copyHint">{t('groups.clickToCopyHint') || (language === 'en' ? '* Click on the code to copy it quickly.' : '* Nhấp vào mã mời để sao chép nhanh.')}</p>
                   </div>
 
                   <div className="invitesTableContainer custom-scrollbar">
                     {invitesLoading && invites.length === 0 ? (
-                      <div className="loadingText">{t('sidebar.loading') || 'Đang tải...'}</div>
+                      <div className="loadingText">{t('sidebar.loading') || (language === 'en' ? 'Loading...' : 'Đang tải...')}</div>
                     ) : invites.length === 0 ? (
-                      <div className="emptyInvitesText">{t('invite.emptyList') || 'Chưa có mã mời nào được tạo.'}</div>
+                      <div className="emptyInvitesText">{t('invite.emptyList') || (language === 'en' ? 'No invite codes have been created yet.' : 'Chưa có mã mời nào được tạo.')}</div>
                     ) : (
                       <table className="invitesTable">
                         <thead>
                           <tr>
-                            <th>{language === 'vi' ? 'Mã' : 'Code'}</th>
-                            <th>{language === 'vi' ? 'Dùng' : 'Uses'}</th>
-                            <th>{language === 'vi' ? 'Hạn dùng' : 'Expires'}</th>
-                            <th>{language === 'vi' ? 'Trạng thái' : 'Status'}</th>
-                            <th style={{ textAlign: 'center' }}>{language === 'vi' ? 'Hành động' : 'Action'}</th>
+                            <th>{t('groups.tableColCode') || 'Code'}</th>
+                            <th>{t('groups.tableColUses') || 'Uses'}</th>
+                            <th>{t('groups.tableColExpires') || 'Expires'}</th>
+                            <th>{t('groups.tableColStatus') || 'Status'}</th>
+                            <th style={{ textAlign: 'center' }}>{t('groups.tableColAction') || 'Action'}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -817,7 +901,11 @@ export default function GroupSettingsModal({
                                     title={isCurrentlyActive ? t('invite.titleCopyActive') : t('invite.titleCopyLocked')}
                                   >
                                     <span className="tokenText">{inviteItem.token}</span>
-                                    {isCurrentlyActive && <span className="copyBtnIcon">📋</span>}
+                                    {isCurrentlyActive && (
+                                      <span className={`copyBtnIcon ${copiedToken === inviteItem.token ? 'copied' : ''}`} style={{ transition: 'all 0.2s', display: 'inline-flex', alignItems: 'center' }}>
+                                        {copiedToken === inviteItem.token ? <Icons.Check size={14} style={{ color: '#10b981' }} /> : <Icons.Copy size={13} />}
+                                      </span>
+                                    )}
                                   </div>
                                 </td>
                                 <td>
@@ -827,18 +915,32 @@ export default function GroupSettingsModal({
                                   {inviteItem.expires_at ? new Date(inviteItem.expires_at).toLocaleDateString() : '∞'}
                                 </td>
                                 <td>
-                                  <span className={`statusBadge ${isCurrentlyActive ? 'active' : 'locked'}`}>
-                                    {isCurrentlyActive ? (language === 'vi' ? 'Chạy' : 'Active') : (language === 'vi' ? 'Khóa' : 'Locked')}
+                                  <span className={`statusBadge ${
+                                    isCurrentlyActive
+                                      ? 'active'
+                                      : isLimitReached
+                                        ? 'limit-reached'
+                                        : isItemExpired
+                                          ? 'expired'
+                                          : 'locked'
+                                  }`}>
+                                    {isCurrentlyActive
+                                      ? (t('groups.statusActive') || 'Active')
+                                      : isLimitReached
+                                        ? (t('groups.statusLimitReached') || 'Out of uses')
+                                        : isItemExpired
+                                          ? (t('groups.statusExpired') || 'Expired')
+                                          : (t('groups.statusLocked') || 'Locked')}
                                   </span>
                                 </td>
                                 <td style={{ textAlign: 'center' }}>
-                                  {isCurrentlyActive && myRole !== 'member' ? (
+                                  {isCurrentlyActive && localRole !== 'member' ? (
                                     <button
                                       className="tableLockBtn"
                                       onClick={() => handleDeactivateInvite(inviteItem.id)}
-                                      title={t('actions.lock') || 'Khóa mã'}
+                                      title={t('actions.lock') || (language === 'en' ? 'Lock code' : 'Khóa mã')}
                                     >
-                                      {language === 'vi' ? 'Khóa' : 'Lock'}
+                                      {t('groups.actionLock') || 'Lock'}
                                     </button>
                                   ) : (
                                     <span className="lockedPlaceholder">-</span>
@@ -1575,6 +1677,16 @@ export default function GroupSettingsModal({
           background: rgba(239, 68, 68, 0.15);
           color: #f87171;
           border: 1px solid rgba(239, 68, 68, 0.25);
+        }
+        .statusBadge.expired {
+          background: rgba(245, 158, 11, 0.15);
+          color: #fbbf24;
+          border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+        .statusBadge.limit-reached {
+          background: rgba(168, 85, 247, 0.15);
+          color: #c084fc;
+          border: 1px solid rgba(168, 85, 247, 0.25);
         }
         
         .tableLockBtn {
