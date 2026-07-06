@@ -1,6 +1,8 @@
+import crypto from 'crypto';
 import * as db from '../../lib/db';
 import { isValidUUID, getGroupMemberRole, isGroupMember } from '../../lib/utils';
-import { ValidationError, ForbiddenError } from '../../lib/errors';
+import { ValidationError, ForbiddenError, NotFoundError } from '../../lib/errors';
+import { sendNotificationRealtime } from '../../lib/websocket';
 
 export async function transferGroupOwnership(groupId: string, targetUserId: string, actorUserId: string) {
   if (!isValidUUID(groupId) || !isValidUUID(targetUserId)) {
@@ -24,6 +26,20 @@ export async function transferGroupOwnership(groupId: string, targetUserId: stri
   try {
     await client.query('BEGIN');
 
+    // Lấy thông tin nhóm name và tên actor
+    const infoQuery = await client.query(
+      `SELECT g.name as group_name, u.name as actor_name
+       FROM groups g, users u
+       WHERE g.id = $1 AND u.id = $2`,
+      [groupId, actorUserId]
+    );
+    
+    if (infoQuery.rows.length === 0) {
+      throw new NotFoundError('Group or Actor not found');
+    }
+    
+    const { group_name: groupName, actor_name: actorName } = infoQuery.rows[0];
+
     // 1. Cập nhật owner_id trong bảng groups
     await client.query(
       'UPDATE groups SET owner_id = $1 WHERE id = $2',
@@ -42,7 +58,30 @@ export async function transferGroupOwnership(groupId: string, targetUserId: stri
       [groupId, actorUserId]
     );
 
+    // 4. Tạo thông báo cho chủ sở hữu mới
+    const notificationId = crypto.randomUUID();
+    const notificationTitle = 'Chuyển nhượng quyền sở hữu nhóm';
+    const notificationContent = `Bạn đã được nhượng quyền làm Chủ sở hữu mới của nhóm "${groupName}" bởi ${actorName}.`;
+    
+    await client.query(
+      `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)
+       VALUES ($1, $2, $3, $4, 'system', false, NOW(), $5)`,
+      [notificationId, targetUserId, notificationTitle, notificationContent, 'system', { groupId, groupName }]
+    );
+
     await client.query('COMMIT');
+
+    // Gửi WebSocket realtime tới chủ sở hữu mới
+    sendNotificationRealtime(targetUserId, {
+      id: notificationId,
+      title: notificationTitle,
+      content: notificationContent,
+      type: 'system',
+      is_read: false,
+      created_at: new Date().toISOString(),
+      metadata: { groupId, groupName }
+    });
+
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

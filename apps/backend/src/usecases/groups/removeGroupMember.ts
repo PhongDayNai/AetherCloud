@@ -1,6 +1,9 @@
+import crypto from 'crypto';
 import * as db from '../../lib/db';
 import { isValidUUID, getGroupMemberRole } from '../../lib/utils';
 import { ValidationError, NotFoundError, ForbiddenError } from '../../lib/errors';
+import { leaveGroup } from './leaveGroup';
+import { sendNotificationRealtime } from '../../lib/websocket';
 
 export async function removeGroupMember(groupId: string, targetUserId: string, actorUserId: string) {
   if (!isValidUUID(groupId) || !isValidUUID(targetUserId)) {
@@ -19,11 +22,8 @@ export async function removeGroupMember(groupId: string, targetUserId: string, a
 
   // Trường hợp 1: Tự rời nhóm
   if (targetUserId === actorUserId) {
-    if (targetRole === 'owner') {
-      throw new ValidationError('The owner cannot leave the group. Please transfer ownership or delete the group.');
-    }
-    await db.query('DELETE FROM group_members WHERE group_id = $1 AND user_id = $2', [groupId, targetUserId]);
-    return 'You have successfully left the group';
+    const result = await leaveGroup(groupId, targetUserId);
+    return result.message;
   }
 
   // Trường hợp 2: Trục xuất thành viên khác
@@ -38,6 +38,67 @@ export async function removeGroupMember(groupId: string, targetUserId: string, a
     throw new ForbiddenError('Cannot remove the group owner');
   }
 
+  // Lấy thông tin nhóm name và tên actor
+  const infoQuery = await db.query(
+    `SELECT g.name as group_name, g.owner_id as group_owner_id, u.name as actor_name
+     FROM groups g, users u
+     WHERE g.id = $1 AND u.id = $2`,
+    [groupId, actorUserId]
+  );
+  
+  if (infoQuery.rows.length === 0) {
+    throw new NotFoundError('Group or Actor not found');
+  }
+  
+  const { group_name: groupName, group_owner_id: ownerId, actor_name: actorName } = infoQuery.rows[0];
+
+  // Thực hiện xóa
   await db.query('DELETE FROM group_members WHERE group_id = $1 AND user_id = $2', [groupId, targetUserId]);
+
+  // 1. Tạo thông báo gửi cho người bị trục xuất
+  const kickNotificationId = crypto.randomUUID();
+  const kickTitle = 'Thông báo từ nhóm';
+  const kickContent = `Bạn đã bị xóa khỏi nhóm "${groupName}" bởi ${actorName}.`;
+  await db.query(
+    `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)
+     VALUES ($1, $2, $3, $4, 'group_leave', false, NOW(), $5)`,
+    [kickNotificationId, targetUserId, kickTitle, kickContent, 'group_leave', { groupId, groupName }]
+  );
+  
+  sendNotificationRealtime(targetUserId, {
+    id: kickNotificationId,
+    title: kickTitle,
+    content: kickContent,
+    type: 'group_leave',
+    is_read: false,
+    created_at: new Date().toISOString(),
+    metadata: { groupId, groupName }
+  });
+
+  // 2. Nếu người thực hiện trục xuất là Admin (không phải Owner), gửi thông báo báo cáo cho Owner nhóm
+  if (actorUserId !== ownerId) {
+    const targetUserQuery = await db.query('SELECT name FROM users WHERE id = $1', [targetUserId]);
+    const targetName = targetUserQuery.rows[0]?.name || 'Thành viên';
+
+    const reportNotificationId = crypto.randomUUID();
+    const reportTitle = 'Thành viên bị trục xuất';
+    const reportContent = `Quản trị viên ${actorName} đã xóa thành viên ${targetName} khỏi nhóm "${groupName}".`;
+    await db.query(
+      `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)
+       VALUES ($1, $2, $3, $4, 'group_leave', false, NOW(), $5)`,
+      [reportNotificationId, ownerId, reportTitle, reportContent, 'group_leave', { groupId, groupName, actorName, targetName }]
+    );
+    
+    sendNotificationRealtime(ownerId, {
+      id: reportNotificationId,
+      title: reportTitle,
+      content: reportContent,
+      type: 'group_leave',
+      is_read: false,
+      created_at: new Date().toISOString(),
+      metadata: { groupId, groupName, actorName, targetName }
+    });
+  }
+
   return 'Successfully removed member from the group';
 }
