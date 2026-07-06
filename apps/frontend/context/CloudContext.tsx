@@ -20,7 +20,10 @@ import {
 export interface ToastItem {
   id: string;
   message: string;
-  type: 'info' | 'error';
+  type: 'info' | 'error' | 'backend';
+  title?: string;
+  duration?: number;
+  onClick?: () => void;
 }
 
 interface CloudContextType {
@@ -218,7 +221,7 @@ interface CloudContextType {
   active: Asset | null;
   toasts: ToastItem[];
   removeToast: (id: string) => void;
-  addToast: (message: string, type?: 'info' | 'error') => void;
+  addToast: (message: string, type?: 'info' | 'error' | 'backend', options?: { title?: string; duration?: number; onClick?: () => void }) => void;
   nextCursor: string | null;
   hasMore: boolean;
   isLoadingMore: boolean;
@@ -265,13 +268,22 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [toastQueue, setToastQueue] = useState<ToastItem[]>([]);
 
-  const addToast = React.useCallback((message: string, type: 'info' | 'error' = 'info') => {
+  const addToast = React.useCallback((
+    message: string, 
+    type: 'info' | 'error' | 'backend' = 'info', 
+    options?: { title?: string; duration?: number; onClick?: () => void }
+  ) => {
     const newToast: ToastItem = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
       message,
-      type
+      type,
+      ...options
     };
-    setToastQueue((prev) => [...prev, newToast]);
+    if (type === 'backend') {
+      setToastQueue((prev) => [newToast, ...prev]);
+    } else {
+      setToastQueue((prev) => [...prev, newToast]);
+    }
   }, []);
 
   const removeToast = React.useCallback((id: string) => {
@@ -280,8 +292,15 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (toastQueue.length > 0 && toasts.length < 3) {
-      const nextToast = toastQueue[0];
-      setToastQueue((prev) => prev.slice(1));
+      const backendIndex = toastQueue.findIndex(t => t.type === 'backend');
+      let nextToast: ToastItem;
+      if (backendIndex !== -1) {
+        nextToast = toastQueue[backendIndex];
+        setToastQueue((prev) => prev.filter((_, idx) => idx !== backendIndex));
+      } else {
+        nextToast = toastQueue[0];
+        setToastQueue((prev) => prev.slice(1));
+      }
       setToasts((prev) => [...prev, nextToast]);
     }
   }, [toastQueue, toasts]);
@@ -1131,6 +1150,12 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       if (cursor) params.append('cursor', cursor);
 
       const res = await fetch(`${api}/api/assets?${params.toString()}`, { credentials: 'include' });
+      if (res.status === 403) {
+        console.warn('[CloudContext] Access forbidden to group photos. Reverting to personal workspace.');
+        setActiveWorkspace({ type: 'personal' });
+        window.location.href = '/cloud/dashboard';
+        return;
+      }
       if (!res.ok) throw new Error(t('messages.loadDataFailed'));
       const data = await res.json();
       
@@ -1197,6 +1222,12 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       if (cursor) params.append('cursor', cursor);
 
       const res = await fetch(`${api}/api/assets?${params.toString()}`, { credentials: 'include' });
+      if (res.status === 403) {
+        console.warn('[CloudContext] Access forbidden to group docs. Reverting to personal workspace.');
+        setActiveWorkspace({ type: 'personal' });
+        window.location.href = '/cloud/dashboard';
+        return;
+      }
       if (!res.ok) throw new Error(t('messages.loadDataFailed'));
       const data = await res.json();
       
@@ -1325,6 +1356,12 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
         fetch(statsUrl, { credentials: 'include' }),
         fetch(spacesUrl, { credentials: 'include' }),
       ]);
+      if (statsRes.status === 403 || spacesRes.status === 403) {
+        console.warn('[CloudContext] Access forbidden to group resources. Reverting to personal workspace.');
+        setActiveWorkspace({ type: 'personal' });
+        window.location.href = '/cloud/dashboard';
+        return;
+      }
       if (!statsRes.ok || !spacesRes.ok) throw new Error(t('messages.apiErrorOrSessionExpired'));
       const statsData = await statsRes.json();
       const spacesData = await spacesRes.json();
@@ -1338,6 +1375,12 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
 
       if (activeWorkspace.type === 'space') {
         const postsRes = await fetch(`${api}/api/spaces/${activeWorkspace.id}/posts`, { credentials: 'include' });
+        if (postsRes.status === 403) {
+          console.warn('[CloudContext] Access forbidden to space. Reverting to personal workspace.');
+          setActiveWorkspace({ type: 'personal' });
+          window.location.href = '/cloud/dashboard';
+          return;
+        }
         if (postsRes.ok) {
           const postsData = await postsRes.json();
           setPosts(postsData.posts || []);
@@ -1347,6 +1390,12 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       // Fetch processing videos
       const processingUrl = gId ? `${api}/api/assets/processing?groupId=${gId}` : `${api}/api/assets/processing`;
       const procRes = await fetch(processingUrl, { credentials: 'include' });
+      if (procRes.status === 403) {
+        console.warn('[CloudContext] Access forbidden to processing videos. Reverting to personal workspace.');
+        setActiveWorkspace({ type: 'personal' });
+        window.location.href = '/cloud/dashboard';
+        return;
+      }
       if (procRes.ok) {
         const procData = await procRes.json();
         setProcessingVideoIds(procData.ids || []);
@@ -1809,6 +1858,33 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadData(true);
   }, [activeWorkspace, tab]);
+
+  // Lắng nghe event group-update để reload dữ liệu realtime
+  useEffect(() => {
+    const handleGroupUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { type, metadata } = customEvent.detail || {};
+
+      if (type === 'group_kick' && metadata && metadata.groupId) {
+        const isCurrentGroup = 
+          (activeWorkspace && activeWorkspace.type === 'group' && activeWorkspace.id === metadata.groupId) ||
+          (activeWorkspace && activeWorkspace.type === 'space' && activeWorkspace.groupId === metadata.groupId);
+          
+        if (isCurrentGroup) {
+          console.log('[CloudContext] User kicked from active group, reverting to personal workspace');
+          setActiveWorkspace({ type: 'personal' });
+          window.location.href = '/cloud/dashboard';
+          return;
+        }
+      }
+
+      loadData(true);
+    };
+    window.addEventListener('group-update', handleGroupUpdate);
+    return () => {
+      window.removeEventListener('group-update', handleGroupUpdate);
+    };
+  }, [activeWorkspace, loadData]);
 
   return (
     <CloudContext.Provider value={{

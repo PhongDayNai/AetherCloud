@@ -212,6 +212,30 @@ function DocViewerContent() {
     setSandboxMode(saved === 'off' ? false : true);
   }, []);
 
+  // Lắng nghe sự kiện group_kick để kiểm tra quyền truy cập tài liệu realtime
+  useEffect(() => {
+    const handleGroupUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { type, metadata } = customEvent.detail || {};
+
+      if (type === 'group_kick' && metadata && metadata.groupId) {
+        if (asset && asset.groupId === metadata.groupId) {
+          setError(
+            language === 'vi'
+              ? 'Bạn không có quyền truy cập tài liệu này do đã rời khỏi hoặc bị trục xuất khỏi nhóm.'
+              : 'You do not have permission to access this document as you are no longer a member of the group.'
+          );
+          setAsset(null); // Gỡ bỏ metadata để bảo vệ thông tin tài liệu
+        }
+      }
+    };
+
+    window.addEventListener('group-update', handleGroupUpdate);
+    return () => {
+      window.removeEventListener('group-update', handleGroupUpdate);
+    };
+  }, [asset, language]);
+
   const [showMerge, setShowMerge] = useState<boolean>(false);
   const [serverVersion, setServerVersion] = useState<number>(1);
   const [conflictServerContent, setConflictServerContent] = useState<string>('');
@@ -1070,6 +1094,36 @@ function DocViewerContent() {
     }
   };
 
+  // Compute highlighted lines for history comparison view
+  const currentCompareHighlightedLines = useMemo(() => {
+    const textToHighlight = category === 'markdown' ? markdownText : codeText;
+    if (!textToHighlight) return [];
+    try {
+      const extStr = category === 'markdown' ? 'markdown' : (asset ? (asset.ext || '').toLowerCase().replace(/^\./, '') : '');
+      const lang = extStr && hljs.getLanguage(extStr) ? extStr : null;
+      const html = lang
+        ? hljs.highlight(textToHighlight, { language: lang }).value
+        : hljs.highlightAuto(textToHighlight).value;
+      return splitHtmlIntoLines(html);
+    } catch {
+      return textToHighlight.split('\n');
+    }
+  }, [codeText, markdownText, category, asset]);
+
+  const historyCompareHighlightedLines = useMemo(() => {
+    if (!historyContent) return [];
+    try {
+      const extStr = category === 'markdown' ? 'markdown' : (asset ? (asset.ext || '').toLowerCase().replace(/^\./, '') : '');
+      const lang = extStr && hljs.getLanguage(extStr) ? extStr : null;
+      const html = lang
+        ? hljs.highlight(historyContent, { language: lang }).value
+        : hljs.highlightAuto(historyContent).value;
+      return splitHtmlIntoLines(html);
+    } catch {
+      return historyContent.split('\n');
+    }
+  }, [historyContent, category, asset]);
+
   if (error) {
     return (
       <div className="docViewerContainer">
@@ -1109,35 +1163,7 @@ function DocViewerContent() {
     : '';
   const highlightedLines = splitHtmlIntoLines(highlightedHtml);
 
-  // Compute highlighted lines for history comparison view
-  const currentCompareHighlightedLines = useMemo(() => {
-    const textToHighlight = category === 'markdown' ? markdownText : codeText;
-    if (!textToHighlight) return [];
-    try {
-      const extStr = category === 'markdown' ? 'markdown' : (asset ? (asset.ext || '').toLowerCase().replace(/^\./, '') : '');
-      const lang = extStr && hljs.getLanguage(extStr) ? extStr : null;
-      const html = lang
-        ? hljs.highlight(textToHighlight, { language: lang }).value
-        : hljs.highlightAuto(textToHighlight).value;
-      return splitHtmlIntoLines(html);
-    } catch {
-      return textToHighlight.split('\n');
-    }
-  }, [codeText, markdownText, category, asset]);
 
-  const historyCompareHighlightedLines = useMemo(() => {
-    if (!historyContent) return [];
-    try {
-      const extStr = category === 'markdown' ? 'markdown' : (asset ? (asset.ext || '').toLowerCase().replace(/^\./, '') : '');
-      const lang = extStr && hljs.getLanguage(extStr) ? extStr : null;
-      const html = lang
-        ? hljs.highlight(historyContent, { language: lang }).value
-        : hljs.highlightAuto(historyContent).value;
-      return splitHtmlIntoLines(html);
-    } catch {
-      return historyContent.split('\n');
-    }
-  }, [historyContent, category, asset]);
 
   // Helper to determine the mode and styles for the sandbox/edit button
   const getSandboxModeConfig = () => {
