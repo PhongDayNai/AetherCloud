@@ -13,6 +13,8 @@ interface RootLayoutProps {
   children: React.ReactNode;
 }
 
+import { NotificationProvider } from '../context/NotificationContext';
+
 export default function RootLayout({ children }: RootLayoutProps): React.JSX.Element {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -207,7 +209,9 @@ export default function RootLayout({ children }: RootLayoutProps): React.JSX.Ele
         <ThemeProvider>
           <LanguageProvider>
             <ConfirmProvider>
-              {children}
+              <NotificationProvider>
+                {children}
+              </NotificationProvider>
             </ConfirmProvider>
           </LanguageProvider>
         </ThemeProvider>
