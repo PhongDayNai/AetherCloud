@@ -91,7 +91,7 @@ export async function inviteMemberByEmail(
   // - Hết hạn sau đúng 24 giờ
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   // const expiresAt = new Date(Date.now() + 1 * 60 * 1000);
-  const inviteToken = crypto.randomBytes(6).toString('hex').toUpperCase();
+  const inviteToken = crypto.randomBytes(32).toString('hex');
 
   await db.query(
     `INSERT INTO group_invitations (id, group_id, created_by, token, max_uses, uses_count, is_active, expires_at, created_at)

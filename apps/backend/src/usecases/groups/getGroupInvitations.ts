@@ -17,7 +17,7 @@ export async function getGroupInvitations(
   const queryText = `
     SELECT id, token, max_uses, uses_count, is_active, expires_at, created_at
     FROM group_invitations
-    WHERE group_id = $1
+    WHERE group_id = $1 AND LENGTH(token) = 6
     ORDER BY created_at DESC
     LIMIT $2 OFFSET $3
   `;
