@@ -19,11 +19,11 @@ export default function GroupSettingsModal({
   onClose,
   group
 }: GroupSettingsModalProps): React.JSX.Element | null {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { api, user, addToast, loadData } = useCloud();
   const confirm = useConfirm();
 
-  // Tab State
+  // Tab State: 'members' | 'invites'
   const [activeTab, setActiveTab] = useState<'members' | 'invites'>('members');
 
   // Members States
@@ -38,11 +38,14 @@ export default function GroupSettingsModal({
   // Group Invitation States
   const [invites, setInvites] = useState<any[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
+
+  // States cho Form tạo mã mời
   const [maxUses, setMaxUses] = useState<number | null>(null);
   const [expiresInHours, setExpiresInHours] = useState<number | null>(null);
   const [expiresDate, setExpiresDate] = useState<string>('');
   const [isUnlimitedUses, setIsUnlimitedUses] = useState<boolean>(true);
   const [isNoExpiry, setIsNoExpiry] = useState<boolean>(true);
+  const [expiryType, setExpiryType] = useState<'hours' | 'date'>('hours');
 
   const [createInviteMsg, setCreateInviteMsg] = useState<string>('');
   const [createInviteErr, setCreateInviteErr] = useState<string>('');
@@ -104,6 +107,7 @@ export default function GroupSettingsModal({
       setExpiresDate('');
       setIsUnlimitedUses(true);
       setIsNoExpiry(true);
+      setExpiryType('hours');
       setCreateInviteMsg('');
       setCreateInviteErr('');
       setCopiedToken(null);
@@ -124,7 +128,7 @@ export default function GroupSettingsModal({
     const handleGroupUpdate = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { type, metadata } = customEvent.detail || {};
-      
+
       if (metadata && metadata.groupId === group.id) {
         fetchMembers();
         if (activeTab === 'invites' || type === 'group_join') {
@@ -141,31 +145,7 @@ export default function GroupSettingsModal({
 
   if (!isOpen || !group) return null;
 
-  // 1. Mời thành viên mới
-  const handleInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteEmail.trim()) return;
-    setErrorMsg('');
-    try {
-      const res = await fetch(`${api}/api/groups/${group.id}/members`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole })
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || t('groups.inviteFailed') || 'Mời thành viên thất bại');
-      }
-      addToast(t('groups.inviteSuccess') || 'Gửi lời mời thành công!', 'info');
-      setInviteEmail('');
-      fetchMembers();
-    } catch (err: any) {
-      setErrorMsg(err.message);
-    }
-  };
-
-  // Mời trực tiếp qua Email dạng Notification
+  // 1. Mời thành viên trực tiếp qua Email dạng Notification
   const handleInviteEmailDirect = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
@@ -226,7 +206,7 @@ export default function GroupSettingsModal({
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || t('groups.kickFailed'));
       }
-      
+
       // Kích hoạt animation biến mất
       setKickedUserIds((prev) => [...prev, userId]);
 
@@ -317,8 +297,8 @@ export default function GroupSettingsModal({
     try {
       const body = {
         maxUses: isUnlimitedUses ? null : maxUses,
-        expiresInHours: isNoExpiry ? null : (expiresInHours || null),
-        expiresDate: isNoExpiry ? null : (expiresDate || null)
+        expiresInHours: isNoExpiry ? null : (expiryType === 'hours' ? expiresInHours : null),
+        expiresDate: isNoExpiry ? null : (expiryType === 'date' ? expiresDate : null)
       };
       const res = await fetch(`${api}/api/groups/${group.id}/invitations`, {
         method: 'POST',
@@ -374,554 +354,675 @@ export default function GroupSettingsModal({
   return (
     <div className="modalBackdrop" onClick={onClose}>
       <div className="modalContent" onClick={(e) => e.stopPropagation()}>
-        <div className="modalHeader">
-          <h2>{group.name} - {t('groups.settingsTitle') || 'Thiết lập nhóm'}</h2>
-          <button className="closeBtn" onClick={onClose}>✕</button>
-        </div>
 
-        {/* Tab Headers */}
-        <div className="tabHeaders">
-          <button
-            className={`tabHeader ${activeTab === 'members' ? 'active' : ''}`}
-            onClick={() => setActiveTab('members')}
-          >
-            👥 {t('groups.membersTab') || 'Thành viên'}
-          </button>
-          <button
-            className={`tabHeader ${activeTab === 'invites' ? 'active' : ''}`}
-            onClick={() => setActiveTab('invites')}
-          >
-            ✉️ {t('groups.invitesTab') || 'Mã mời nhóm'}
-          </button>
-        </div>
+        {/* SIDEBAR DỌC BÊN TRÁI */}
+        <div className="sidebarPanel">
+          <div className="groupProfile">
+            <div className="groupAvatar">
+              <Icons.Group size={24} />
+            </div>
+            <div className="groupMeta">
+              <span className="groupName" title={group.name}>{group.name}</span>
+              <span className="groupRole">{myRole === 'owner' ? 'Chủ nhóm' : myRole === 'admin' ? 'Quản trị viên' : 'Thành viên'}</span>
+            </div>
+          </div>
 
-        {/* TAB 1: THÀNH VIÊN */}
-        {activeTab === 'members' && (
-          <div className="tabContent">
-            {/* Form mời thành viên cho Owner và Admin */}
-            {myRole !== 'member' && (
-              <form onSubmit={handleInviteEmailDirect} className="inviteForm">
-                {errorMsg && <div className="errorBanner">{errorMsg}</div>}
-                <div className="inviteRow">
-                  <input
-                    type="text"
-                    placeholder={t('groups.inviteEmail') || 'Email người nhận...'}
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    required
-                    disabled={loading}
-                  />
-                  <CustomSelect
-                    value={inviteRole}
-                    options={[
-                      { value: 'member', label: 'Member' },
-                      { value: 'admin', label: 'Admin' }
-                    ]}
-                    onChange={(val) => setInviteRole(val as any)}
-                    disabled={myRole === 'admin' || loading}
-                    width="110px"
-                  />
-                  <button type="submit" disabled={!inviteEmail.trim() || loading} className="inviteBtn">
-                    {t('groups.inviteBtn') || 'Mời'}
-                  </button>
-                </div>
-              </form>
+          <div className="verticalTabs">
+            <button
+              className={`verticalTabButton ${activeTab === 'members' ? 'active' : ''}`}
+              onClick={() => setActiveTab('members')}
+            >
+              <Icons.User size={16} />
+              <span>{t('groups.membersTab') || 'Thành viên'}</span>
+            </button>
+            <button
+              className={`verticalTabButton ${activeTab === 'invites' ? 'active' : ''}`}
+              onClick={() => setActiveTab('invites')}
+            >
+              <Icons.Documents size={16} />
+              <span>{t('groups.invitesTab') || 'Mã mời nhóm'}</span>
+            </button>
+          </div>
+
+          <div className="sidebarFooter">
+            {myRole === 'owner' ? (
+              <button onClick={handleDisbandGroup} className="sidebarActionBtn disband">
+                <Icons.Trash size={13} />
+                <span>{t('groups.disbandBtn') || 'Giải tán nhóm'}</span>
+              </button>
+            ) : (
+              <button onClick={handleLeaveGroup} className="sidebarActionBtn leave">
+                <Icons.LogOut size={13} />
+                <span>{t('groups.leaveBtn') || 'Rời khỏi nhóm'}</span>
+              </button>
             )}
+          </div>
+        </div>
 
-            {/* Danh sách thành viên */}
-            <div className="membersContainer custom-scrollbar">
-              {loading && members.length === 0 ? (
-                <div className="loadingText">{t('sidebar.loading') || 'Đang tải...'}</div>
-              ) : (
-                <div className="membersList">
-                  {members.map((member) => {
-                    const isLeaving = kickedUserIds.includes(member.user_id);
-                    const isMe = member.user_id === user?.sub;
-                    return (
-                      <div key={member.user_id} className={`memberRow ${isLeaving ? 'leaving' : ''}`}>
-                        <div className="avatar">
-                          {member.name ? member.name.charAt(0).toUpperCase() : '?'}
-                        </div>
-                        <div className="meta">
-                          <div className="name">
-                            {member.name || member.email}
-                            {isMe && <span className="meTag">(Tôi)</span>}
+        {/* NỘI DUNG PANEL CHÍNH BÊN PHẢI */}
+        <div className="mainContentPanel">
+          <div className="panelHeader">
+            <h2>{activeTab === 'members' ? (t('groups.membersTab') || 'Thành viên nhóm') : (t('groups.invitesTab') || 'Quản lý mã mời')}</h2>
+            <button className="closeBtn" onClick={onClose}>
+              <Icons.Close size={16} />
+            </button>
+          </div>
+
+          {/* TAB CONTENT: MEMBERS */}
+          {activeTab === 'members' && (
+            <div className="panelBody scrollable custom-scrollbar">
+              {/* Form mời email */}
+              {myRole !== 'member' && (
+                <div className="inviteSection">
+                  <h3 className="sectionSubtitle">{language === 'vi' ? 'Mời thành viên mới' : 'Invite new member'}</h3>
+                  <form onSubmit={handleInviteEmailDirect} className="inviteForm">
+                    {errorMsg && <div className="errorBanner">{errorMsg}</div>}
+                    <div className="inviteRow">
+                      <input
+                        type="email"
+                        placeholder={t('groups.inviteEmail') || 'Email người nhận...'}
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        required
+                        disabled={loading}
+                      />
+                      <CustomSelect
+                        value={inviteRole}
+                        options={[
+                          { value: 'member', label: 'Member' },
+                          { value: 'admin', label: 'Admin' }
+                        ]}
+                        onChange={(val) => setInviteRole(val as any)}
+                        disabled={myRole === 'admin' || loading}
+                        width="110px"
+                      />
+                      <button type="submit" disabled={!inviteEmail.trim() || loading} className="inviteBtn">
+                        <Icons.Plus size={14} style={{ marginRight: '4px' }} />
+                        {t('groups.inviteBtn') || 'Mời'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Danh sách thành viên */}
+              <div className="membersListContainer">
+                <h3 className="sectionSubtitle">{language === 'vi' ? 'Danh sách thành viên' : 'Members List'}</h3>
+                {loading && members.length === 0 ? (
+                  <div className="loadingText">{t('sidebar.loading') || 'Đang tải...'}</div>
+                ) : (
+                  <div className="membersList">
+                    {members.map((member) => {
+                      const isLeaving = kickedUserIds.includes(member.user_id);
+                      const isMe = member.user_id === user?.sub;
+                      return (
+                        <div key={member.user_id} className={`memberRow ${isLeaving ? 'leaving' : ''}`}>
+                          <div className="avatar">
+                            {member.name ? member.name.charAt(0).toUpperCase() : '?'}
                           </div>
-                          <div className="email">{member.email}</div>
+                          <div className="meta">
+                            <div className="name">
+                              {member.name || member.email}
+                              {isMe && <span className="meTag">(Tôi)</span>}
+                            </div>
+                            <div className="email">{member.email}</div>
+                          </div>
+
+                          <div className="roleActions">
+                            <span className={`roleBadge ${member.role}`}>{member.role}</span>
+
+                            {!isMe && myRole !== 'member' && member.role !== 'owner' && actionLoadingId !== member.user_id && (
+                              <div className="actionButtons">
+                                {myRole === 'owner' && (
+                                  <>
+                                    {member.role === 'admin' ? (
+                                      <button
+                                        onClick={() => handleUpdateRole(member.user_id, 'member')}
+                                        title={t('groups.demoteBtn') || 'Hạ xuống thành viên'}
+                                        className="actionIconBtn"
+                                      >
+                                        <Icons.ChevronDown size={14} />
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleUpdateRole(member.user_id, 'admin')}
+                                        title={t('groups.promoteBtn') || 'Thăng cấp Quản trị viên'}
+                                        className="actionIconBtn"
+                                      >
+                                        <Icons.ChevronUp size={14} />
+                                      </button>
+                                    )}
+
+                                    <button
+                                      onClick={() => handleTransferOwnership(member.user_id)}
+                                      title={t('groups.transferBtn') || 'Nhượng chức Chủ nhóm'}
+                                      className="actionIconBtn ownershipBtn"
+                                    >
+                                      <Icons.Transfer size={14} />
+                                    </button>
+                                  </>
+                                )}
+
+                                {/* Owner có quyền kick bất kỳ ai, Admin có quyền kick member thường */}
+                                {(myRole === 'owner' || (myRole === 'admin' && member.role === 'member')) && (
+                                  <button
+                                    onClick={() => handleKick(member.user_id)}
+                                    title={t('groups.kickBtn') || 'Trục xuất'}
+                                    className="actionIconBtn kickBtn"
+                                  >
+                                    <Icons.Close size={12} />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {actionLoadingId === member.user_id && (
+                              <span className="spinner">⌛</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB CONTENT: INVITES */}
+          {activeTab === 'invites' && (
+            <div className="panelBody no-scroll">
+              <div className="invitesTwoColumnLayout">
+
+                {/* CỘT TRÁI: TẠO MÃ MỚI */}
+                <div className="invitesFormColumn">
+                  <h3 className="sectionSubtitle">{language === 'vi' ? 'Tạo mã mời mới' : 'Create Invite Code'}</h3>
+
+                  {myRole !== 'member' ? (
+                    <form onSubmit={handleCreateInvite} className="createInviteForm">
+                      <div className="alertContainer">
+                        {createInviteMsg && <div className="alertMsg successMsg">{createInviteMsg}</div>}
+                        {createInviteErr && <div className="alertMsg errorMsg">{createInviteErr}</div>}
+                      </div>
+
+                      {/* Lượt dùng */}
+                      <div className="formField">
+                        <div className="formFieldHeader">
+                          <label>{t('invite.maxUsesLabel') || 'Số lượt sử dụng tối đa'}</label>
+                          <div className="toggleWrapper">
+                            <span className="toggleLabel">{t('invite.unlimited') || 'Không giới hạn'}</span>
+                            <button
+                              type="button"
+                              className={`premiumSwitch ${isUnlimitedUses ? 'active' : ''}`}
+                              onClick={() => {
+                                setIsUnlimitedUses(!isUnlimitedUses);
+                                if (isUnlimitedUses) setMaxUses(1);
+                              }}
+                            >
+                              <span className="premiumSwitchHandle" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className={`inputHeightWrapper ${!isUnlimitedUses ? 'open' : ''}`}>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="Ví dụ: 10"
+                            value={maxUses || ''}
+                            onChange={(e) => setMaxUses(parseInt(e.target.value) || null)}
+                            disabled={isUnlimitedUses}
+                            className="no-spinner textInput"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Hạn dùng */}
+                      <div className="formField">
+                        <div className="formFieldHeader">
+                          <label>{t('invite.expiresLabel') || 'Thời hạn hết hạn'}</label>
+                          <div className="toggleWrapper">
+                            <span className="toggleLabel">{t('invite.noExpiry') || 'Không hết hạn'}</span>
+                            <button
+                              type="button"
+                              className={`premiumSwitch ${isNoExpiry ? 'active' : ''}`}
+                              onClick={() => setIsNoExpiry(!isNoExpiry)}
+                            >
+                              <span className="premiumSwitchHandle" />
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="roleActions">
-                          <span className={`roleBadge ${member.role}`}>{member.role}</span>
+                        <div className={`inputHeightWrapper ${!isNoExpiry ? 'open' : ''}`}>
+                          <div className="expiryTypeTabs">
+                            <button
+                              type="button"
+                              className={`expiryTypeTab ${expiryType === 'hours' ? 'active' : ''}`}
+                              onClick={() => {
+                                setExpiryType('hours');
+                                setExpiresDate('');
+                              }}
+                            >
+                              {language === 'vi' ? 'Theo giờ' : 'By hours'}
+                            </button>
+                            <button
+                              type="button"
+                              className={`expiryTypeTab ${expiryType === 'date' ? 'active' : ''}`}
+                              onClick={() => {
+                                setExpiryType('date');
+                                setExpiresInHours(null);
+                              }}
+                            >
+                              {language === 'vi' ? 'Theo ngày' : 'By date'}
+                            </button>
+                          </div>
 
-                          {!isMe && myRole !== 'member' && member.role !== 'owner' && actionLoadingId !== member.user_id && (
-                            <div className="actionButtons">
-                              {myRole === 'owner' && (
-                                <>
-                                  {member.role === 'admin' ? (
+                          <div className="expiryValueInputContainer">
+                            {expiryType === 'hours' ? (
+                              <input
+                                type="number"
+                                min="1"
+                                placeholder={t('invite.hoursPlaceholder') || 'Số giờ (ví dụ: 24)'}
+                                value={expiresInHours || ''}
+                                onChange={(e) => setExpiresInHours(parseInt(e.target.value) || null)}
+                                className="no-spinner textInput"
+                              />
+                            ) : (
+                              <CustomDatePicker
+                                value={expiresDate}
+                                onChange={(val) => setExpiresDate(val)}
+                                placeholder={t('invite.datePlaceholder') || 'Chọn ngày...'}
+                              />
+                            )}
+                          </div>
+                          {expiryType === 'date' && (
+                            <span className="fieldHint">{t('invite.expiryDateHint') || '* Hết hạn vào lúc 23:59:59 của ngày được chọn.'}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button type="submit" className="createBtn">
+                        {t('invite.createBtn') || 'Tạo mã mời'}
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="memberInviteInfo">
+                      {t('invite.membersOnlyView') || 'Chỉ Quản trị viên mới được phép tạo mã mời.'}
+                    </div>
+                  )}
+                </div>
+
+                {/* CỘT PHẢI: BẢNG DANH SÁCH MÃ MỜI */}
+                <div className="invitesListColumn">
+                  <div className="listHeader">
+                    <h3 className="sectionSubtitle">{t('invite.listTitle') || 'Danh sách mã mời đã tạo'}</h3>
+                    <p className="copyHint">{t('invite.clickToCopyHint') || '* Nhấp vào mã mời để sao chép nhanh.'}</p>
+                  </div>
+
+                  <div className="invitesTableContainer custom-scrollbar">
+                    {invitesLoading && invites.length === 0 ? (
+                      <div className="loadingText">{t('sidebar.loading') || 'Đang tải...'}</div>
+                    ) : invites.length === 0 ? (
+                      <div className="emptyInvitesText">{t('invite.emptyList') || 'Chưa có mã mời nào được tạo.'}</div>
+                    ) : (
+                      <table className="invitesTable">
+                        <thead>
+                          <tr>
+                            <th>{language === 'vi' ? 'Mã' : 'Code'}</th>
+                            <th>{language === 'vi' ? 'Dùng' : 'Uses'}</th>
+                            <th>{language === 'vi' ? 'Hạn dùng' : 'Expires'}</th>
+                            <th>{language === 'vi' ? 'Trạng thái' : 'Status'}</th>
+                            <th style={{ textAlign: 'center' }}>{language === 'vi' ? 'Hành động' : 'Action'}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {invites.map((inviteItem) => {
+                            const isItemExpired = inviteItem.expires_at ? new Date(inviteItem.expires_at) < new Date() : false;
+                            const isLimitReached = inviteItem.max_uses ? inviteItem.uses_count >= inviteItem.max_uses : false;
+                            const isCurrentlyActive = inviteItem.is_active && !isItemExpired && !isLimitReached;
+
+                            return (
+                              <tr key={inviteItem.id} className={isCurrentlyActive ? 'row-active' : 'row-locked'}>
+                                <td>
+                                  <div
+                                    className="tokenCell"
+                                    onClick={() => copyToClipboard(inviteItem.token, isCurrentlyActive)}
+                                    title={isCurrentlyActive ? t('invite.titleCopyActive') : t('invite.titleCopyLocked')}
+                                  >
+                                    <span className="tokenText">{inviteItem.token}</span>
+                                    {isCurrentlyActive && <span className="copyBtnIcon">📋</span>}
+                                  </div>
+                                </td>
+                                <td>
+                                  {inviteItem.uses_count}/{inviteItem.max_uses !== null ? inviteItem.max_uses : '∞'}
+                                </td>
+                                <td className="expiresCell" title={inviteItem.expires_at ? new Date(inviteItem.expires_at).toLocaleString() : ''}>
+                                  {inviteItem.expires_at ? new Date(inviteItem.expires_at).toLocaleDateString() : '∞'}
+                                </td>
+                                <td>
+                                  <span className={`statusBadge ${isCurrentlyActive ? 'active' : 'locked'}`}>
+                                    {isCurrentlyActive ? (language === 'vi' ? 'Chạy' : 'Active') : (language === 'vi' ? 'Khóa' : 'Locked')}
+                                  </span>
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  {isCurrentlyActive && myRole !== 'member' ? (
                                     <button
-                                      onClick={() => handleUpdateRole(member.user_id, 'member')}
-                                      title={t('groups.demoteBtn') || 'Hạ xuống thành viên'}
-                                      className="actionIconBtn"
+                                      className="tableLockBtn"
+                                      onClick={() => handleDeactivateInvite(inviteItem.id)}
+                                      title={t('actions.lock') || 'Khóa mã'}
                                     >
-                                      <Icons.ChevronDown size={14} />
+                                      {language === 'vi' ? 'Khóa' : 'Lock'}
                                     </button>
                                   ) : (
-                                    <button
-                                      onClick={() => handleUpdateRole(member.user_id, 'admin')}
-                                      title={t('groups.promoteBtn') || 'Thăng cấp Quản trị viên'}
-                                      className="actionIconBtn"
-                                    >
-                                      <Icons.ChevronUp size={14} />
-                                    </button>
+                                    <span className="lockedPlaceholder">-</span>
                                   )}
-
-                                  <button
-                                    onClick={() => handleTransferOwnership(member.user_id)}
-                                    title={t('groups.transferBtn') || 'Nhượng chức Chủ nhóm'}
-                                    className="actionIconBtn ownershipBtn"
-                                  >
-                                    <Icons.Transfer size={14} />
-                                  </button>
-                                </>
-                              )}
-
-                              {/* Owner có quyền kick bất kỳ ai, Admin có quyền kick member thường */}
-                              {(myRole === 'owner' || (myRole === 'admin' && member.role === 'member')) && (
-                                <button
-                                  onClick={() => handleKick(member.user_id)}
-                                  title={t('groups.kickBtn') || 'Trục xuất'}
-                                  className="actionIconBtn kickBtn"
-                                >
-                                  <Icons.Close size={12} />
-                                </button>
-                              )}
-                            </div>
-                          )}
-
-                          {actionLoadingId === member.user_id && (
-                            <span className="spinner">⌛</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: MÃ MỜI NHÓM */}
-        {activeTab === 'invites' && (
-          <div className="tabContent invitesTab">
-            {/* Chỉ Owner và Admin mới được tạo mã mời */}
-            {myRole !== 'member' ? (
-              <form onSubmit={handleCreateInvite} className="createInviteForm">
-                {/* Alert Messages Container */}
-                <div className="alertContainer">
-                  {createInviteMsg && <div className="alertMsg successMsg">{createInviteMsg}</div>}
-                  {createInviteErr && <div className="alertMsg errorMsg">{createInviteErr}</div>}
-                </div>
-
-                <div className="inviteSettingsGrid">
-                  {/* Cấu hình lượt sử dụng */}
-                  <div className="formField">
-                    <label>{t('invite.maxUsesLabel') || 'Số lượt sử dụng tối đa'}</label>
-                    <div className="toggleWrapper">
-                      <span className="toggleLabel">{t('invite.unlimited') || 'Không giới hạn'}</span>
-                      <button
-                        type="button"
-                        className={`premiumSwitch ${isUnlimitedUses ? 'active' : ''}`}
-                        onClick={() => {
-                          setIsUnlimitedUses(!isUnlimitedUses);
-                          if (isUnlimitedUses) setMaxUses(10);
-                        }}
-                      >
-                        <span className="premiumSwitchHandle" />
-                      </button>
-                    </div>
-
-                    <div className={`inputHeightWrapper ${!isUnlimitedUses ? 'open' : ''}`}>
-                      <input
-                        type="number"
-                        min="1"
-                        placeholder="Ví dụ: 10"
-                        value={maxUses || ''}
-                        onChange={(e) => setMaxUses(parseInt(e.target.value) || null)}
-                        disabled={isUnlimitedUses}
-                        className="no-spinner textInput"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Cấu hình thời hạn hết hạn */}
-                  <div className="formField">
-                    <label>{t('invite.expiresLabel') || 'Thời hạn hết hạn'}</label>
-                    <div className="toggleWrapper">
-                      <span className="toggleLabel">{t('invite.noExpiry') || 'Không hết hạn'}</span>
-                      <button
-                        type="button"
-                        className={`premiumSwitch ${isNoExpiry ? 'active' : ''}`}
-                        onClick={() => setIsNoExpiry(!isNoExpiry)}
-                      >
-                        <span className="premiumSwitchHandle" />
-                      </button>
-                    </div>
-
-                    <div className={`inputHeightWrapper ${!isNoExpiry ? 'open' : ''}`}>
-                      <div className="expiryInputs">
-                        <input
-                          type="number"
-                          min="1"
-                          placeholder={t('invite.hoursPlaceholder') || 'Số giờ (ví dụ: 24)'}
-                          value={expiresInHours || ''}
-                          onChange={(e) => {
-                            setExpiresInHours(parseInt(e.target.value) || null);
-                            if (e.target.value) setExpiresDate('');
-                          }}
-                          disabled={isNoExpiry}
-                          className="no-spinner textInput"
-                        />
-                        <span className="expiryDivider">{t('invite.or') || 'hoặc'}</span>
-                        <CustomDatePicker
-                          value={expiresDate}
-                          onChange={(val) => {
-                            setExpiresDate(val);
-                            if (val) setExpiresInHours(null);
-                          }}
-                          disabled={isNoExpiry}
-                          placeholder={t('invite.datePlaceholder') || 'Chọn ngày...'}
-                        />
-                      </div>
-                      <span className="fieldHint">{t('invite.expiryDateHint') || '* Hết hạn vào lúc 23:59:59 của ngày được chọn.'}</span>
-                    </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 </div>
 
-                <button type="submit" className="createBtn">
-                  {t('invite.createBtn') || 'Tạo mã mời mới'}
-                </button>
-              </form>
-            ) : (
-              <div className="memberInviteInfo">
-                {t('invite.membersOnlyView') || 'Chỉ Quản trị viên mới được phép tạo mã mời.'}
               </div>
-            )}
-
-            {/* Tiêu đề & Hướng dẫn sao chép nhanh */}
-            <div className="listHeader">
-              <h3>{t('invite.listTitle') || 'Danh sách mã mời đã tạo'}</h3>
-              <p className="copyHint">{t('invite.clickToCopyHint') || '* Nhấp vào mã mời để sao chép nhanh.'}</p>
             </div>
-
-            {/* Danh sách mã mời nhóm đã tạo */}
-            <div className="invitesTableContainer custom-scrollbar">
-              {invitesLoading && invites.length === 0 ? (
-                <div className="loadingText">{t('sidebar.loading') || 'Đang tải...'}</div>
-              ) : invites.length === 0 ? (
-                <div className="emptyInvitesText">{t('invite.emptyList') || 'Chưa có mã mời nào được tạo.'}</div>
-              ) : (
-                <div className="invitesList">
-                  {invites.map((inviteItem) => {
-                    const isItemExpired = inviteItem.expires_at ? new Date(inviteItem.expires_at) < new Date() : false;
-                    const isLimitReached = inviteItem.max_uses ? inviteItem.uses_count >= inviteItem.max_uses : false;
-                    const isCurrentlyActive = inviteItem.is_active && !isItemExpired && !isLimitReached;
-
-                    return (
-                      <div key={inviteItem.id} className={`inviteItemRow ${isCurrentlyActive ? 'active' : 'locked'}`}>
-                        <div
-                          className="inviteTokenCell"
-                          onClick={() => copyToClipboard(inviteItem.token, isCurrentlyActive)}
-                          title={isCurrentlyActive ? t('invite.titleCopyActive') : t('invite.titleCopyLocked')}
-                        >
-                          <span className="tokenText">{inviteItem.token}</span>
-                          {isCurrentlyActive && <span className="copyBtnIcon">📋</span>}
-                        </div>
-
-                        <div className="inviteMetaCell">
-                          <div className="metaRow">
-                            <span className="label">{t('invite.uses') || 'Sử dụng'}:</span>
-                            <span className="val">
-                              {inviteItem.uses_count} / {inviteItem.max_uses !== null ? inviteItem.max_uses : '∞'}
-                            </span>
-                          </div>
-                          <div className="metaRow">
-                            <span className="label">{t('invite.expires') || 'Hết hạn'}:</span>
-                            <span className="val expiresVal">
-                              {inviteItem.expires_at ? new Date(inviteItem.expires_at).toLocaleString() : '∞'}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="inviteStatusCell">
-                          <span className={`statusBadge ${isCurrentlyActive ? 'active' : 'locked'}`}>
-                            {isCurrentlyActive ? (t('invite.statusActive') || 'Hoạt động') : (t('invite.statusLocked') || 'Bị khóa')}
-                          </span>
-
-                          {isCurrentlyActive && myRole !== 'member' && (
-                            <button
-                              className="lockInviteBtn"
-                              onClick={() => handleDeactivateInvite(inviteItem.id)}
-                              title={t('actions.lock') || 'Khóa mã'}
-                            >
-                              🔒
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Nút thoát / giải tán ở footer */}
-        <div className="modalFooter">
-          {myRole === 'owner' ? (
-            <button onClick={handleDisbandGroup} className="disbandBtn">
-              {t('groups.disbandBtn') || 'Giải tán nhóm'}
-            </button>
-          ) : (
-            <button onClick={handleLeaveGroup} className="leaveBtn">
-              {t('groups.leaveBtn') || 'Rời khỏi nhóm'}
-            </button>
           )}
         </div>
+
       </div>
 
       <style jsx>{`
+        /* Kích thước popup cố định, phẳng giống System Admin Settings */
         .modalBackdrop {
           position: fixed;
           top: 0;
           left: 0;
           right: 0;
           bottom: 0;
-          background-color: var(--bg-backdrop);
-          backdrop-filter: blur(12px);
+          background-color: var(--bg-backdrop, rgba(0, 0, 0, 0.4));
+          backdrop-filter: blur(16px);
           z-index: 9999;
           display: flex;
           justify-content: center;
           align-items: center;
-          animation: backdropFadeIn 0.25s ease-out;
+          animation: backdropFadeIn 0.2s ease-out;
         }
         .modalContent {
-          background: var(--bg-modal-wrapper);
-          backdrop-filter: blur(20px);
-          border: 1px solid var(--border-strong);
+          background: var(--bg-modal-wrapper, rgba(23, 23, 27, 0.85));
+          backdrop-filter: blur(25px);
+          border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.08));
           border-radius: 20px;
-          padding: 22px;
-          width: 90%;
-          max-width: 500px;
-          box-shadow: var(--modal-shadow);
+          width: 1160px;
+          height: 580px;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
           box-sizing: border-box;
-          animation: modalScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          animation: modalScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
           color: var(--text-primary);
           display: flex;
-          flex-direction: column;
-          max-height: 85vh;
+          overflow: hidden;
         }
-        .modalHeader {
+
+        /* PANEL SIDEBAR DỌC BÊN TRÁI */
+        .sidebarPanel {
+          width: 220px;
+          background: rgba(0, 0, 0, 0.15);
+          border-right: 1px solid var(--border-color, rgba(255, 255, 255, 0.05));
+          display: flex;
+          flex-direction: column;
+          padding: 20px;
+          box-sizing: border-box;
+          flex-shrink: 0;
+        }
+        .groupProfile {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 24px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .groupAvatar {
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          background: rgba(59, 130, 246, 0.15);
+          color: var(--accent-color, #3b82f6);
+          border: 1px solid rgba(59, 130, 246, 0.25);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .groupMeta {
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+        }
+        .groupName {
+          font-size: 14.5px;
+          font-weight: 700;
+          color: var(--text-primary);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .groupRole {
+          font-size: 11px;
+          color: var(--text-muted, #71717a);
+          margin-top: 2px;
+        }
+        .verticalTabs {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          flex: 1;
+        }
+        .verticalTabButton {
+          background: transparent;
+          border: 0;
+          outline: none;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          border-radius: 8px;
+          color: var(--text-secondary, #a1a1aa);
+          font-size: 13.5px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: left;
+          font-family: inherit;
+        }
+        .verticalTabButton:hover {
+          background: rgba(255, 255, 255, 0.03);
+          color: var(--text-primary);
+        }
+        .verticalTabButton.active {
+          background: rgba(59, 130, 246, 0.1);
+          color: var(--accent-color, #3b82f6);
+          border: 1px solid rgba(59, 130, 246, 0.15);
+        }
+        .sidebarFooter {
+          margin-top: auto;
+        }
+        .sidebarActionBtn {
+          width: 100%;
+          border: 1px solid rgba(239, 68, 68, 0.15);
+          background: rgba(239, 68, 68, 0.05);
+          color: #fca5a5;
+          padding: 9px 12px;
+          border-radius: 8px;
+          font-size: 12.5px;
+          font-weight: 600;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          transition: all 0.2s ease;
+          font-family: inherit;
+        }
+        .sidebarActionBtn:hover {
+          background: rgba(239, 68, 68, 0.12);
+          border-color: rgba(239, 68, 68, 0.3);
+          color: #ef4444;
+        }
+
+        /* NỘI DUNG PANEL CHÍNH BÊN PHẢI */
+        .mainContentPanel {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          padding: 24px;
+          box-sizing: border-box;
+          min-width: 0;
+          overflow: visible; /* Cho phép datepicker nổi lên trên */
+        }
+        .panelHeader {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 12px;
+          margin-bottom: 20px;
           flex-shrink: 0;
         }
-        .modalHeader h2 {
-          font-size: 17px;
+        .panelHeader h2 {
+          font-size: 18px;
           font-weight: 700;
           letter-spacing: -0.4px;
           margin: 0;
-          text-overflow: ellipsis;
-          overflow: hidden;
-          white-space: nowrap;
-          max-width: 90%;
         }
         .closeBtn {
           background: transparent;
           border: 0;
-          color: var(--text-muted);
-          font-size: 18px;
+          color: var(--text-muted, #71717a);
           cursor: pointer;
-          transition: color 0.2s;
+          transition: color 0.15s;
           padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         .closeBtn:hover {
           color: var(--text-primary);
         }
 
-        /* Tab Headers UI */
-        .tabHeaders {
-          display: flex;
-          gap: 6px;
-          border-bottom: 1px solid var(--border-color);
-          margin-bottom: 16px;
-          flex-shrink: 0;
-        }
-        .tabHeader {
-          flex: 1;
-          background: none;
-          border: none;
-          color: var(--text-secondary);
-          font-size: 13.5px;
-          font-weight: 600;
-          padding: 10px 0;
-          cursor: pointer;
-          position: relative;
-          transition: color 0.25s;
-          font-family: inherit;
-        }
-        .tabHeader:hover {
-          color: var(--text-primary);
-        }
-        .tabHeader.active {
-          color: var(--accent-color, #3b82f6);
-        }
-        .tabHeader.active::after {
-          content: '';
-          position: absolute;
-          bottom: -1px;
-          left: 0;
-          right: 0;
-          height: 2px;
-          background: var(--accent-color, #3b82f6);
-          border-radius: 99px;
-        }
-
-        .tabContent {
-          display: flex;
-          flex-direction: column;
+        /* TAB BODY PANEL CONTAINER */
+        .panelBody {
           flex: 1;
           min-height: 0;
         }
-
-        .errorBanner {
-          background: rgba(244, 63, 94, 0.08);
-          border: 1px solid rgba(244, 63, 94, 0.15);
-          color: #fca5a5;
-          padding: 8px 12px;
-          border-radius: 8px;
-          font-size: 12.5px;
-          margin-bottom: 12px;
+        .panelBody.scrollable {
+          overflow-y: auto;
+          padding-right: 4px;
         }
-        
+        .panelBody.no-scroll {
+          overflow: visible; /* Cần thiết để CustomDatePicker không bị cắt */
+        }
+
+        /* COMMON SECTION STYLES */
+        .sectionSubtitle {
+          font-size: 13.5px;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin-top: 0;
+          margin-bottom: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          opacity: 0.9;
+        }
+
+        /* MEMBERS TAB LOGIC & FORM */
+        .inviteSection {
+          margin-bottom: 24px;
+        }
         .inviteForm {
-          margin-bottom: 16px;
-          flex-shrink: 0;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.05));
+          border-radius: 12px;
+          padding: 14px;
         }
         .inviteRow {
           display: flex;
-          gap: 8px;
+          gap: 10px;
         }
         .inviteRow input[type="email"] {
           flex: 1;
-          padding: 10px 12px;
+          padding: 9px 12px;
           border-radius: 8px;
-          border: 1px solid var(--border-input);
-          background-color: var(--bg-input);
+          border: 1px solid var(--border-input, rgba(255, 255, 255, 0.1));
+          background-color: var(--bg-input, rgba(0, 0, 0, 0.2));
           color: var(--text-primary);
           font-size: 13.5px;
           outline: none;
           transition: all 0.2s ease;
         }
         .inviteRow input[type="email"]:focus {
-          border-color: var(--border-input-focus);
-          background: var(--bg-input-focus);
+          border-color: var(--border-input-focus, #3b82f6);
+          background: var(--bg-input-focus, rgba(0, 0, 0, 0.3));
         }
         .inviteBtn {
-          background: var(--button-primary-bg);
-          border: 1px solid var(--button-primary-bg);
-          color: var(--button-primary-text);
+          background: var(--button-primary-bg, #ffffff);
+          border: none;
+          color: var(--button-primary-text, #000000);
           border-radius: 8px;
           padding: 0 16px;
           font-size: 13px;
           font-weight: 600;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: opacity 0.2s ease;
+          display: flex;
+          align-items: center;
+          font-family: inherit;
         }
         .inviteBtn:hover {
-          opacity: 0.95;
+          opacity: 0.92;
         }
         .inviteBtn:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }
 
-        .membersContainer {
-          flex: 1;
-          overflow-y: auto;
-          margin-bottom: 16px;
-          border: 1px solid var(--border-color);
-          border-radius: 12px;
-          background: rgba(255, 255, 255, 0.01);
-          max-height: 380px;
-          padding: 4px;
-        }
-        .loadingText {
-          text-align: center;
-          padding: 30px;
-          color: var(--text-muted);
-          font-size: 13.5px;
+        /* MEMBERS LIST */
+        .membersListContainer {
+          display: flex;
+          flex-direction: column;
         }
         .membersList {
           display: flex;
           flex-direction: column;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.05));
+          border-radius: 12px;
+          overflow: hidden;
         }
         .memberRow {
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 10px 12px;
-          border-bottom: 1px solid var(--border-color);
+          padding: 12px 16px;
+          border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.05));
           transition: background 0.15s ease;
-          animation: memberRowFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        @keyframes memberRowFadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .memberRow.leaving {
-          animation: memberRowFadeOut 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          overflow: hidden;
-          border-bottom: 0;
-          pointer-events: none;
-        }
-        @keyframes memberRowFadeOut {
-          from {
-            opacity: 1;
-            transform: translateY(0);
-            max-height: 80px;
-            padding-top: 10px;
-            padding-bottom: 10px;
-          }
-          to {
-            opacity: 0;
-            transform: translateY(-8px);
-            max-height: 0;
-            padding-top: 0;
-            padding-bottom: 0;
-          }
+          animation: memberRowFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .memberRow:last-child {
           border-bottom: 0;
         }
         .memberRow:hover {
-          background: var(--bg-item-hover);
+          background: rgba(255, 255, 255, 0.03);
+        }
+        .memberRow.leaving {
+          animation: memberRowFadeOut 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          overflow: hidden;
+          border-bottom: 0;
+          pointer-events: none;
         }
         .avatar {
-          width: 34px;
-          height: 34px;
+          width: 36px;
+          height: 36px;
           border-radius: 50%;
-          background: var(--bg-item-active);
-          border: 1px solid var(--border-strong);
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -938,56 +1039,59 @@ export default function GroupSettingsModal({
           min-width: 0;
         }
         .name {
-          font-size: 13px;
+          font-size: 13.5px;
           font-weight: 600;
           color: var(--text-primary);
           display: flex;
           align-items: center;
           gap: 6px;
-          text-overflow: ellipsis;
           overflow: hidden;
+          text-overflow: ellipsis;
           white-space: nowrap;
         }
         .meTag {
           font-size: 10px;
-          color: var(--text-accent);
-          font-weight: 500;
+          color: var(--accent-color, #3b82f6);
+          font-weight: 600;
+          background: rgba(59, 130, 246, 0.15);
+          padding: 1px 5px;
+          border-radius: 4px;
         }
         .email {
-          font-size: 11px;
-          color: var(--text-muted);
-          text-overflow: ellipsis;
+          font-size: 11.5px;
+          color: var(--text-muted, #71717a);
           overflow: hidden;
+          text-overflow: ellipsis;
           white-space: nowrap;
         }
         
         .roleActions {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
         }
         .roleBadge {
-          font-size: 10.5px;
+          font-size: 10px;
           font-weight: 700;
           text-transform: uppercase;
-          padding: 2px 6px;
+          padding: 2.5px 7px;
           border-radius: 6px;
           letter-spacing: 0.3px;
         }
         .roleBadge.owner {
           background: rgba(245, 158, 11, 0.15);
-          color: #f59e0b;
-          border: 1px solid rgba(245, 158, 11, 0.2);
+          color: #fbbf24;
+          border: 1px solid rgba(245, 158, 11, 0.25);
         }
         .roleBadge.admin {
           background: rgba(59, 130, 246, 0.15);
           color: #60a5fa;
-          border: 1px solid rgba(59, 130, 246, 0.2);
+          border: 1px solid rgba(59, 130, 246, 0.25);
         }
         .roleBadge.member {
-          background: rgba(113, 113, 122, 0.15);
-          color: #a1a1aa;
-          border: 1px solid rgba(113, 113, 122, 0.2);
+          background: rgba(161, 161, 170, 0.1);
+          color: #d4d4d8;
+          border: 1px solid rgba(161, 161, 170, 0.15);
         }
 
         .actionButtons {
@@ -995,11 +1099,11 @@ export default function GroupSettingsModal({
           gap: 4px;
         }
         .actionIconBtn {
-          background: var(--bg-input);
-          border: 1px solid var(--border-input);
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
           color: var(--text-secondary);
-          width: 24px;
-          height: 24px;
+          width: 26px;
+          height: 26px;
           border-radius: 6px;
           display: flex;
           align-items: center;
@@ -1009,54 +1113,58 @@ export default function GroupSettingsModal({
           padding: 0;
         }
         .actionIconBtn:hover {
-          background: var(--bg-item-hover);
+          background: rgba(255, 255, 255, 0.08);
           color: var(--text-primary);
-          border-color: var(--border-color);
+          border-color: rgba(255, 255, 255, 0.15);
         }
         .ownershipBtn:hover {
-          color: #f59e0b;
+          color: #fbbf24;
           border-color: rgba(245, 158, 11, 0.3);
         }
         .kickBtn:hover {
-          color: #ef4444;
+          color: #f87171;
           border-color: rgba(239, 68, 68, 0.3);
         }
-        .spinner {
-          font-size: 14px;
-          animation: spin 1s linear infinite;
+        
+        /* TWO COLUMN INVITES TAB LAYOUT */
+        .invitesTwoColumnLayout {
+          display: flex;
+          gap: 24px;
+          height: 100%;
+          overflow: visible; /* Rất quan trọng để hiển thị datepicker */
         }
-
-        /* INVITATIONS TAB STYLING */
-        .invitesTab {
-          max-height: 480px;
+        .invitesFormColumn {
+          width: 290px;
+          flex-shrink: 0;
           display: flex;
           flex-direction: column;
+          overflow: visible;
         }
+        .invitesListColumn {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+        }
+        
         .createInviteForm {
-          background: rgba(255, 255, 255, 0.01);
-          border: 1px solid var(--border-color);
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.05));
           border-radius: 12px;
-          padding: 12px 14px;
-          margin-bottom: 16px;
-          flex-shrink: 0;
+          padding: 16px;
           display: flex;
           flex-direction: column;
-          gap: 10px;
-        }
-        .alertContainer {
-          flex-shrink: 0;
+          gap: 14px;
+          overflow: visible; /* Cực kỳ quan trọng */
         }
         .alertMsg {
           padding: 8px 12px;
           border-radius: 8px;
-          font-size: 12px;
+          font-size: 11.5px;
           font-weight: 500;
           line-height: 1.4;
-          opacity: 0;
-          max-height: 0;
-          overflow: hidden;
-          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-          animation: slideDownIn 0.3s ease-out forwards;
+          margin-bottom: 8px;
+          animation: slideDownIn 0.2s ease-out forwards;
         }
         .successMsg {
           background: rgba(16, 185, 129, 0.1);
@@ -1068,15 +1176,16 @@ export default function GroupSettingsModal({
           border: 1px solid rgba(239, 68, 68, 0.2);
           color: #fca5a5;
         }
-        .inviteSettingsGrid {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
         .formField {
           display: flex;
           flex-direction: column;
           gap: 6px;
+          overflow: visible; /* Đảm bảo CustomDatePicker có thể tràn ra ngoài formField */
+        }
+        .formFieldHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
         }
         .formField label {
           font-size: 12.5px;
@@ -1086,25 +1195,21 @@ export default function GroupSettingsModal({
         .toggleWrapper {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          background: var(--bg-input);
-          border: 1px solid var(--border-input);
-          border-radius: 8px;
-          padding: 6px 10px;
+          gap: 8px;
         }
         .toggleLabel {
-          font-size: 13px;
-          color: var(--text-primary);
+          font-size: 11px;
+          color: var(--text-muted, #71717a);
         }
         .premiumSwitch {
           background: rgba(255, 255, 255, 0.08);
-          border: 1px solid var(--border-input);
-          width: 38px;
-          height: 20px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          width: 34px;
+          height: 18px;
           border-radius: 99px;
           position: relative;
           cursor: pointer;
-          transition: all 0.3s ease;
+          transition: all 0.25s ease;
           padding: 0;
         }
         .premiumSwitch.active {
@@ -1112,18 +1217,18 @@ export default function GroupSettingsModal({
           border-color: var(--accent-color);
         }
         .premiumSwitchHandle {
-          width: 14px;
-          height: 14px;
+          width: 12px;
+          height: 12px;
           border-radius: 50%;
           background: #ffffff;
           position: absolute;
           top: 50%;
           left: 3px;
           transform: translateY(-50%);
-          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .premiumSwitch.active .premiumSwitchHandle {
-          left: calc(100% - 17px);
+          left: calc(100% - 15px);
         }
         
         .inputHeightWrapper {
@@ -1131,298 +1236,265 @@ export default function GroupSettingsModal({
           opacity: 0;
           overflow: hidden;
           visibility: hidden;
-          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           display: flex;
           flex-direction: column;
           gap: 6px;
         }
+        /* Mấu chốt gỡ lỗi DatePicker: khi wrapper mở ra, ta phải cho overflow: visible */
         .inputHeightWrapper.open {
-          max-height: 90px;
+          max-height: 95px;
           opacity: 1;
           visibility: visible;
           padding-top: 4px;
+          overflow: visible; 
         }
-        .textInput {
-          background: var(--bg-input);
-          border: 1px solid var(--border-input);
+
+        .expiryTypeTabs {
+          display: flex;
+          background: rgba(0, 0, 0, 0.2);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 6px;
+          padding: 2px;
+          gap: 2px;
+        }
+        .expiryTypeTab {
+          flex: 1;
+          background: transparent;
+          border: 0;
+          color: var(--text-muted, #71717a);
+          font-size: 11px;
+          font-weight: 600;
+          padding: 5px 0;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: all 0.15s;
+          font-family: inherit;
+        }
+        .expiryTypeTab:hover {
           color: var(--text-primary);
-          border-radius: 8px;
+        }
+        .expiryTypeTab.active {
+          background: rgba(255, 255, 255, 0.08);
+          color: var(--text-primary);
+        }
+
+        .expiryValueInputContainer {
+          position: relative;
+          overflow: visible; /* Cực kỳ quan trọng để CustomDatePicker hiển thị popup */
+        }
+
+        .textInput {
+          background: var(--bg-input, rgba(0, 0, 0, 0.2));
+          border: 1px solid var(--border-input, rgba(255, 255, 255, 0.1));
+          color: var(--text-primary);
+          border-radius: 6px;
           padding: 8px 12px;
           font-size: 13px;
           outline: none;
           transition: all 0.2s;
+          width: 100%;
+          box-sizing: border-box;
         }
         .textInput:focus {
-          border-color: var(--border-input-focus);
-          background: var(--bg-input-focus);
+          border-color: var(--border-input-focus, #3b82f6);
+          background: var(--bg-input-focus, rgba(0, 0, 0, 0.3));
         }
         .no-spinner::-webkit-inner-spin-button,
         .no-spinner::-webkit-outer-spin-button {
           -webkit-appearance: none;
           margin: 0;
         }
-        .expiryInputs {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .expiryInputs .textInput {
-          flex: 1;
-        }
-        .expiryDivider {
-          font-size: 12px;
-          color: var(--text-muted);
-          font-weight: 500;
-        }
         .fieldHint {
-          font-size: 11px;
-          color: var(--text-muted);
+          font-size: 10.5px;
+          color: var(--text-muted, #71717a);
           font-style: italic;
         }
         .createBtn {
-          background: var(--button-primary-bg);
+          background: var(--button-primary-bg, #ffffff);
           border: none;
-          color: var(--button-primary-text);
+          color: var(--button-primary-text, #000000);
           border-radius: 8px;
           padding: 10px 0;
-          font-size: 13px;
-          font-weight: 600;
+          font-size: 13.5px;
+          font-weight: 700;
           cursor: pointer;
-          transition: all 0.25s;
+          transition: opacity 0.2s ease;
           text-align: center;
-          box-shadow: 0 2px 10px rgba(255, 255, 255, 0.05);
+          margin-top: 4px;
         }
         .createBtn:hover {
-          opacity: 0.95;
-          transform: translateY(-1px);
+          opacity: 0.92;
         }
         .memberInviteInfo {
           text-align: center;
-          padding: 20px;
-          font-size: 13px;
+          padding: 24px 16px;
+          font-size: 12.5px;
           color: var(--text-muted);
-          border: 1px dashed var(--border-input);
+          border: 1px dashed rgba(255, 255, 255, 0.1);
           border-radius: 12px;
           background: rgba(255, 255, 255, 0.01);
-          margin-bottom: 16px;
         }
 
+        /* TABLE VIEW DANH SÁCH MÃ MỜI ĐÃ TẠO */
         .listHeader {
           display: flex;
           flex-direction: column;
-          gap: 4px;
-          margin-bottom: 8px;
+          gap: 2px;
+          margin-bottom: 12px;
           flex-shrink: 0;
-        }
-        .listHeader h3 {
-          margin: 0;
-          font-size: 13.5px;
-          font-weight: 700;
-          color: var(--text-primary);
         }
         .copyHint {
           margin: 0;
           font-size: 11px;
-          color: var(--text-muted);
+          color: var(--text-muted, #71717a);
         }
-
         .invitesTableContainer {
           flex: 1;
           overflow-y: auto;
-          border: 1px solid var(--border-color);
+          overflow-x: hidden;
+          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.05));
           border-radius: 12px;
-          background: rgba(255, 255, 255, 0.01);
-          max-height: 200px;
-          padding: 4px;
+          background: rgba(0, 0, 0, 0.1);
+          max-height: 380px;
         }
         .emptyInvitesText {
           text-align: center;
-          padding: 24px;
-          font-size: 12.5px;
+          padding: 40px 20px;
+          font-size: 13px;
           color: var(--text-muted);
         }
-        .invitesList {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
+        
+        /* TABLE STYLING */
+        .invitesTable {
+          width: 100%;
+          border-collapse: collapse;
+          text-align: left;
+          font-size: 12.5px;
         }
-        .inviteItemRow {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px;
-          border-bottom: 1px solid var(--border-color);
-          transition: background 0.15s ease;
-          border-radius: 8px;
+        .invitesTable th {
+          background: rgba(0, 0, 0, 0.2);
+          padding: 10px 12px;
+          font-weight: 700;
+          color: var(--text-secondary);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+          position: sticky;
+          top: 0;
+          z-index: 10;
         }
-        .inviteItemRow:last-child {
+        .invitesTable td {
+          padding: 10px 12px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+          color: var(--text-secondary);
+          vertical-align: middle;
+        }
+        .invitesTable tr:last-child td {
           border-bottom: none;
         }
-        .inviteItemRow:hover {
-          background: var(--bg-item-hover);
+        .invitesTable tr:hover td {
+          background: rgba(255, 255, 255, 0.015);
         }
-        .inviteItemRow.locked {
-          opacity: 0.6;
+        .invitesTable tr.row-locked {
+          opacity: 0.55;
         }
-        .inviteTokenCell {
-          background: var(--bg-item-active);
-          border: 1px solid var(--border-strong);
-          border-radius: 8px;
-          padding: 6px 10px;
-          display: flex;
+        
+        .tokenCell {
+          display: inline-flex;
           align-items: center;
           gap: 6px;
           cursor: pointer;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 6px;
+          padding: 4px 8px;
           font-family: monospace;
           font-weight: 700;
-          font-size: 12px;
-          color: var(--text-primary);
-          transition: all 0.2s;
-          flex-shrink: 0;
+          color: var(--accent-color, #3b82f6);
+          transition: all 0.15s ease;
         }
-        .inviteItemRow.active .inviteTokenCell:hover {
-          border-color: var(--accent-color, #3b82f6);
-          background: rgba(59, 130, 246, 0.1);
+        .row-active .tokenCell:hover {
+          background: rgba(59, 130, 246, 0.12);
+          border-color: rgba(59, 130, 246, 0.25);
+        }
+        .tokenText {
+          font-size: 11.5px;
         }
         .copyBtnIcon {
-          font-size: 11px;
+          font-size: 10px;
+          opacity: 0.8;
         }
-        .inviteMetaCell {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          min-width: 0;
-        }
-        .metaRow {
-          display: flex;
-          gap: 4px;
-          font-size: 10.5px;
-          line-height: 1.2;
-        }
-        .metaRow .label {
-          color: var(--text-muted);
-        }
-        .metaRow .val {
-          color: var(--text-secondary);
-          font-weight: 600;
-        }
-        .expiresVal {
-          text-overflow: ellipsis;
+        .expiresCell {
+          max-width: 110px;
           overflow: hidden;
+          text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .inviteStatusCell {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-shrink: 0;
-        }
+        
         .statusBadge {
           font-size: 9.5px;
           font-weight: 700;
-          padding: 2px 5px;
+          padding: 2px 6px;
           border-radius: 4px;
           text-transform: uppercase;
+          letter-spacing: 0.3px;
         }
         .statusBadge.active {
           background: rgba(16, 185, 129, 0.15);
-          color: #10b981;
-          border: 1px solid rgba(16, 185, 129, 0.2);
+          color: #34d399;
+          border: 1px solid rgba(16, 185, 129, 0.25);
         }
         .statusBadge.locked {
           background: rgba(239, 68, 68, 0.15);
           color: #f87171;
-          border: 1px solid rgba(239, 68, 68, 0.2);
+          border: 1px solid rgba(239, 68, 68, 0.25);
         }
-        .lockInviteBtn {
-          background: var(--bg-input);
-          border: 1px solid var(--border-input);
-          cursor: pointer;
-          font-size: 11px;
-          width: 22px;
-          height: 22px;
-          border-radius: 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.2s;
-          padding: 0;
-        }
-        .lockInviteBtn:hover {
-          background: rgba(239, 68, 68, 0.2);
-          border-color: rgba(239, 68, 68, 0.35);
-          transform: scale(1.05);
-        }
-
-        .modalFooter {
-          display: flex;
-          justify-content: flex-end;
-          flex-shrink: 0;
-          border-top: 1px solid var(--border-color);
-          padding-top: 14px;
-          margin-top: 8px;
-        }
-        .disbandBtn, .leaveBtn {
-          border: 1px solid rgba(239, 68, 68, 0.2);
+        
+        .tableLockBtn {
           background: rgba(239, 68, 68, 0.05);
+          border: 1px solid rgba(239, 68, 68, 0.15);
           color: #fca5a5;
-          border-radius: 8px;
-          padding: 8px 16px;
-          font-size: 13px;
+          padding: 3px 8px;
+          border-radius: 4px;
+          font-size: 11px;
           font-weight: 600;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: all 0.15s ease;
+          font-family: inherit;
         }
-        .disbandBtn:hover, .leaveBtn:hover {
-          background: #ef4444;
-          color: white;
-          border-color: #ef4444;
+        .tableLockBtn:hover {
+          background: rgba(239, 68, 68, 0.12);
+          border-color: rgba(239, 68, 68, 0.3);
+          color: #ef4444;
         }
-
-        /* Custom Scrollbar */
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: var(--border-input);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: var(--text-muted);
+        .lockedPlaceholder {
+          color: var(--text-muted, #71717a);
+          font-size: 12px;
         }
 
-        /* Keyframes */
+        /* ANIMATIONS & RESPONSIVE */
         @keyframes backdropFadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
         }
         @keyframes modalScaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.96) translateY(12px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
+          from { opacity: 0; transform: scale(0.96); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes memberRowFadeIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes memberRowFadeOut {
+          from { opacity: 1; transform: translateY(0); max-height: 80px; padding-top: 12px; padding-bottom: 12px; }
+          to { opacity: 0; transform: translateY(-8px); max-height: 0; padding-top: 0; padding-bottom: 0; }
         }
         @keyframes slideDownIn {
-          from {
-            opacity: 0;
-            max-height: 0;
-            padding: 0 12px;
-            margin-bottom: 0;
-          }
-          to {
-            opacity: 1;
-            max-height: 60px;
-            padding: 8px 12px;
-            margin-bottom: 12px;
-          }
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .spinner {
+          display: inline-block;
+          animation: spin 1s linear infinite;
         }
         @keyframes spin {
           from { transform: rotate(0deg); }
