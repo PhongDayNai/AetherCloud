@@ -257,37 +257,43 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       socketRef.current.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          if (message.type === 'notification_deleted') {
-            const deletedId = message.data?.id;
-            if (deletedId) {
-              setNotifications((prev) => {
-                const target = prev.find((n) => n.id === deletedId);
-                const newList = prev.filter((n) => n.id !== deletedId);
-                if (target && !target.is_read) {
-                  setUnreadCount((prevCount) => Math.max(0, prevCount - 1));
-                }
-                return newList;
-              });
-            }
-          }
-
-          if (message.type === 'group_invite_declined') {
-            const { groupId } = message.data || {};
-            if (typeof window !== 'undefined' && groupId) {
-              window.dispatchEvent(
-                new CustomEvent('group-update', {
-                  detail: {
-                    type: 'group_invite_declined',
-                    metadata: { groupId }
-                  }
-                })
-              );
-            }
-          }
-
           if (message.type === 'notification') {
-            const newNotification = message.data as NotificationItem;
-            
+            const payload = message.data;
+
+            // Xử lý các tin nhắn kiểm soát (Control Messages) được gửi ngầm qua payload
+            if (payload && (payload.type === 'notification_deleted' || payload.type === 'group_invite_declined')) {
+              if (payload.type === 'notification_deleted') {
+                const deletedId = payload.data?.id;
+                if (deletedId) {
+                  setNotifications((prev) => {
+                    const target = prev.find((n) => n.id === deletedId);
+                    const newList = prev.filter((n) => n.id !== deletedId);
+                    if (target && !target.is_read) {
+                      setUnreadCount((prevCount) => Math.max(0, prevCount - 1));
+                    }
+                    return newList;
+                  });
+                }
+              }
+
+              if (payload.type === 'group_invite_declined') {
+                const { groupId } = payload.data || {};
+                if (typeof window !== 'undefined' && groupId) {
+                  window.dispatchEvent(
+                    new CustomEvent('group-update', {
+                      detail: {
+                        type: 'group_invite_declined',
+                        metadata: { groupId }
+                      }
+                    })
+                  );
+                }
+              }
+              return; // Dừng lại ở đây, không đưa tin nhắn kiểm soát vào danh sách hiển thị
+            }
+
+            const newNotification = payload as NotificationItem;
+
             // Dispatch event toàn cục báo cập nhật thông tin nhóm (realtime reload)
             if (typeof window !== 'undefined' && newNotification.type && newNotification.type.startsWith('group_')) {
               window.dispatchEvent(

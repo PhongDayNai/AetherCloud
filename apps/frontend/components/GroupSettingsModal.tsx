@@ -23,8 +23,8 @@ export default function GroupSettingsModal({
   const { api, user, addToast, loadData } = useCloud();
   const confirm = useConfirm();
 
-  // Tab State: 'members' | 'invites'
-  const [activeTab, setActiveTab] = useState<'members' | 'invites'>('members');
+  // Tab State: 'members' | 'pending' | 'invites'
+  const [activeTab, setActiveTab] = useState<'members' | 'pending' | 'invites'>('members');
 
   // Members States
   const [members, setMembers] = useState<any[]>([]);
@@ -38,6 +38,7 @@ export default function GroupSettingsModal({
   // Group Invitation States
   const [invites, setInvites] = useState<any[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
 
   // States cho Form tạo mã mời
   const [maxUses, setMaxUses] = useState<number | null>(null);
@@ -93,6 +94,47 @@ export default function GroupSettingsModal({
     }
   };
 
+  const fetchPendingInvites = async () => {
+    if (!group) return;
+    try {
+      const res = await fetch(`${api}/api/groups/${group.id}/pending-invites`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok) {
+          setPendingInvites(data.pending || []);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRevokeInvite = async (notiId: string) => {
+    const msg = language === 'vi'
+      ? 'Bạn có chắc chắn muốn hủy lời mời này không?'
+      : 'Are you sure you want to revoke this invitation?';
+    if (!await confirm(msg, { isDanger: true })) return;
+    try {
+      const res = await fetch(`${api}/api/groups/${group.id}/pending-invites/${notiId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        const successMsg = language === 'vi' ? 'Đã hủy lời mời thành công' : 'Invitation revoked successfully';
+        addToast(successMsg, 'info');
+        fetchPendingInvites();
+      } else {
+        if (data.code === 'INVITATION_ALREADY_RESOLVED') {
+          throw new Error(t('groups.error.invitationAlreadyResolved') || 'Lời mời này đã được chấp nhận hoặc từ chối.');
+        }
+        throw new Error(data.message || 'Hủy thất bại');
+      }
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
+  };
+
   useEffect(() => {
     if (isOpen && group) {
       setInviteEmail('');
@@ -115,6 +157,12 @@ export default function GroupSettingsModal({
   }, [isOpen, group]);
 
   useEffect(() => {
+    if (myRole === 'member' && activeTab === 'pending') {
+      setActiveTab('members');
+    }
+  }, [myRole, activeTab]);
+
+  useEffect(() => {
     if (isOpen && group && activeTab === 'invites') {
       fetchInvites();
       setCreateInviteMsg('');
@@ -131,6 +179,7 @@ export default function GroupSettingsModal({
 
       if (metadata && metadata.groupId === group.id) {
         fetchMembers();
+        fetchPendingInvites();
         if (activeTab === 'invites' || type === 'group_join') {
           fetchInvites();
         }
@@ -159,11 +208,21 @@ export default function GroupSettingsModal({
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.code === 'USER_NOT_FOUND') {
+          throw new Error(t('groups.error.userNotFound') || 'Người dùng với email này không tồn tại.');
+        }
+        if (data.code === 'ALREADY_MEMBER') {
+          throw new Error(t('groups.error.alreadyMember') || 'Người dùng này đã là thành viên của nhóm.');
+        }
+        if (data.code === 'PENDING_INVITE_EXISTS') {
+          throw new Error(t('groups.error.pendingInviteExists') || 'Người dùng này đã có một lời mời đang chờ phản hồi.');
+        }
         throw new Error(data.message || t('groups.inviteFailed') || 'Mời thành viên thất bại');
       }
       addToast(t('groups.inviteSuccess') || 'Gửi lời mời thành công!', 'info');
       setInviteEmail('');
       fetchMembers();
+      fetchPendingInvites();
     } catch (err: any) {
       setErrorMsg(err.message);
     }
@@ -375,6 +434,15 @@ export default function GroupSettingsModal({
               <Icons.User size={16} />
               <span>{t('groups.membersTab') || 'Thành viên'}</span>
             </button>
+            {myRole !== 'member' && (
+              <button
+                className={`verticalTabButton ${activeTab === 'pending' ? 'active' : ''}`}
+                onClick={() => setActiveTab('pending')}
+              >
+                <Icons.Info size={16} />
+                <span>{language === 'vi' ? 'Lời mời đang chờ' : 'Pending Invites'}</span>
+              </button>
+            )}
             <button
               className={`verticalTabButton ${activeTab === 'invites' ? 'active' : ''}`}
               onClick={() => setActiveTab('invites')}
@@ -402,7 +470,14 @@ export default function GroupSettingsModal({
         {/* NỘI DUNG PANEL CHÍNH BÊN PHẢI */}
         <div className="mainContentPanel">
           <div className="panelHeader">
-            <h2>{activeTab === 'members' ? (t('groups.membersTab') || 'Thành viên nhóm') : (t('groups.invitesTab') || 'Quản lý mã mời')}</h2>
+            <h2>
+              {activeTab === 'members'
+                ? (t('groups.membersTab') || 'Thành viên nhóm')
+                : activeTab === 'pending'
+                  ? (language === 'vi' ? 'Lời mời đang chờ' : 'Pending Invites')
+                  : (t('groups.invitesTab') || 'Quản lý mã mời')
+              }
+            </h2>
             <button className="closeBtn" onClick={onClose}>
               <Icons.Close size={16} />
             </button>
@@ -463,7 +538,7 @@ export default function GroupSettingsModal({
                           <div className="meta">
                             <div className="name">
                               {member.name || member.email}
-                              {isMe && <span className="meTag">(Tôi)</span>}
+                              {isMe && <span className="meTag">{language === 'vi' ? '(Tôi)' : '(Me)'}</span>}
                             </div>
                             <div className="email">{member.email}</div>
                           </div>
@@ -523,6 +598,59 @@ export default function GroupSettingsModal({
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB CONTENT: PENDING INVITES */}
+          {activeTab === 'pending' && myRole !== 'member' && (
+            <div className="panelBody scrollable custom-scrollbar">
+              <div className="pendingInvitesContainer">
+                {pendingInvites.length === 0 ? (
+                  <div className="emptyPendingText" style={{
+                    fontSize: '13.5px',
+                    color: 'var(--text-muted, #71717a)',
+                    fontStyle: 'italic',
+                    padding: '30px 20px',
+                    background: 'rgba(255, 255, 255, 0.01)',
+                    border: '1px dashed rgba(255, 255, 255, 0.08)',
+                    borderRadius: '12px',
+                    textAlign: 'center',
+                    marginTop: '8px'
+                  }}>
+                    {language === 'vi' ? 'Không có lời mời nào đang chờ phản hồi' : 'No pending invitations'}
+                  </div>
+                ) : (
+                  <div className="membersList" style={{ marginTop: '8px' }}>
+                    {pendingInvites.map((invite) => (
+                      <div key={invite.id} className="memberRow">
+                        <div className="avatar pending-avatar" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Icons.User size={14} />
+                        </div>
+                        <div className="meta">
+                          <div className="name">
+                            {invite.name || invite.email}
+                            <span className="pendingTag" style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--text-muted, #71717a)', fontStyle: 'italic' }}>
+                              {language === 'vi' ? '(Đang chờ)' : '(Pending)'}
+                            </span>
+                          </div>
+                          <div className="email">{invite.email}</div>
+                        </div>
+                        <div className="roleActions">
+                          <span className={`roleBadge ${invite.role}`}>{invite.role}</span>
+                          <button
+                            onClick={() => handleRevokeInvite(invite.id)}
+                            title={language === 'vi' ? 'Hủy lời mời' : 'Revoke invitation'}
+                            className="actionIconBtn kickBtn"
+                          >
+                            <Icons.Close size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

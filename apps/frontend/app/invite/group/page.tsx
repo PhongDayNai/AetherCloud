@@ -75,6 +75,12 @@ function InviteGroupContent() {
         const data = await res.json();
         
         if (!res.ok || !data.ok) {
+          if (data.code === 'INVITATION_NOT_FOUND') {
+            throw new Error(t('groups.error.invitationNotFound') || 'Liên kết mời này không tồn tại hoặc đã bị hủy bỏ.');
+          }
+          if (data.code === 'INVITATION_EXPIRED_OR_LIMIT_REACHED') {
+            throw new Error(t('groups.error.invitationExpiredOrLimitReached') || 'Liên kết mời này đã hết hạn hoặc đạt giới hạn lượt sử dụng.');
+          }
           throw new Error(data.message || (language === 'vi' ? 'Liên kết mời không hợp lệ hoặc đã hết hạn.' : 'Invalid or expired invitation link.'));
         }
 
@@ -111,6 +117,12 @@ function InviteGroupContent() {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
+        if (data.code === 'INVITATION_NOT_FOUND') {
+          throw new Error(t('groups.error.invitationNotFound') || 'Liên kết mời này không tồn tại hoặc đã bị hủy bỏ.');
+        }
+        if (data.code === 'INVITATION_EXPIRED_OR_LIMIT_REACHED') {
+          throw new Error(t('groups.error.invitationExpiredOrLimitReached') || 'Liên kết mời này đã hết hạn hoặc đạt giới hạn lượt sử dụng.');
+        }
         throw new Error(data.message || 'Chấp nhận lời mời thất bại');
       }
       // Điều hướng tới dashboard nhóm
