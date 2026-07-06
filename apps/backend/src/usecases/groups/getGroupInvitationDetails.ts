@@ -20,7 +20,7 @@ export async function getGroupInvitationDetails(token: string, userId?: string) 
   );
 
   if (inviteQuery.rows.length === 0) {
-    throw new NotFoundError('Invitation link is invalid or has been deleted');
+    throw new NotFoundError('Invitation link is invalid or has been deleted', 'INVITATION_NOT_FOUND');
   }
 
   const invite = inviteQuery.rows[0];
@@ -31,7 +31,7 @@ export async function getGroupInvitationDetails(token: string, userId?: string) 
   const isLimitReached = invite.max_uses ? invite.uses_count >= invite.max_uses : false;
 
   if (!invite.is_active || isExpired || isLimitReached) {
-    throw new ValidationError('This invitation link has expired or been deactivated');
+    throw new ValidationError('This invitation link has expired or been deactivated', 'INVITATION_EXPIRED_OR_LIMIT_REACHED');
   }
 
   // Đếm số thành viên nhóm

@@ -38,9 +38,13 @@ export async function leaveGroup(groupId: string, userId: string) {
       [groupId, userId]
     );
 
-    // Dọn dẹp các thông báo mời chưa đọc gửi cho thành viên tự rời nhóm liên quan đến nhóm này
+    // Dọn dẹp các thông báo mời chưa phản hồi gửi cho thành viên tự rời nhóm liên quan đến nhóm này
     await client.query(
-      "DELETE FROM notifications WHERE user_id = $1 AND type = 'group_invite' AND (metadata->>'groupId') = $2",
+      `DELETE FROM notifications 
+       WHERE user_id = $1 
+         AND type = 'group_invite' 
+         AND (metadata->>'groupId') = $2 
+         AND (metadata->>'status' IS NULL OR metadata->>'status' = '')`,
       [userId, groupId]
     );
 

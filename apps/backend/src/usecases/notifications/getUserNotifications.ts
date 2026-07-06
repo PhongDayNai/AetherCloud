@@ -43,7 +43,10 @@ export async function getUserNotifications(
           const meta = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : r.metadata;
           if (meta && meta.groupId) {
             let actualStatus: string | null = null;
-            if (joinedGroupIds.has(meta.groupId)) {
+            const expiresAt = meta.expiresAt ? new Date(meta.expiresAt) : null;
+            const isExpired = expiresAt ? expiresAt < new Date() : false;
+            
+            if (joinedGroupIds.has(meta.groupId) && !isExpired) {
               actualStatus = 'accepted';
             }
 

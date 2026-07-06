@@ -1,5 +1,6 @@
 import * as db from '../../lib/db';
 import { NotFoundError, ConflictError } from '../../lib/errors';
+import { sendNotificationRealtime } from '../../lib/websocket';
 
 export async function declineGroupInvitation(token: string, userId: string, inviteNotificationId?: string) {
   // Tìm thông tin nhóm từ mã mời
@@ -9,7 +10,7 @@ export async function declineGroupInvitation(token: string, userId: string, invi
   );
 
   if (inviteQuery.rows.length === 0) {
-    throw new NotFoundError('Invitation link is invalid or has been deleted');
+    throw new NotFoundError('Invitation link is invalid or has been deleted', 'INVITATION_NOT_FOUND');
   }
 
   const groupId = inviteQuery.rows[0].group_id;
@@ -24,7 +25,10 @@ export async function declineGroupInvitation(token: string, userId: string, invi
     const targetNotiId = inviteNotificationId || (
       await db.query(
         `SELECT id FROM notifications 
-         WHERE user_id = $1 AND type = 'group_invite' AND is_read = false AND (metadata->>'groupId') = $2
+         WHERE user_id = $1 
+           AND type = 'group_invite' 
+           AND (metadata->>'groupId') = $2 
+           AND (metadata->>'status' IS NULL OR metadata->>'status' = '')
          LIMIT 1`,
         [userId, groupId]
       )
@@ -65,7 +69,9 @@ export async function declineGroupInvitation(token: string, userId: string, invi
     const inviteNotificationQuery = await db.query(
       `SELECT id, metadata 
        FROM notifications 
-       WHERE user_id = $1 AND type = 'group_invite' AND is_read = false`,
+       WHERE user_id = $1 
+         AND type = 'group_invite' 
+         AND (metadata->>'status' IS NULL OR metadata->>'status' = '')`,
       [userId]
     );
 
@@ -86,6 +92,20 @@ export async function declineGroupInvitation(token: string, userId: string, invi
         // Bỏ qua
       }
     }
+  }
+
+  // Tìm chủ nhóm để gửi thông báo cập nhật UI realtime (xóa khỏi Pending Invites)
+  try {
+    const ownerQuery = await db.query('SELECT owner_id FROM groups WHERE id = $1', [groupId]);
+    if (ownerQuery.rows.length > 0) {
+      const ownerId = ownerQuery.rows[0].owner_id;
+      sendNotificationRealtime(ownerId, {
+        type: 'group_invite_declined',
+        data: { groupId, userId }
+      });
+    }
+  } catch (e) {
+    // Bỏ qua lỗi gửi websocket phụ
   }
 
   return { success: true, groupId };

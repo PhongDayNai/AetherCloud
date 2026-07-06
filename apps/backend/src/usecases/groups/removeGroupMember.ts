@@ -55,9 +55,13 @@ export async function removeGroupMember(groupId: string, targetUserId: string, a
   // Thực hiện xóa
   await db.query('DELETE FROM group_members WHERE group_id = $1 AND user_id = $2', [groupId, targetUserId]);
 
-  // Dọn dẹp các thông báo mời chưa đọc gửi cho thành viên bị trục xuất liên quan đến nhóm này
+  // Dọn dẹp các thông báo mời chưa phản hồi gửi cho thành viên bị trục xuất liên quan đến nhóm này
   await db.query(
-    "DELETE FROM notifications WHERE user_id = $1 AND type = 'group_invite' AND (metadata->>'groupId') = $2",
+    `DELETE FROM notifications 
+     WHERE user_id = $1 
+       AND type = 'group_invite' 
+       AND (metadata->>'groupId') = $2 
+       AND (metadata->>'status' IS NULL OR metadata->>'status' = '')`,
     [targetUserId, groupId]
   );
 

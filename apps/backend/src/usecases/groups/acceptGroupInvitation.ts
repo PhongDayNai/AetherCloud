@@ -21,7 +21,7 @@ export async function acceptGroupInvitation(token: string, userId: string, invit
     );
 
     if (inviteQuery.rows.length === 0) {
-      throw new NotFoundError('Invitation link is invalid or has been deleted');
+      throw new NotFoundError('Invitation link is invalid or has been deleted', 'INVITATION_NOT_FOUND');
     }
 
     const invite = inviteQuery.rows[0];
@@ -33,7 +33,7 @@ export async function acceptGroupInvitation(token: string, userId: string, invit
     const isLimitReached = invite.max_uses ? invite.uses_count >= invite.max_uses : false;
 
     if (!invite.is_active || isExpired || isLimitReached) {
-      throw new ValidationError('This invitation link has expired or been deactivated');
+      throw new ValidationError('This invitation link has expired or been deactivated', 'INVITATION_EXPIRED_OR_LIMIT_REACHED');
     }
 
     // 3. Kiểm tra xem user đã là thành viên nhóm chưa
@@ -46,7 +46,10 @@ export async function acceptGroupInvitation(token: string, userId: string, invit
       const targetNotiId = inviteNotificationId || (
         await client.query(
           `SELECT id FROM notifications 
-           WHERE user_id = $1 AND type = 'group_invite' AND is_read = false AND (metadata->>'groupId') = $2
+           WHERE user_id = $1 
+             AND type = 'group_invite' 
+             AND (metadata->>'groupId') = $2 
+             AND (metadata->>'status' IS NULL OR metadata->>'status' = '')
            LIMIT 1`,
           [userId, groupId]
         )
@@ -66,11 +69,13 @@ export async function acceptGroupInvitation(token: string, userId: string, invit
       return { success: true, groupId, groupName };
     }
 
-    // Tìm xem có notification mời trực tiếp nào chưa đọc cho user này vào nhóm này không
+    // Tìm xem có notification mời trực tiếp nào chưa phản hồi cho user này vào nhóm này không
     const inviteNotificationQuery = await client.query(
       `SELECT id, metadata 
        FROM notifications 
-       WHERE user_id = $1 AND type = 'group_invite' AND is_read = false`,
+       WHERE user_id = $1 
+         AND type = 'group_invite' 
+         AND (metadata->>'status' IS NULL OR metadata->>'status' = '')`,
       [userId]
     );
 

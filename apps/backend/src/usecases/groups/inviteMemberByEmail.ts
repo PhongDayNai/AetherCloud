@@ -32,7 +32,7 @@ export async function inviteMemberByEmail(
   // 4. Tìm kiếm người dùng được mời
   const userQuery = await db.query('SELECT id, name FROM users WHERE email = $1', [cleanEmail]);
   if (userQuery.rows.length === 0) {
-    throw new ValidationError('Người dùng với email này không tồn tại trên hệ thống');
+    throw new ValidationError('User with this email does not exist.', 'USER_NOT_FOUND');
   }
   const targetUser = userQuery.rows[0];
 
@@ -42,17 +42,41 @@ export async function inviteMemberByEmail(
     [groupId, targetUser.id]
   );
   if (memberCheck.rows.length > 0) {
-    throw new ConflictError('Người dùng này đã là thành viên của nhóm');
+    throw new ConflictError('This user is already a member of the group.', 'ALREADY_MEMBER');
   }
 
-  // 5b. Kiểm tra xem đã có lời mời trùng lặp chưa đọc gửi tới user này chưa
+  // 5b. Kiểm tra xem đã có lời mời trùng lặp đang chờ phản hồi gửi tới user này chưa (chưa accept/decline và chưa hết hạn)
   const pendingInviteCheck = await db.query(
-    `SELECT id FROM notifications 
-     WHERE user_id = $1 AND type = 'group_invite' AND is_read = false AND (metadata->>'groupId') = $2`,
+    `SELECT id, metadata FROM notifications 
+     WHERE user_id = $1 
+       AND type = 'group_invite' 
+       AND (metadata->>'groupId') = $2 
+       AND (metadata->>'status' IS NULL OR metadata->>'status' = '')`,
     [targetUser.id, groupId]
   );
-  if (pendingInviteCheck.rows.length > 0) {
-    throw new ConflictError('Đã có một lời mời chưa phản hồi được gửi tới người dùng này');
+  
+  let hasActivePending = false;
+  const now = new Date();
+  for (const row of pendingInviteCheck.rows) {
+    try {
+      const meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+      if (meta && meta.expiresAt) {
+        const isExpired = new Date(meta.expiresAt) < now;
+        if (!isExpired) {
+          hasActivePending = true;
+          break;
+        }
+      } else {
+        hasActivePending = true;
+        break;
+      }
+    } catch (e) {
+      // Bỏ qua lỗi parse
+    }
+  }
+
+  if (hasActivePending) {
+    throw new ConflictError('This user already has a pending invitation to join this group.', 'PENDING_INVITE_EXISTS');
   }
 
 
