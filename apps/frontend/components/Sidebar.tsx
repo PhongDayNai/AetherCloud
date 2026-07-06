@@ -170,53 +170,30 @@ export default function Sidebar({
       <div className="logo">AetherCloud</div>
 
       {/* Giao diện Workspace Switcher thiết kế theo yêu cầu */}
-      <div className="workspaceSwitcherWrapper">
-        <div 
-          className={`workspaceSwitcherContainer ${showWsDropdown ? 'expanded' : 'collapsed'}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {!showWsDropdown ? (
-            <button className="wsBtn" onClick={() => setShowWsDropdown(true)}>
-              <span className="wsIcon">
-                {activeWorkspace.type === 'personal' || (activeWorkspace.type === 'space' && !activeWorkspace.groupId) ? <Icons.User /> : <Icons.Group />}
-              </span>
-              <span className="wsName" style={{ maxWidth: activeWorkspace.type === 'group' ? '120px' : '150px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                {activeWorkspace.type === 'personal' || (activeWorkspace.type === 'space' && !activeWorkspace.groupId)
-                  ? t('sidebar.personalCloud') || 'Không gian cá nhân'
-                  : activeWorkspace.type === 'group'
-                  ? activeWorkspace.name
-                  : (groups.find(g => g.id === activeWorkspace.groupId)?.name || 'Loading group...')}
-              </span>
-              {activeWorkspace.type === 'group' && (
-                <button 
-                  className="wsInlineSettingsBtn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowGroupSettingsModal(true);
-                  }}
-                  title={t('groups.settingsTitle') || 'Thiết lập nhóm'}
-                  style={{
-                    background: 'transparent',
-                    border: 0,
-                    padding: '4px',
-                    cursor: 'pointer',
-                    color: 'var(--text-muted)',
-                    marginLeft: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'color 0.2s',
-                    zIndex: 20
-                  }}
-                >
-                  <Icons.Settings size={13} />
-                </button>
-              )}
-              <span className="wsChangeIcon">
-                <Icons.Change size={14} />
-              </span>
-            </button>
-          ) : (
+      <div className="workspaceAreaContainer" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', marginBottom: '16px' }}>
+        <div className="workspaceSwitcherWrapper" style={{ flexGrow: 1, minWidth: 0, height: '40px', position: 'relative' }}>
+          <div 
+            className={`workspaceSwitcherContainer ${showWsDropdown ? 'expanded' : 'collapsed'}`}
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%' }}
+          >
+            {!showWsDropdown ? (
+              <button className="wsBtn" onClick={() => setShowWsDropdown(true)} style={{ width: '100%' }}>
+                <span className="wsIcon">
+                  {activeWorkspace.type === 'personal' || (activeWorkspace.type === 'space' && !activeWorkspace.groupId) ? <Icons.User /> : <Icons.Group />}
+                </span>
+                <span className="wsName" style={{ maxWidth: '140px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                  {activeWorkspace.type === 'personal' || (activeWorkspace.type === 'space' && !activeWorkspace.groupId)
+                    ? t('sidebar.personalCloud') || 'Không gian cá nhân'
+                    : activeWorkspace.type === 'group'
+                    ? activeWorkspace.name
+                    : (groups.find(g => g.id === activeWorkspace.groupId)?.name || 'Loading group...')}
+                </span>
+                <span className="wsChangeIcon">
+                  <Icons.Change size={14} />
+                </span>
+              </button>
+            ) : (
             <div className="wsExpandedContent">
               <div className="wsDropdownTitle">{t('sidebar.workspace') || 'Workspace'}</div>
               
@@ -302,6 +279,18 @@ export default function Sidebar({
           )}
         </div>
       </div>
+
+      {/* Nút settings độc lập ở bên ngoài */}
+      {activeWorkspace.type === 'group' && !showWsDropdown && (
+        <button 
+          className="wsExternalSettingsBtn"
+          onClick={() => setShowGroupSettingsModal(true)}
+          title={t('groups.settingsTitle') || 'Thiết lập nhóm'}
+        >
+          <Icons.Settings size={15} />
+        </button>
+      )}
+    </div>
 
       <div className="sidebarMenu">
         {/* Main Navigation */}
@@ -938,9 +927,39 @@ export default function Sidebar({
 
         .workspaceSwitcherWrapper {
           position: relative;
-          width: 100%;
           height: 40px;
-          margin-bottom: 16px;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .wsExternalSettingsBtn {
+          background: var(--bg-input, rgba(255, 255, 255, 0.03));
+          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+          color: var(--text-muted);
+          width: 38px;
+          height: 38px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+          flex-shrink: 0;
+          animation: wsSettingsBtnAppear 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        .wsExternalSettingsBtn:hover {
+          background: var(--bg-item-hover);
+          color: var(--text-primary);
+          border-color: var(--border-strong);
+          transform: rotate(90deg);
+        }
+        @keyframes wsSettingsBtnAppear {
+          from {
+            opacity: 0;
+            transform: scale(0.8);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
         }
         .workspaceSwitcherContainer {
           position: absolute;
