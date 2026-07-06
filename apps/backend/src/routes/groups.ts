@@ -84,8 +84,10 @@ router.get('/invitations/:token', async (req: Request, res: Response) => {
 // 2. POST chấp nhận lời mời gia nhập nhóm
 router.post('/invitations/:token/accept', requireAuth, async (req: Request, res: Response) => {
   const { token } = req.params;
+  const { notificationId } = req.body || {};
+  const queryNotificationId = req.query.notificationId as string;
   try {
-    const result = await groupUsecase.acceptGroupInvitation(token, req.user!.sub);
+    const result = await groupUsecase.acceptGroupInvitation(token, req.user!.sub, notificationId || queryNotificationId);
     return res.json({ ok: true, ...result });
   } catch (err: any) {
     if (err instanceof DomainError) {
@@ -115,8 +117,10 @@ router.post('/invitations/:token/accept', requireAuth, async (req: Request, res:
 // 3. POST từ chối lời mời gia nhập nhóm
 router.post('/invitations/:token/decline', requireAuth, async (req: Request, res: Response) => {
   const { token } = req.params;
+  const { notificationId } = req.body || {};
+  const queryNotificationId = req.query.notificationId as string;
   try {
-    const result = await groupUsecase.declineGroupInvitation(token, req.user!.sub);
+    const result = await groupUsecase.declineGroupInvitation(token, req.user!.sub, notificationId || queryNotificationId);
     return res.json({ ok: true, ...result });
   } catch (err: any) {
     if (err instanceof DomainError) {

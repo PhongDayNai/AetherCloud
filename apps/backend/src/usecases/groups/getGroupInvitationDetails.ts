@@ -42,7 +42,7 @@ export async function getGroupInvitationDetails(token: string, userId?: string) 
   const memberCount = memberCountQuery.rows[0].count;
 
   // Kiểm tra trạng thái của user hiện tại trong nhóm (nếu đã đăng nhập)
-  let userStatus = 'none'; // 'none' | 'joined' | 'declined'
+  let userStatus = 'none'; // 'none' | 'joined'
   if (userId) {
     const memberCheck = await db.query(
       'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
@@ -50,17 +50,6 @@ export async function getGroupInvitationDetails(token: string, userId?: string) 
     );
     if (memberCheck.rows.length > 0) {
       userStatus = 'joined';
-    } else {
-      const responseCheck = await db.query(
-        'SELECT status FROM group_invite_responses WHERE group_id = $1 AND user_id = $2',
-        [invite.group_id, userId]
-      );
-      if (responseCheck.rows.length > 0) {
-        const lastStatus = responseCheck.rows[0].status;
-        // Nếu trước đây từng accept nhưng hiện tại không còn trong nhóm (đã rời hoặc bị kick),
-        // đặt trạng thái về 'none' để cho phép họ gia nhập lại.
-        userStatus = lastStatus === 'accepted' ? 'none' : lastStatus;
-      }
     }
   }
 

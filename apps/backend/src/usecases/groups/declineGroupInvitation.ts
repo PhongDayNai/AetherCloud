@@ -1,7 +1,7 @@
 import * as db from '../../lib/db';
-import { NotFoundError } from '../../lib/errors';
+import { NotFoundError, ConflictError } from '../../lib/errors';
 
-export async function declineGroupInvitation(token: string, userId: string) {
+export async function declineGroupInvitation(token: string, userId: string, inviteNotificationId?: string) {
   // Tìm thông tin nhóm từ mã mời
   const inviteQuery = await db.query(
     'SELECT group_id FROM group_invitations WHERE token = $1',
@@ -14,35 +14,77 @@ export async function declineGroupInvitation(token: string, userId: string) {
 
   const groupId = inviteQuery.rows[0].group_id;
 
-  // Ghi nhận phản hồi declined
-  await db.query(
-    `INSERT INTO group_invite_responses (user_id, group_id, status, updated_at)
-     VALUES ($1, $2, 'declined', NOW())
-     ON CONFLICT (user_id, group_id) 
-     DO UPDATE SET status = 'declined', updated_at = NOW()`,
-    [userId, groupId]
+  // Kiểm tra xem user đã là thành viên nhóm chưa
+  const memberCheck = await db.query(
+    'SELECT role FROM group_members WHERE group_id = $1 AND user_id = $2',
+    [groupId, userId]
   );
+  if (memberCheck.rows.length > 0) {
+    // Nếu đã là thành viên mà bấm Decline, cập nhật trạng thái thông báo thành accepted và trả về thành công
+    const targetNotiId = inviteNotificationId || (
+      await db.query(
+        `SELECT id FROM notifications 
+         WHERE user_id = $1 AND type = 'group_invite' AND is_read = false AND (metadata->>'groupId') = $2
+         LIMIT 1`,
+        [userId, groupId]
+      )
+    ).rows[0]?.id;
 
-  // Tìm và tự động đánh dấu đã đọc lời mời tương ứng
-  const inviteNotificationQuery = await db.query(
-    `SELECT id, metadata 
-     FROM notifications 
-     WHERE user_id = $1 AND type = 'group_invite' AND is_read = false`,
-    [userId]
-  );
+    if (targetNotiId) {
+      await db.query(
+        `UPDATE notifications 
+         SET is_read = true, 
+             metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{status}', '"accepted"') 
+         WHERE id = $1`,
+        [targetNotiId]
+      );
+    }
+    return { success: true, groupId };
+  }
 
-  for (const row of inviteNotificationQuery.rows) {
-    try {
-      const meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
-      if (meta && meta.groupId === groupId) {
-        await db.query(
-          'UPDATE notifications SET is_read = true WHERE id = $1',
-          [row.id]
-        );
-        break;
+
+
+  let updated = false;
+
+  // Nếu có inviteNotificationId, cập nhật trực tiếp bản ghi đó
+  if (inviteNotificationId) {
+    const res = await db.query(
+      `UPDATE notifications 
+       SET is_read = true, 
+           metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{status}', '"declined"') 
+       WHERE id = $1 AND user_id = $2`,
+      [inviteNotificationId, userId]
+    );
+    if (res.rowCount !== null && res.rowCount > 0) {
+      updated = true;
+    }
+  }
+
+  // Nếu chưa cập nhật, dò tìm tự động
+  if (!updated) {
+    const inviteNotificationQuery = await db.query(
+      `SELECT id, metadata 
+       FROM notifications 
+       WHERE user_id = $1 AND type = 'group_invite' AND is_read = false`,
+      [userId]
+    );
+
+    for (const row of inviteNotificationQuery.rows) {
+      try {
+        const meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+        if (meta && (meta.groupId === groupId || meta.token === token)) {
+          await db.query(
+            `UPDATE notifications 
+             SET is_read = true, 
+                 metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{status}', '"declined"') 
+             WHERE id = $1`,
+            [row.id]
+          );
+          break;
+        }
+      } catch (e) {
+        // Bỏ qua
       }
-    } catch (e) {
-      // Bỏ qua
     }
   }
 

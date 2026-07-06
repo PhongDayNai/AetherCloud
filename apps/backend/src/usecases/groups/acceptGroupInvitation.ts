@@ -3,7 +3,7 @@ import * as db from '../../lib/db';
 import { ValidationError, ConflictError, NotFoundError } from '../../lib/errors';
 import { sendNotificationRealtime } from '../../lib/websocket';
 
-export async function acceptGroupInvitation(token: string, userId: string) {
+export async function acceptGroupInvitation(token: string, userId: string, inviteNotificationId?: string) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -42,7 +42,28 @@ export async function acceptGroupInvitation(token: string, userId: string) {
       [groupId, userId]
     );
     if (memberCheck.rows.length > 0) {
-      throw new ConflictError('You are already a member of this group');
+      // Nếu đã là thành viên, cập nhật trạng thái thông báo thành accepted và trả về thành công
+      const targetNotiId = inviteNotificationId || (
+        await client.query(
+          `SELECT id FROM notifications 
+           WHERE user_id = $1 AND type = 'group_invite' AND is_read = false AND (metadata->>'groupId') = $2
+           LIMIT 1`,
+          [userId, groupId]
+        )
+      ).rows[0]?.id;
+
+      if (targetNotiId) {
+        await client.query(
+          `UPDATE notifications 
+           SET is_read = true, 
+               metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{status}', '"accepted"') 
+           WHERE id = $1`,
+          [targetNotiId]
+        );
+      }
+
+      await client.query('COMMIT');
+      return { success: true, groupId, groupName };
     }
 
     // Tìm xem có notification mời trực tiếp nào chưa đọc cho user này vào nhóm này không
@@ -56,18 +77,39 @@ export async function acceptGroupInvitation(token: string, userId: string) {
     let targetRole = 'member';
     let matchedNotificationId: string | null = null;
 
-    for (const row of inviteNotificationQuery.rows) {
-      try {
-        const meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
-        if (meta && meta.groupId === groupId) {
-          if (meta.role === 'admin' || meta.role === 'member') {
+    if (inviteNotificationId) {
+      const directNotificationQuery = await client.query(
+        'SELECT id, metadata FROM notifications WHERE id = $1 AND user_id = $2',
+        [inviteNotificationId, userId]
+      );
+      if (directNotificationQuery.rows.length > 0) {
+        const row = directNotificationQuery.rows[0];
+        matchedNotificationId = row.id;
+        try {
+          const meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+          if (meta && (meta.role === 'admin' || meta.role === 'member')) {
             targetRole = meta.role;
           }
-          matchedNotificationId = row.id;
-          break;
+        } catch (e) {
+          // Bỏ qua lỗi
         }
-      } catch (e) {
-        // Bỏ qua lỗi parse
+      }
+    }
+
+    if (!matchedNotificationId) {
+      for (const row of inviteNotificationQuery.rows) {
+        try {
+          const meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+          if (meta && (meta.groupId === groupId || meta.token === token)) {
+            if (meta.role === 'admin' || meta.role === 'member') {
+              targetRole = meta.role;
+            }
+            matchedNotificationId = row.id;
+            break;
+          }
+        } catch (e) {
+          // Bỏ qua lỗi parse
+        }
       }
     }
 
@@ -85,19 +127,15 @@ export async function acceptGroupInvitation(token: string, userId: string) {
       [newUsesCount, !shouldDeactivate, invite.invite_id]
     );
 
-    // 6. Ghi nhận phản hồi accepted
-    await client.query(
-      `INSERT INTO group_invite_responses (user_id, group_id, status, updated_at)
-       VALUES ($1, $2, 'accepted', NOW())
-       ON CONFLICT (user_id, group_id) 
-       DO UPDATE SET status = 'accepted', updated_at = NOW()`,
-      [userId, groupId]
-    );
 
-    // Tự động đánh dấu đã đọc lời mời nếu có
+
+    // Tự động đánh dấu đã đọc lời mời và cập nhật status accepted trong metadata
     if (matchedNotificationId) {
       await client.query(
-        'UPDATE notifications SET is_read = true WHERE id = $1',
+        `UPDATE notifications 
+         SET is_read = true, 
+             metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{status}', '"accepted"') 
+         WHERE id = $1`,
         [matchedNotificationId]
       );
     }
