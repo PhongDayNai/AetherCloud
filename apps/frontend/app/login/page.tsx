@@ -46,11 +46,13 @@ export default function LoginPage(): React.JSX.Element {
 
   useEffect(() => {
     let mounted = true;
+    const redirectUrl = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
+    
     (async () => {
       try {
         const r = await fetch(`${getApiOrigin()}/api/auth/me`, { credentials: 'include' });
         if (!mounted) return;
-        if (r.ok) window.location.href = '/dashboard';
+        if (r.ok) window.location.href = redirectUrl;
       } catch { }
     })();
 
@@ -85,8 +87,9 @@ export default function LoginPage(): React.JSX.Element {
 
       if (res.ok) {
         setMsg(isLogin ? t('messages.loginSuccess') : t('messages.registerSuccess'));
+        const redirectUrl = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
         setTimeout(() => {
-          window.location.href = '/dashboard';
+          window.location.href = redirectUrl;
         }, 1000);
         return;
       }

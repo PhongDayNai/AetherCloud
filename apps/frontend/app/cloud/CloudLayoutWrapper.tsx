@@ -14,6 +14,7 @@ import UploadModal from '../../components/UploadModal';
 import ProcessingBadge from '../../components/ProcessingBadge';
 import { useCloud, ToastItem } from '../../context/CloudContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useNotification } from '../../context/NotificationContext';
 
 interface ToastProps {
   toast: ToastItem;
@@ -24,33 +25,49 @@ function Toast({ toast, onClose }: ToastProps) {
   const [isExiting, setIsExiting] = React.useState(false);
 
   useEffect(() => {
+    const duration = toast.duration || 3000;
+    const exitDelay = duration - 300;
+
     const exitTimer = setTimeout(() => {
       setIsExiting(true);
-    }, 2700);
+    }, exitDelay);
 
     const removeTimer = setTimeout(() => {
       onClose(toast.id);
-    }, 3000);
+    }, duration);
 
     return () => {
       clearTimeout(exitTimer);
       clearTimeout(removeTimer);
     };
-  }, [toast.id, onClose]);
+  }, [toast.id, toast.duration, onClose]);
 
-  const handleClose = () => {
+  const handleClose = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Chặn lan truyền click
     setIsExiting(true);
     setTimeout(() => {
       onClose(toast.id);
     }, 300);
   };
 
+  const handleToastClick = () => {
+    if (toast.onClick) {
+      toast.onClick();
+    }
+  };
+
   return (
-    <div className={`toastItem ${toast.type === 'error' ? 'toastError' : 'toastInfo'} ${isExiting ? 'toastExiting' : ''}`}>
+    <div 
+      className={`toastItem ${toast.type === 'error' ? 'toastError' : toast.type === 'backend' ? 'toastBackend' : 'toastInfo'} ${isExiting ? 'toastExiting' : ''} ${toast.onClick ? 'toastInteractable' : ''}`}
+      onClick={handleToastClick}
+    >
       <span className="toastIcon">
-        {toast.type === 'error' ? '✕' : '✓'}
+        {toast.type === 'error' ? '✕' : toast.type === 'backend' ? '🔔' : '✓'}
       </span>
-      <span className="toastMsg">{toast.message}</span>
+      <div className="toastContent">
+        {toast.title && <div className="toastTitle">{toast.title}</div>}
+        <span className="toastMsg">{toast.message}</span>
+      </div>
       <button className="toastCloseBtn" onClick={handleClose}>
         ✕
       </button>
@@ -80,7 +97,7 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
     addSelectedToDocProject, moveSelectedToTrash, restoreSelectedFromTrash,
     purgeSelectedForever, deleteSelectedSpaces, restoreSelectedSpaces,
     purgeSelectedSpaces, msg, err,
-    toasts, removeToast,
+    addToast, toasts, removeToast,
 
     active, albumFilteredPhotos, docsFiltered, activeIndex, setActiveIndex,
     showInfo, setShowInfo, showAlbumPicker, setShowAlbumPicker,
@@ -110,6 +127,14 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
   } = useCloud();
 
   const confirm = useConfirm();
+  const { registerToastListener } = useNotification();
+
+  useEffect(() => {
+    registerToastListener(addToast);
+    return () => {
+      registerToastListener(() => {});
+    };
+  }, [registerToastListener, addToast]);
 
   const handleBulkDelete = async () => {
     if (tab === 'spaces') {
@@ -429,6 +454,12 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
           color: #f87171;
           backdrop-filter: blur(12px);
         }
+        :global(.toastBackend) {
+          background: rgba(99, 102, 241, 0.15);
+          border: 1px solid rgba(99, 102, 241, 0.4);
+          color: #c7d2fe;
+          backdrop-filter: blur(12px);
+        }
         :global([data-theme='light'] .toastInfo) {
           background: rgba(255, 255, 255, 0.9);
           border: 1px solid rgba(0, 0, 0, 0.06);
@@ -438,6 +469,24 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
           background: rgba(254, 226, 226, 0.9);
           border: 1px solid rgba(239, 68, 68, 0.2);
           color: #b91c1c;
+        }
+        :global([data-theme='light'] .toastBackend) {
+          background: rgba(238, 242, 255, 0.95);
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          color: #3730a3;
+        }
+        :global(.toastInteractable) {
+          cursor: pointer;
+        }
+        :global(.toastInteractable:hover) {
+          transform: translateY(-2px) scale(1.015);
+          background: rgba(99, 102, 241, 0.22);
+          border-color: rgba(99, 102, 241, 0.6);
+          box-shadow: 0 12px 30px rgba(99, 102, 241, 0.25);
+        }
+        :global([data-theme='light'] .toastInteractable:hover) {
+          background: rgba(224, 231, 255, 0.95);
+          border-color: rgba(99, 102, 241, 0.5);
         }
         :global(.toastIcon) {
           display: flex;
@@ -458,15 +507,37 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
           background: #ef4444;
           color: #ffffff;
         }
+        :global(.toastBackend .toastIcon) {
+          background: #6366f1;
+          color: #ffffff;
+          font-size: 11px;
+          animation: toastBellRing 1.5s ease infinite alternate;
+        }
         :global([data-theme='light'] .toastInfo .toastIcon) {
           background: #1f2937;
           color: #ffffff;
         }
-        :global(.toastMsg) {
+        :global(.toastContent) {
+          display: flex;
+          flex-direction: column;
           flex: 1;
+          align-items: flex-start;
+          justify-content: center;
+          gap: 2px;
+        }
+        :global(.toastTitle) {
+          font-weight: 600;
+          font-size: 13px;
+          color: #ffffff;
+        }
+        :global([data-theme='light'] .toastTitle) {
+          color: #1e1b4b;
+        }
+        :global(.toastMsg) {
           line-height: 1.4;
           word-break: break-word;
           white-space: normal;
+          opacity: 0.95;
         }
         :global(.toastCloseBtn) {
           background: transparent;
@@ -516,6 +587,15 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
             border-top-width: 0;
             border-bottom-width: 0;
           }
+        }
+        @keyframes toastBellRing {
+          0% { transform: rotate(0); }
+          15% { transform: rotate(15deg); }
+          30% { transform: rotate(-15deg); }
+          45% { transform: rotate(10deg); }
+          60% { transform: rotate(-10deg); }
+          75% { transform: rotate(4deg); }
+          100% { transform: rotate(0); }
         }
         .pageContentTransition {
           animation: pageFadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;

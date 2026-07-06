@@ -64,6 +64,8 @@ interface CustomDatePickerProps {
   onlyMonth?: boolean;
   minDate?: string;
   maxDate?: string;
+  disabled?: boolean;
+  placeholder?: string;
 }
 
 export default function CustomDatePicker({ 
@@ -72,7 +74,9 @@ export default function CustomDatePicker({
   lang = "vi", 
   onlyMonth = false, 
   minDate, 
-  maxDate 
+  maxDate,
+  disabled = false,
+  placeholder = ""
 }: CustomDatePickerProps): React.JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -202,7 +206,7 @@ export default function CustomDatePicker({
   const yearsList = Array.from({ length: 15 }, (_, i) => startYear + i);
 
   const getFormattedValue = () => {
-    if (!value) return lang === "vi" ? "Chọn ngày..." : "Select date...";
+    if (!value) return placeholder || (lang === "vi" ? "Chọn ngày..." : "Select date...");
     const parts = value.split("-");
     if (parts.length !== 3 && parts.length !== 2) return value;
     if (onlyMonth) {
@@ -228,7 +232,7 @@ export default function CustomDatePicker({
         }
       `}</style>
       <div 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
         style={{
           width: "100%",
           backgroundColor: "var(--bg-input)",
@@ -242,12 +246,13 @@ export default function CustomDatePicker({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          cursor: "pointer",
+          cursor: disabled ? "not-allowed" : "pointer",
           userSelect: "none",
-          boxSizing: "border-box"
+          boxSizing: "border-box",
+          opacity: disabled ? 0.5 : 1
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--border-input-focus)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border-input)"; }}
+        onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.borderColor = "var(--border-input-focus)"; }}
+        onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.borderColor = "var(--border-input)"; }}
       >
         <span style={{ color: value ? "var(--text-primary)" : "var(--text-muted)" }}>
           {getFormattedValue()}

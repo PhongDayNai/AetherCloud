@@ -180,13 +180,38 @@ export default function Sidebar({
               <span className="wsIcon">
                 {activeWorkspace.type === 'personal' || (activeWorkspace.type === 'space' && !activeWorkspace.groupId) ? <Icons.User /> : <Icons.Group />}
               </span>
-              <span className="wsName">
+              <span className="wsName" style={{ maxWidth: activeWorkspace.type === 'group' ? '120px' : '150px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                 {activeWorkspace.type === 'personal' || (activeWorkspace.type === 'space' && !activeWorkspace.groupId)
                   ? t('sidebar.personalCloud') || 'Không gian cá nhân'
                   : activeWorkspace.type === 'group'
                   ? activeWorkspace.name
                   : (groups.find(g => g.id === activeWorkspace.groupId)?.name || 'Loading group...')}
               </span>
+              {activeWorkspace.type === 'group' && (
+                <button 
+                  className="wsInlineSettingsBtn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowGroupSettingsModal(true);
+                  }}
+                  title={t('groups.settingsTitle') || 'Thiết lập nhóm'}
+                  style={{
+                    background: 'transparent',
+                    border: 0,
+                    padding: '4px',
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)',
+                    marginLeft: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'color 0.2s',
+                    zIndex: 20
+                  }}
+                >
+                  <Icons.Settings size={13} />
+                </button>
+              )}
               <span className="wsChangeIcon">
                 <Icons.Change size={14} />
               </span>
