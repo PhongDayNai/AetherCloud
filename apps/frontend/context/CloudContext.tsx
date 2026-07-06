@@ -1865,13 +1865,13 @@ export function CloudProvider({ children }: { children: React.ReactNode }) {
       const customEvent = e as CustomEvent;
       const { type, metadata } = customEvent.detail || {};
 
-      if (type === 'group_kick' && metadata && metadata.groupId) {
+      if ((type === 'group_kick' || type === 'group_delete') && metadata && metadata.groupId) {
         const isCurrentGroup = 
           (activeWorkspace && activeWorkspace.type === 'group' && activeWorkspace.id === metadata.groupId) ||
           (activeWorkspace && activeWorkspace.type === 'space' && activeWorkspace.groupId === metadata.groupId);
           
         if (isCurrentGroup) {
-          console.log('[CloudContext] User kicked from active group, reverting to personal workspace');
+          console.log('[CloudContext] Group disbanded or user kicked, reverting to personal workspace');
           setActiveWorkspace({ type: 'personal' });
           window.location.href = '/cloud/dashboard';
           return;

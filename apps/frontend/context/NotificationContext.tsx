@@ -153,7 +153,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (res.ok && data.ok) {
         // Cập nhật state local ngay lập tức để đồng bộ UI
         setNotifications((prev) => 
-          prev.map((n) => n.metadata?.token === token ? { ...n, is_read: true, metadata: { ...n.metadata, status: 'accepted' } } : n)
+          prev.map((n) => {
+            if (notificationId && n.id === notificationId) {
+              return { ...n, is_read: true, metadata: { ...n.metadata, status: 'accepted' } };
+            }
+            if (!notificationId && n.metadata?.token === token) {
+              return { ...n, is_read: true, metadata: { ...n.metadata, status: 'accepted' } };
+            }
+            return n;
+          })
         );
         setUnreadCount((prev) => Math.max(0, prev - 1));
         fetchNotifications();
@@ -182,7 +190,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (res.ok && data.ok) {
         // Cập nhật state local ngay lập tức để đồng bộ UI
         setNotifications((prev) => 
-          prev.map((n) => n.metadata?.token === token ? { ...n, is_read: true, metadata: { ...n.metadata, status: 'declined' } } : n)
+          prev.map((n) => {
+            if (notificationId && n.id === notificationId) {
+              return { ...n, is_read: true, metadata: { ...n.metadata, status: 'declined' } };
+            }
+            if (!notificationId && n.metadata?.token === token) {
+              return { ...n, is_read: true, metadata: { ...n.metadata, status: 'declined' } };
+            }
+            return n;
+          })
         );
         setUnreadCount((prev) => Math.max(0, prev - 1));
         fetchNotifications();
@@ -241,6 +257,34 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       socketRef.current.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
+          if (message.type === 'notification_deleted') {
+            const deletedId = message.data?.id;
+            if (deletedId) {
+              setNotifications((prev) => {
+                const target = prev.find((n) => n.id === deletedId);
+                const newList = prev.filter((n) => n.id !== deletedId);
+                if (target && !target.is_read) {
+                  setUnreadCount((prevCount) => Math.max(0, prevCount - 1));
+                }
+                return newList;
+              });
+            }
+          }
+
+          if (message.type === 'group_invite_declined') {
+            const { groupId } = message.data || {};
+            if (typeof window !== 'undefined' && groupId) {
+              window.dispatchEvent(
+                new CustomEvent('group-update', {
+                  detail: {
+                    type: 'group_invite_declined',
+                    metadata: { groupId }
+                  }
+                })
+              );
+            }
+          }
+
           if (message.type === 'notification') {
             const newNotification = message.data as NotificationItem;
             

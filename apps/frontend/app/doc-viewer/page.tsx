@@ -218,12 +218,12 @@ function DocViewerContent() {
       const customEvent = e as CustomEvent;
       const { type, metadata } = customEvent.detail || {};
 
-      if (type === 'group_kick' && metadata && metadata.groupId) {
+      if ((type === 'group_kick' || type === 'group_delete') && metadata && metadata.groupId) {
         if (asset && asset.groupId === metadata.groupId) {
           setError(
             language === 'vi'
-              ? 'Bạn không có quyền truy cập tài liệu này do đã rời khỏi hoặc bị trục xuất khỏi nhóm.'
-              : 'You do not have permission to access this document as you are no longer a member of the group.'
+              ? 'Bạn không có quyền truy cập tài liệu này do nhóm đã bị giải tán hoặc bạn không còn là thành viên.'
+              : 'You do not have permission to access this document as the group has been disbanded or you are no longer a member.'
           );
           setAsset(null); // Gỡ bỏ metadata để bảo vệ thông tin tài liệu
         }

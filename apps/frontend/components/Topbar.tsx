@@ -5,6 +5,66 @@ import { useCloud } from '../context/CloudContext';
 import { useNotification, NotificationItem } from '../context/NotificationContext';
 import { useRouter } from 'next/navigation';
 
+const renderNotificationIcon = (type: string) => {
+  const size = 14;
+  switch (type) {
+    case 'group_invite':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#3b82f6' }}>
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+          <polyline points="22,6 12,13 2,6" />
+        </svg>
+      );
+    case 'group_join':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#10b981' }}>
+          <path d="M17 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M9 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      );
+    case 'group_leave':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#ef4444' }}>
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+      );
+    case 'group_kick':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#f87171' }}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+        </svg>
+      );
+    case 'group_role_update':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#f59e0b' }}>
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+      );
+    case 'group_owner_transfer':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#fbbf24' }}>
+          <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z" />
+          <path d="M3 20h18v2H3z" />
+        </svg>
+      );
+    case 'system':
+    default:
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#a1a1aa' }}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="16" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+      );
+  }
+};
+
 interface TopbarProps {
   search: string;
   setSearch: (search: string) => void;
@@ -289,20 +349,17 @@ export default function Topbar({
                       className={`notification-item ${item.is_read ? 'read' : 'unread'}`}
                       onClick={() => handleNotificationClick(item)}
                     >
+                      {/* Cột 1: Icon tròn bên trái */}
+                      <div className={`notification-icon-wrapper ${item.type}`}>
+                        {renderNotificationIcon(item.type)}
+                      </div>
+
+                      {/* Cột 2: Content bên phải */}
                       <div className="notification-item-content">
-                        <div className="notification-meta-row">
-                          <span className={`type-tag ${item.type}`}>
-                            {item.type === 'group_invite' && '✉️'}
-                            {item.type === 'group_join' && '🤝'}
-                            {item.type === 'group_leave' && '🚪'}
-                            {item.type === 'group_kick' && '👢'}
-                            {item.type === 'group_role_update' && '🎖️'}
-                            {item.type === 'group_owner_transfer' && '👑'}
-                            {item.type === 'system' && '⚙️'}
-                          </span>
+                        <div className="notification-header-row">
+                          <h4 className="notification-item-title">{text.title}</h4>
                           <span className="notification-time">{formatRelativeTime(item.created_at)}</span>
                         </div>
-                        <h4 className="notification-item-title">{text.title}</h4>
                         <p className="notification-item-text">{text.content}</p>
 
                         {/* Các nút tương tác lời mời nhóm */}
@@ -339,19 +396,20 @@ export default function Topbar({
                         })()}
                       </div>
                     
-                    <button 
-                      className="notification-item-delete" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteNotification(item.id);
-                      }}
-                      title={t('actions.delete') || 'Xóa'}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                );
-              })
+                      {/* Cột 3: Nút xóa góc phải */}
+                      <button 
+                        className="notification-item-delete" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNotification(item.id);
+                        }}
+                        title={t('actions.delete') || 'Xóa'}
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  );
+                })
             )}
             </div>
           </div>
@@ -586,8 +644,9 @@ export default function Topbar({
         /* Notification Item */
         .notification-item {
           display: flex;
-          justify-content: space-between;
-          padding: 14px 16px;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 12px 14px;
           border-bottom: 1px solid var(--popover-divider, #27272a);
           cursor: pointer;
           position: relative;
@@ -602,34 +661,70 @@ export default function Topbar({
         .notification-item.unread::before {
           content: '';
           position: absolute;
-          left: 6px;
+          left: 4px;
           top: 50%;
           transform: translateY(-50%);
-          width: 6px;
-          height: 6px;
-          border-radius: 99px;
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
           background: var(--accent-color, #3b82f6);
         }
         .notification-item:hover {
           background: var(--bg-item-hover);
         }
+
+        /* Icon wrapper */
+        .notification-icon-wrapper {
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          margin-top: 2px;
+        }
+        .notification-icon-wrapper.group_invite {
+          background: rgba(59, 130, 246, 0.12);
+        }
+        .notification-icon-wrapper.group_join {
+          background: rgba(16, 185, 129, 0.12);
+        }
+        .notification-icon-wrapper.group_leave {
+          background: rgba(239, 68, 68, 0.12);
+        }
+        .notification-icon-wrapper.group_kick {
+          background: rgba(248, 113, 113, 0.12);
+        }
+        .notification-icon-wrapper.group_role_update {
+          background: rgba(245, 158, 11, 0.12);
+        }
+        .notification-icon-wrapper.group_owner_transfer {
+          background: rgba(251, 191, 36, 0.12);
+        }
+        .notification-icon-wrapper.system {
+          background: rgba(161, 161, 170, 0.12);
+        }
+
         .notification-item-content {
           flex: 1;
           display: flex;
           flex-direction: column;
           gap: 4px;
+          min-width: 0;
         }
-        .notification-meta-row {
+        .notification-header-row {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          font-size: 11px;
-        }
-        .type-tag {
-          font-size: 12px;
+          align-items: flex-start;
+          gap: 8px;
         }
         .notification-time {
+          font-size: 11px;
           color: var(--text-muted);
+          white-space: nowrap;
+          flex-shrink: 0;
+          margin-top: 1px;
         }
         .notification-item-title {
           margin: 0;
@@ -637,6 +732,7 @@ export default function Topbar({
           font-weight: 600;
           color: var(--text-primary);
           line-height: 1.3;
+          flex: 1;
         }
         .notification-item-text {
           margin: 0;
@@ -653,7 +749,7 @@ export default function Topbar({
           cursor: pointer;
           opacity: 0;
           padding: 0 4px;
-          align-self: flex-start;
+          margin-top: -2px;
           transition: all 0.2s;
         }
         .notification-item:hover .notification-item-delete {
