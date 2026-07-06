@@ -241,6 +241,44 @@ BEGIN
     ALTER TABLE assets ADD CONSTRAINT assets_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL;
   END IF;
 END $$;
+
+-- Phase 4: Group Invitations, Notifications, and Responses
+CREATE TABLE IF NOT EXISTS group_invitations (
+  id UUID PRIMARY KEY,
+  group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token VARCHAR(100) UNIQUE NOT NULL,
+  max_uses INT, -- Số lần sử dụng tối đa (NULL: không giới hạn)
+  uses_count INT NOT NULL DEFAULT 0, -- Số lần thực tế đã sử dụng
+  is_active BOOLEAN NOT NULL DEFAULT TRUE, -- Cho phép khóa thủ công mã mời
+  expires_at TIMESTAMPTZ, -- Hạn sử dụng (NULL: không hết hạn)
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_invitations_token ON group_invitations(token);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  type VARCHAR(50) NOT NULL DEFAULT 'group_join', -- 'group_join' | 'group_invite' | 'group_leave' | 'system'
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  metadata JSONB -- Lưu trữ thông tin động: { groupId, token, email, senderName, groupName, status, etc. }
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
+
+CREATE TABLE IF NOT EXISTS group_invite_responses (
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  status VARCHAR(50) NOT NULL, -- 'accepted' | 'declined'
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, group_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_invite_responses_lookup ON group_invite_responses(user_id, group_id);
 `;
 
 
