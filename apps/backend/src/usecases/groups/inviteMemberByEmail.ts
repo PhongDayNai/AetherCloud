@@ -57,8 +57,8 @@ export async function inviteMemberByEmail(
 
   // 6. Tạo lời mời dưới dạng một Notification cho user đích
   const notificationId = crypto.randomUUID();
-  const notificationTitle = 'Lời mời tham gia nhóm';
-  const notificationContent = `${senderName} đã mời bạn tham gia vào nhóm "${groupName}" với vai trò ${role === 'admin' ? 'Quản trị viên' : 'Thành viên'}.`;
+  const notificationTitle = 'Group Invitation';
+  const notificationContent = `${senderName} has invited you to join group "${groupName}" as ${role}.`;
 
   // Để người dùng có thể Chấp nhận/Từ chối trực tiếp từ Notification, 
   // chúng ta cần cung cấp một mã mời có hiệu lực cho nhóm đó.

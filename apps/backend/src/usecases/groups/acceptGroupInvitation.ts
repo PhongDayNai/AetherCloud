@@ -104,8 +104,8 @@ export async function acceptGroupInvitation(token: string, userId: string) {
 
     // 7. Tạo và bắn thông báo cho Owner của nhóm
     const notificationId = crypto.randomUUID();
-    const notificationTitle = 'Thành viên mới gia nhập nhóm';
-    const notificationContent = `Người dùng ${joinerName} đã tham gia vào nhóm "${groupName}" qua mã mời.`;
+    const notificationTitle = 'New Member Joined';
+    const notificationContent = `User ${joinerName} has joined group "${groupName}" via invite code.`;
     
     await client.query(
       `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)

@@ -46,8 +46,8 @@ export async function leaveGroup(groupId: string, userId: string) {
 
     // Tạo thông báo cho Owner nhóm
     const notificationId = crypto.randomUUID();
-    const notificationTitle = 'Thành viên rời nhóm';
-    const notificationContent = `Người dùng ${userName} đã rời khỏi nhóm "${groupName}".`;
+    const notificationTitle = 'Member Left Group';
+    const notificationContent = `User ${userName} has left group "${groupName}".`;
 
     await client.query(
       `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)

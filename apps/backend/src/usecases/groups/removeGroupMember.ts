@@ -63,11 +63,11 @@ export async function removeGroupMember(groupId: string, targetUserId: string, a
 
   // 1. Tạo thông báo gửi cho người bị trục xuất
   const kickNotificationId = crypto.randomUUID();
-  const kickTitle = 'Thông báo từ nhóm';
-  const kickContent = `Bạn đã bị xóa khỏi nhóm "${groupName}" bởi ${actorName}.`;
+  const kickTitle = 'Group Notification';
+  const kickContent = `You have been removed from group "${groupName}" by ${actorName}.`;
   await db.query(
     `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)
-     VALUES ($1, $2, $3, $4, 'group_leave', false, NOW(), $5)`,
+     VALUES ($1, $2, $3, $4, 'group_kick', false, NOW(), $5)`,
     [kickNotificationId, targetUserId, kickTitle, kickContent, { groupId, groupName }]
   );
   
@@ -75,7 +75,7 @@ export async function removeGroupMember(groupId: string, targetUserId: string, a
     id: kickNotificationId,
     title: kickTitle,
     content: kickContent,
-    type: 'group_leave',
+    type: 'group_kick',
     is_read: false,
     created_at: new Date().toISOString(),
     metadata: { groupId, groupName }
@@ -84,14 +84,14 @@ export async function removeGroupMember(groupId: string, targetUserId: string, a
   // 2. Nếu người thực hiện trục xuất là Admin (không phải Owner), gửi thông báo báo cáo cho Owner nhóm
   if (actorUserId !== ownerId) {
     const targetUserQuery = await db.query('SELECT name FROM users WHERE id = $1', [targetUserId]);
-    const targetName = targetUserQuery.rows[0]?.name || 'Thành viên';
+    const targetName = targetUserQuery.rows[0]?.name || 'Member';
 
     const reportNotificationId = crypto.randomUUID();
-    const reportTitle = 'Thành viên bị trục xuất';
-    const reportContent = `Quản trị viên ${actorName} đã xóa thành viên ${targetName} khỏi nhóm "${groupName}".`;
+    const reportTitle = 'Member Expelled';
+    const reportContent = `Admin ${actorName} has removed member ${targetName} from group "${groupName}".`;
     await db.query(
       `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)
-       VALUES ($1, $2, $3, $4, 'group_leave', false, NOW(), $5)`,
+       VALUES ($1, $2, $3, $4, 'group_kick', false, NOW(), $5)`,
       [reportNotificationId, ownerId, reportTitle, reportContent, { groupId, groupName, actorName, targetName }]
     );
     
@@ -99,7 +99,7 @@ export async function removeGroupMember(groupId: string, targetUserId: string, a
       id: reportNotificationId,
       title: reportTitle,
       content: reportContent,
-      type: 'group_leave',
+      type: 'group_kick',
       is_read: false,
       created_at: new Date().toISOString(),
       metadata: { groupId, groupName, actorName, targetName }

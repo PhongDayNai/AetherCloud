@@ -26,19 +26,24 @@ export async function transferGroupOwnership(groupId: string, targetUserId: stri
   try {
     await client.query('BEGIN');
 
-    // Lấy thông tin nhóm name và tên actor
+    // Lấy thông tin nhóm name, tên actor và tên target user
     const infoQuery = await client.query(
-      `SELECT g.name as group_name, u.name as actor_name
-       FROM groups g, users u
-       WHERE g.id = $1 AND u.id = $2`,
-      [groupId, actorUserId]
+      `SELECT 
+         g.name as group_name, 
+         u1.name as actor_name,
+         u2.name as target_name
+       FROM groups g
+       JOIN users u1 ON u1.id = $2
+       JOIN users u2 ON u2.id = $3
+       WHERE g.id = $1`,
+      [groupId, actorUserId, targetUserId]
     );
     
     if (infoQuery.rows.length === 0) {
-      throw new NotFoundError('Group or Actor not found');
+      throw new NotFoundError('Group, Actor, or Target User not found');
     }
     
-    const { group_name: groupName, actor_name: actorName } = infoQuery.rows[0];
+    const { group_name: groupName, actor_name: actorName, target_name: targetName } = infoQuery.rows[0];
 
     // 1. Cập nhật owner_id trong bảng groups
     await client.query(
@@ -60,13 +65,13 @@ export async function transferGroupOwnership(groupId: string, targetUserId: stri
 
     // 4. Tạo thông báo cho chủ sở hữu mới
     const notificationId = crypto.randomUUID();
-    const notificationTitle = 'Chuyển nhượng quyền sở hữu nhóm';
-    const notificationContent = `Bạn đã được nhượng quyền làm Chủ sở hữu mới của nhóm "${groupName}" bởi ${actorName}.`;
+    const notificationTitle = 'Group Ownership Transferred';
+    const notificationContent = `You have been promoted to Owner of group "${groupName}" by ${actorName}.`;
     
     await client.query(
       `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)
-       VALUES ($1, $2, $3, $4, 'system', false, NOW(), $5)`,
-      [notificationId, targetUserId, notificationTitle, notificationContent, { groupId, groupName }]
+       VALUES ($1, $2, $3, $4, 'group_owner_transfer', false, NOW(), $5)`,
+      [notificationId, targetUserId, notificationTitle, notificationContent, { groupId, groupName, newOwnerName: targetName }]
     );
 
     await client.query('COMMIT');
@@ -76,10 +81,10 @@ export async function transferGroupOwnership(groupId: string, targetUserId: stri
       id: notificationId,
       title: notificationTitle,
       content: notificationContent,
-      type: 'system',
+      type: 'group_owner_transfer',
       is_read: false,
       created_at: new Date().toISOString(),
-      metadata: { groupId, groupName }
+      metadata: { groupId, groupName, newOwnerName: targetName }
     });
 
   } catch (err) {

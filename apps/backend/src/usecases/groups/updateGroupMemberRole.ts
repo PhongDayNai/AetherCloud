@@ -41,12 +41,12 @@ export async function updateGroupMemberRole(groupId: string, targetUserId: strin
 
   // Tạo thông báo gửi cho thành viên được cập nhật vai trò
   const notificationId = crypto.randomUUID();
-  const notificationTitle = 'Cập nhật vai trò trong nhóm';
-  const notificationContent = `Vai trò của bạn trong nhóm "${groupName}" đã được thay đổi thành ${role === 'admin' ? 'Quản trị viên' : 'Thành viên'}.`;
+  const notificationTitle = 'Role Updated';
+  const notificationContent = `Your role in group "${groupName}" has been updated to ${role}.`;
   
   await db.query(
     `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)
-     VALUES ($1, $2, $3, $4, 'system', false, NOW(), $5)`,
+     VALUES ($1, $2, $3, $4, 'group_role_update', false, NOW(), $5)`,
     [notificationId, targetUserId, notificationTitle, notificationContent, { groupId, groupName, role }]
   );
 
@@ -55,7 +55,7 @@ export async function updateGroupMemberRole(groupId: string, targetUserId: strin
     id: notificationId,
     title: notificationTitle,
     content: notificationContent,
-    type: 'system',
+    type: 'group_role_update',
     is_read: false,
     created_at: new Date().toISOString(),
     metadata: { groupId, groupName, role }
