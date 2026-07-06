@@ -55,31 +55,34 @@ export async function inviteMemberByEmail(
     throw new ConflictError('Đã có một lời mời chưa phản hồi được gửi tới người dùng này');
   }
 
+
   // 6. Tạo lời mời dưới dạng một Notification cho user đích
   const notificationId = crypto.randomUUID();
   const notificationTitle = 'Group Invitation';
   const notificationContent = `${senderName} has invited you to join group "${groupName}" as ${role}.`;
 
-  // Để người dùng có thể Chấp nhận/Từ chối trực tiếp từ Notification, 
-  // chúng ta cần cung cấp một mã mời có hiệu lực cho nhóm đó.
-  // Ta sẽ tìm xem nhóm đã có mã mời active nào chưa, nếu chưa ta sẽ tự động tạo một mã mời không hết hạn và unlimited sử dụng cho nhóm.
-  let inviteToken = '';
-  const activeInviteQuery = await db.query(
-    'SELECT token FROM group_invitations WHERE group_id = $1 AND is_active = true ORDER BY created_at DESC LIMIT 1',
-    [groupId]
+  // Để người dùng có thể Chấp nhận/Từ chối trực tiếp từ Notification,
+  // chúng ta tạo một mã mời nhóm riêng biệt dành riêng cho lần mời này:
+  // - Chỉ dùng được đúng 1 lần (max_uses = 1)
+  // - Hết hạn sau đúng 24 giờ
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  // const expiresAt = new Date(Date.now() + 1 * 60 * 1000);
+  const inviteToken = crypto.randomBytes(6).toString('hex').toUpperCase();
+
+  await db.query(
+    `INSERT INTO group_invitations (id, group_id, created_by, token, max_uses, uses_count, is_active, expires_at, created_at)
+     VALUES ($1, $2, $3, $4, 1, 0, true, $5, NOW())`,
+    [crypto.randomUUID(), groupId, senderUserId, inviteToken, expiresAt]
   );
-  
-  if (activeInviteQuery.rows.length > 0) {
-    inviteToken = activeInviteQuery.rows[0].token;
-  } else {
-    // Tự động sinh một mã mời unlimited
-    inviteToken = crypto.randomBytes(6).toString('hex').toUpperCase();
-    await db.query(
-      `INSERT INTO group_invitations (id, group_id, created_by, token, max_uses, uses_count, is_active, expires_at, created_at)
-       VALUES ($1, $2, $3, $4, null, 0, true, null, NOW())`,
-      [crypto.randomUUID(), groupId, senderUserId, inviteToken]
-    );
-  }
+
+  const inviteMetadata = {
+    groupId,
+    groupName,
+    senderName,
+    role,
+    token: inviteToken,
+    expiresAt: expiresAt.toISOString()
+  };
 
   await db.query(
     `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)
@@ -89,7 +92,7 @@ export async function inviteMemberByEmail(
       targetUser.id,
       notificationTitle,
       notificationContent,
-      { groupId, groupName, senderName, role, token: inviteToken }
+      inviteMetadata
     ]
   );
 
@@ -101,7 +104,7 @@ export async function inviteMemberByEmail(
     type: 'group_invite',
     is_read: false,
     created_at: new Date().toISOString(),
-    metadata: { groupId, groupName, senderName, role, token: inviteToken }
+    metadata: inviteMetadata
   });
 
   return { success: true, message: 'Invitation sent successfully' };
