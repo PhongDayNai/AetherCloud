@@ -7,14 +7,22 @@ const router = express.Router();
 
 // 1. GET danh sách thông báo của user hiện tại
 router.get('/', requireAuth, async (req: Request, res: Response) => {
-  const { isRead } = req.query;
+  const { isRead, limit, offset } = req.query;
   let filterIsRead: boolean | undefined = undefined;
   
   if (isRead === 'true') filterIsRead = true;
   if (isRead === 'false') filterIsRead = false;
 
+  const parsedLimit = parseInt(limit as string) || 20;
+  const parsedOffset = parseInt(offset as string) || 0;
+
   try {
-    const notifications = await notificationUsecase.getUserNotifications(req.user!.sub, filterIsRead);
+    const notifications = await notificationUsecase.getUserNotifications(
+      req.user!.sub, 
+      filterIsRead,
+      parsedLimit,
+      parsedOffset
+    );
     return res.json({ ok: true, notifications });
   } catch (err: any) {
     return res.status(500).json({ message: err.message });

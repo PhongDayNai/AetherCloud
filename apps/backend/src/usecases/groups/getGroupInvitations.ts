@@ -2,7 +2,12 @@ import * as db from '../../lib/db';
 import { ForbiddenError } from '../../lib/errors';
 import { getGroupMemberRole } from '../../lib/utils';
 
-export async function getGroupInvitations(groupId: string, userId: string) {
+export async function getGroupInvitations(
+  groupId: string, 
+  userId: string,
+  limit: number = 20,
+  offset: number = 0
+) {
   // Kiểm tra quyền: Chỉ Owner hoặc Admin của nhóm mới được xem danh sách mã mời
   const userRole = await getGroupMemberRole(groupId, userId);
   if (userRole !== 'owner' && userRole !== 'admin') {
@@ -14,7 +19,8 @@ export async function getGroupInvitations(groupId: string, userId: string) {
     FROM group_invitations
     WHERE group_id = $1
     ORDER BY created_at DESC
+    LIMIT $2 OFFSET $3
   `;
-  const res = await db.query(queryText, [groupId]);
+  const res = await db.query(queryText, [groupId, limit, offset]);
   return res.rows;
 }

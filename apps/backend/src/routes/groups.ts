@@ -293,8 +293,17 @@ router.post('/:groupId/invitations', requireAuth, requireGroupMember, async (req
 // 14. GET danh sách mã mời đã tạo cho nhóm (chỉ cho phép owner/admin nhóm)
 router.get('/:groupId/invitations', requireAuth, requireGroupMember, async (req: Request, res: Response) => {
   const { groupId } = req.params;
+  const { limit, offset } = req.query;
+  const parsedLimit = parseInt(limit as string) || 20;
+  const parsedOffset = parseInt(offset as string) || 0;
+
   try {
-    const invitations = await groupUsecase.getGroupInvitations(groupId, req.user!.sub);
+    const invitations = await groupUsecase.getGroupInvitations(
+      groupId, 
+      req.user!.sub,
+      parsedLimit,
+      parsedOffset
+    );
     return res.json({ ok: true, invitations });
   } catch (err: any) {
     if (err instanceof DomainError) {
