@@ -55,6 +55,12 @@ export async function removeGroupMember(groupId: string, targetUserId: string, a
   // Thực hiện xóa
   await db.query('DELETE FROM group_members WHERE group_id = $1 AND user_id = $2', [groupId, targetUserId]);
 
+  // Dọn dẹp các thông báo mời chưa đọc gửi cho thành viên bị trục xuất liên quan đến nhóm này
+  await db.query(
+    "DELETE FROM notifications WHERE user_id = $1 AND type = 'group_invite' AND (metadata->>'groupId') = $2",
+    [targetUserId, groupId]
+  );
+
   // 1. Tạo thông báo gửi cho người bị trục xuất
   const kickNotificationId = crypto.randomUUID();
   const kickTitle = 'Thông báo từ nhóm';
@@ -62,7 +68,7 @@ export async function removeGroupMember(groupId: string, targetUserId: string, a
   await db.query(
     `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)
      VALUES ($1, $2, $3, $4, 'group_leave', false, NOW(), $5)`,
-    [kickNotificationId, targetUserId, kickTitle, kickContent, 'group_leave', { groupId, groupName }]
+    [kickNotificationId, targetUserId, kickTitle, kickContent, { groupId, groupName }]
   );
   
   sendNotificationRealtime(targetUserId, {
@@ -86,7 +92,7 @@ export async function removeGroupMember(groupId: string, targetUserId: string, a
     await db.query(
       `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)
        VALUES ($1, $2, $3, $4, 'group_leave', false, NOW(), $5)`,
-      [reportNotificationId, ownerId, reportTitle, reportContent, 'group_leave', { groupId, groupName, actorName, targetName }]
+      [reportNotificationId, ownerId, reportTitle, reportContent, { groupId, groupName, actorName, targetName }]
     );
     
     sendNotificationRealtime(ownerId, {

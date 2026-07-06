@@ -47,7 +47,7 @@ export async function updateGroupMemberRole(groupId: string, targetUserId: strin
   await db.query(
     `INSERT INTO notifications (id, user_id, title, content, type, is_read, created_at, metadata)
      VALUES ($1, $2, $3, $4, 'system', false, NOW(), $5)`,
-    [notificationId, targetUserId, notificationTitle, notificationContent, 'system', { groupId, groupName, role }]
+    [notificationId, targetUserId, notificationTitle, notificationContent, { groupId, groupName, role }]
   );
 
   // Bắn WebSocket realtime tới thành viên đó
