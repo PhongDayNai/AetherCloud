@@ -38,6 +38,12 @@ export async function leaveGroup(groupId: string, userId: string) {
       [groupId, userId]
     );
 
+    // Dọn dẹp các thông báo mời chưa đọc gửi cho thành viên tự rời nhóm liên quan đến nhóm này
+    await client.query(
+      "DELETE FROM notifications WHERE user_id = $1 AND type = 'group_invite' AND (metadata->>'groupId') = $2",
+      [userId, groupId]
+    );
+
     // Tạo thông báo cho Owner nhóm
     const notificationId = crypto.randomUUID();
     const notificationTitle = 'Thành viên rời nhóm';
