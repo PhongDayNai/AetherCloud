@@ -21,6 +21,7 @@ import { docViewerTips, getLocalizedText } from './tipsViewerTips';
 import MascotTipsWidget from '../../components/MascotTipsWidget';
 import QuantumLoader from '../../components/QuantumLoader';
 import { useDocViewerTheme } from './hooks/useDocViewerTheme';
+import DocSidebarFiles from './components/DocSidebarFiles';
 
 import './docViewer.css';
 import 'highlight.js/styles/github-dark.css';
@@ -1584,39 +1585,15 @@ function DocViewerContent() {
 
       <div className="viewerBody">
         {/* Collapsible Left Sidebar */}
-        <aside className={`fileSidebar no-print ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-          <div className="sidebarHeader">{t('sidebar.documents') || 'Documents'}</div>
-          <div className="fileList" onScroll={handleSidebarScroll}>
-            {sidebarFiles.map((file) => {
-              const fileCat = docCategoryOf(file);
-              return (
-                <div
-                  key={file.id}
-                  className={`fileItem ${file.id === asset?.id ? 'active' : ''}`}
-                  onClick={() => handleSidebarItemClick(file.id)}
-                  title={file.originalName}
-                >
-                  <span className="fileItemIcon">
-                    <Icons.DocIcon item={file} size={18} />
-                  </span>
-                  <span className="fileItemName">{file.originalName}</span>
-                </div>
-              );
-            })}
-            {isLoadingMore && (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '12px' }}>
-                <QuantumLoader size="small" />
-              </div>
-            )}
-            {sidebarFiles.length === 0 && (
-              <div style={{ padding: '16px', color: '#71717a', fontSize: '13px', textAlign: 'center' }}>
-                {t('viewer.noFilesFound') || 'No files found'}
-              </div>
-            )}
-            {/* Empty item at the bottom of the scroll list to allow scrolling past the mascot tips */}
-            {!isSidebarCollapsed && <div style={{ height: '35vh', flexShrink: 0 }} />}
-          </div>
-        </aside>
+        <DocSidebarFiles
+          sidebarFiles={sidebarFiles}
+          activeAssetId={asset?.id}
+          isSidebarCollapsed={isSidebarCollapsed}
+          isLoadingMore={isLoadingMore}
+          onItemClick={handleSidebarItemClick}
+          onScroll={handleSidebarScroll}
+          t={t}
+        />
 
         {/* Floating Tips Overlay */}
         <MascotTipsWidget tips={docViewerTips} theme={docTheme} language={currentLang} />
