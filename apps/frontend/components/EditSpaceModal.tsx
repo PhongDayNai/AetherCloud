@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import * as Icons from './Icons';
+import styles from './EditSpaceModal.module.css';
 
 interface EditSpaceModalProps {
   isOpen: boolean;
@@ -66,55 +67,55 @@ export default function EditSpaceModal({
   };
 
   return (
-    <div className="modalBackdrop" onClick={onClose}>
-      <div className="modalContent" onClick={(e) => e.stopPropagation()}>
-        <div className="modalHeader">
+    <div className={styles.modalBackdrop} onClick={onClose}>
+      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
           <h2>{t('spaces.editTitle') || 'Chỉnh sửa không gian con'}</h2>
-          <button className="closeBtn" onClick={onClose}>✕</button>
+          <button className={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modalForm">
-          {errorMsg && <div className="errorBanner">{errorMsg}</div>}
+        <form onSubmit={handleSubmit} className={styles.modalForm}>
+          {errorMsg && <div className={styles.errorBanner}>{errorMsg}</div>}
 
-          <div className="formGroup">
+          <div className={styles.formGroup}>
             <label>{t('spaces.type') || 'Phân loại không gian'}</label>
-            <div className="typeSelectorList">
+            <div className={styles.typeSelectorList}>
               <div 
-                className={`typeOption ${type === 'journal' ? 'active' : ''}`}
+                className={`${styles.typeOption} ${type === 'journal' ? styles.active : ''}`}
                 onClick={() => !loading && setType('journal')}
               >
-                <div className="optionIcon"><Icons.Journal size={20} /></div>
-                <div className="optionMeta">
-                  <div className="optionTitle">{t('spaces.journal') || 'Nhật ký'}</div>
-                  <div className="optionDesc">{t('spaces.journalDesc') || 'Ghi chép câu chuyện, viết nhật ký kèm tệp đính kèm.'}</div>
+                <div className={styles.optionIcon}><Icons.Journal size={20} /></div>
+                <div className={styles.optionMeta}>
+                  <div className={styles.optionTitle}>{t('spaces.journal') || 'Nhật ký'}</div>
+                  <div className={styles.optionDesc}>{t('spaces.journalDesc') || 'Ghi chép câu chuyện, viết nhật ký kèm tệp đính kèm.'}</div>
                 </div>
               </div>
 
               <div 
-                className={`typeOption ${type === 'collection' ? 'active' : ''}`}
+                className={`${styles.typeOption} ${type === 'collection' ? styles.active : ''}`}
                 onClick={() => !loading && setType('collection')}
               >
-                <div className="optionIcon"><Icons.Collection size={20} /></div>
-                <div className="optionMeta">
-                  <div className="optionTitle">{t('spaces.collection') || 'Bộ sưu tập'}</div>
-                  <div className="optionDesc">{t('spaces.collectionDesc') || 'Lưu trữ tệp tin đa phương tiện và file tài liệu chung.'}</div>
+                <div className={styles.optionIcon}><Icons.Collection size={20} /></div>
+                <div className={styles.optionMeta}>
+                  <div className={styles.optionTitle}>{t('spaces.collection') || 'Bộ sưu tập'}</div>
+                  <div className={styles.optionDesc}>{t('spaces.collectionDesc') || 'Lưu trữ tệp tin đa phương tiện và file tài liệu chung.'}</div>
                 </div>
               </div>
 
               <div 
-                className={`typeOption ${type === 'project' ? 'active' : ''}`}
+                className={`${styles.typeOption} ${type === 'project' ? styles.active : ''}`}
                 onClick={() => !loading && setType('project')}
               >
-                <div className="optionIcon"><Icons.Project size={20} /></div>
-                <div className="optionMeta">
-                  <div className="optionTitle">{t('spaces.project') || 'Dự án'}</div>
-                  <div className="optionDesc">{t('spaces.projectDesc') || 'Quản lý file tài liệu dự án trực quan theo thư mục.'}</div>
+                <div className={styles.optionIcon}><Icons.Project size={20} /></div>
+                <div className={styles.optionMeta}>
+                  <div className={styles.optionTitle}>{t('spaces.project') || 'Dự án'}</div>
+                  <div className={styles.optionDesc}>{t('spaces.projectDesc') || 'Quản lý file tài liệu dự án trực quan theo thư mục.'}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="formGroup">
+          <div className={styles.formGroup}>
             <label htmlFor="spaceName">{t('spaces.name') || 'Tên không gian con'}</label>
             <input
               id="spaceName"
@@ -128,7 +129,7 @@ export default function EditSpaceModal({
             />
           </div>
 
-          <div className="formGroup">
+          <div className={styles.formGroup}>
             <label htmlFor="spaceDesc">{t('spaces.desc') || 'Mô tả (Không bắt buộc)'}</label>
             <textarea
               id="spaceDesc"
@@ -141,232 +142,16 @@ export default function EditSpaceModal({
             />
           </div>
 
-          <div className="formActions">
-            <button type="button" className="actionBtnCancel" onClick={onClose} disabled={loading}>
+          <div className={styles.formActions}>
+            <button type="button" className={styles.actionBtnCancel} onClick={onClose} disabled={loading}>
               {t('actions.cancel') || 'Hủy'}
             </button>
-            <button type="submit" className="actionBtnSubmit" disabled={!name.trim() || !type || loading}>
+            <button type="submit" className={styles.actionBtnSubmit} disabled={!name.trim() || !type || loading}>
               {loading ? (t('buttons.processing') || 'Đang lưu...') : (t('actions.save') || 'Lưu thay đổi')}
             </button>
           </div>
         </form>
       </div>
-
-      <style jsx>{`
-        .modalBackdrop {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: var(--bg-backdrop);
-          backdrop-filter: blur(12px);
-          z-index: 9999;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          animation: backdropFadeIn 0.25s ease-out;
-        }
-        .modalContent {
-          background: var(--bg-modal-wrapper);
-          backdrop-filter: blur(20px);
-          border: 1px solid var(--border-strong);
-          border-radius: 20px;
-          padding: 22px;
-          width: 90%;
-          max-width: 460px;
-          box-shadow: var(--modal-shadow);
-          box-sizing: border-box;
-          animation: modalScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-          color: var(--text-primary);
-        }
-        .modalHeader {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 16px;
-        }
-        .modalHeader h2 {
-          font-size: 18px;
-          font-weight: 700;
-          letter-spacing: -0.4px;
-          margin: 0;
-        }
-        .closeBtn {
-          background: transparent;
-          border: 0;
-          color: var(--text-muted);
-          font-size: 18px;
-          cursor: pointer;
-          transition: color 0.2s;
-          padding: 4px;
-        }
-        .closeBtn:hover {
-          color: var(--text-primary);
-        }
-        .modalForm {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-        .errorBanner {
-          background: rgba(244, 63, 94, 0.08);
-          border: 1px solid rgba(244, 63, 94, 0.15);
-          color: #fca5a5;
-          padding: 8px 12px;
-          border-radius: 8px;
-          font-size: 12.5px;
-        }
-        .formGroup {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .formGroup label {
-          font-size: 12.5px;
-          font-weight: 600;
-          color: var(--text-secondary);
-        }
-        .formGroup input[type="text"],
-        .formGroup textarea {
-          width: 100%;
-          padding: 10px 12px;
-          box-sizing: border-box;
-          border-radius: 8px;
-          border: 1px solid var(--border-input);
-          background-color: var(--bg-input);
-          color: var(--text-primary);
-          font-size: 13.5px;
-          outline: none;
-          font-family: inherit;
-          transition: all 0.2s ease;
-        }
-        .formGroup input[type="text"]:focus,
-        .formGroup textarea:focus {
-          border-color: var(--border-input-focus);
-          background: var(--bg-input-focus);
-          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
-        }
-        
-        /* Premium Vertical Selector List */
-        .typeSelectorList {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          margin-top: 4px;
-        }
-        .typeOption {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          border: 1px solid var(--border-tile);
-          background: var(--bg-tile);
-          border-radius: 12px;
-          padding: 10px 14px;
-          cursor: pointer;
-          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-          user-select: none;
-          text-align: left;
-        }
-        .typeOption:hover {
-          border-color: var(--border-tile-hover);
-          background: var(--bg-item-hover);
-        }
-        .typeOption.active {
-          border-color: var(--button-primary-bg);
-          background: var(--bg-item-active);
-          box-shadow: 0 0 0 1px var(--button-primary-bg);
-        }
-        .optionIcon {
-          font-size: 20px;
-          width: 36px;
-          height: 36px;
-          background: rgba(255, 255, 255, 0.03);
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-        .typeOption.active .optionIcon {
-          background: rgba(99, 102, 241, 0.1);
-        }
-        .optionMeta {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .optionTitle {
-          font-size: 13.5px;
-          font-weight: 700;
-          color: var(--text-primary);
-        }
-        .optionDesc {
-          font-size: 11px;
-          color: var(--text-muted);
-          line-height: 1.3;
-        }
-        
-        .formActions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 10px;
-          margin-top: 8px;
-          border-top: 1px solid var(--border-color);
-          padding-top: 16px;
-        }
-        .actionBtnCancel {
-          background: transparent;
-          border: 1px solid var(--border-input);
-          color: var(--text-secondary);
-          border-radius: 8px;
-          padding: 8px 16px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        .actionBtnCancel:hover {
-          background: var(--bg-item-hover);
-          color: var(--text-primary);
-        }
-        .actionBtnSubmit {
-          background: var(--button-primary-bg);
-          border: 1px solid var(--button-primary-bg);
-          color: var(--button-primary-text);
-          border-radius: 8px;
-          padding: 8px 20px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          box-shadow: 0 4px 12px var(--button-primary-shadow);
-          transition: all 0.2s ease;
-        }
-        .actionBtnSubmit:hover {
-          opacity: 0.95;
-          transform: translateY(-1px);
-        }
-        .actionBtnSubmit:disabled,
-        .actionBtnCancel:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        @keyframes backdropFadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes modalScaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.96) translateY(12px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-      `}</style>
     </div>
   );
 }

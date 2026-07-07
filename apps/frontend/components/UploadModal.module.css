@@ -1,0 +1,372 @@
+.modalBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-backdrop);
+  backdrop-filter: blur(12px);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: backdropFadeIn 0.25s ease-out;
+}
+
+.modalContent {
+  background: var(--bg-modal-wrapper);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  padding: 22px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: var(--modal-shadow);
+  box-sizing: border-box;
+  animation: modalScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: var(--text-primary);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modalHeader h2 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  margin: 0;
+}
+
+.closeBtn {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeBtn:hover {
+  color: var(--text-primary);
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px;
+}
+
+button.secondaryButton {
+  background: transparent;
+  border: 1px solid var(--border-input);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button.secondaryButton:hover {
+  background: var(--bg-item-hover);
+  color: var(--text-primary);
+}
+
+button.primaryButton {
+  background: var(--button-primary-bg);
+  border: 1px solid var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px var(--button-primary-shadow);
+  transition: all 0.2s ease;
+}
+
+button.primaryButton:hover:not(:disabled) {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+button.primaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dragDropArea {
+  border: 2px dashed var(--border-color);
+  border-radius: 16px;
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.01);
+  transition: all 0.25s ease;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.dragDropArea:hover {
+  background: rgba(99, 102, 241, 0.03) !important;
+  border-color: var(--button-primary-bg) !important;
+}
+
+.dragDropArea.dragActive {
+  background: rgba(99, 102, 241, 0.05) !important;
+  border-color: var(--button-primary-bg) !important;
+}
+
+.uploadIcon {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dragDropArea.dragActive .uploadIcon {
+  color: var(--button-primary-bg);
+}
+
+.uploadTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.uploadSubtitle {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.selectedFilesSection {
+  margin-bottom: 20px;
+}
+
+.selectedFilesTitle {
+  margin-bottom: 10px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.selectedFilesList {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: var(--bg-input);
+}
+
+/* custom scrollbar for file list */
+.selectedFilesList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.selectedFilesList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.selectedFilesList::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.selectedFilesList::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.selectedFileRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.selectedFileRow:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.fileMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  padding-right: 12px;
+}
+
+.fileIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.fileName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSize {
+  color: var(--text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.removeButton {
+  background: transparent;
+  border: 0;
+  color: rgba(239, 68, 68, 0.8);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.removeButton:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.composerCheckboxContainer {
+  margin: 8px 4px 16px 4px;
+  display: flex;
+  align-items: center;
+}
+
+.saveToPersonalPostLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+  user-select: none;
+  padding: 6px 0;
+  position: relative;
+}
+
+.saveToPersonalPostLabel:hover {
+  color: var(--text-secondary);
+}
+
+.hiddenCheckbox {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.customCheckbox {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #525252;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #000000;
+  flex-shrink: 0;
+}
+
+.saveToPersonalPostLabel:hover .customCheckbox {
+  border-color: #a3a3a3;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.saveToPersonalPostLabel.active .customCheckbox {
+  border-color: #ffffff;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.saveToPersonalPostLabel.active .checkboxText {
+  background: linear-gradient(to right, #a3a3a3 15%, #ffffff 50%, #a3a3a3 85%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textShimmer 2.5s linear infinite;
+  font-weight: 600;
+}
+
+/* Light Mode Overrides */
+:global([data-theme='light']) .customCheckbox {
+  border-color: #d4d4d4;
+  color: #ffffff;
+}
+
+:global([data-theme='light']) .saveToPersonalPostLabel:hover .customCheckbox {
+  border-color: #737373;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+:global([data-theme='light']) .saveToPersonalPostLabel.active .customCheckbox {
+  border-color: #000000;
+  background: #000000;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
+}
+
+:global([data-theme='light']) .saveToPersonalPostLabel.active .checkboxText {
+  background: linear-gradient(to right, #737373 15%, #000000 50%, #737373 85%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: textShimmer 2.5s linear infinite;
+  font-weight: 600;
+}
+
+@keyframes textShimmer {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
