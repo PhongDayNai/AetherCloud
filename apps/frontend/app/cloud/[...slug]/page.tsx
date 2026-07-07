@@ -8,31 +8,12 @@ import AssetGrid from '../../../components/AssetGrid';
 import DocView from '../../../components/DocView';
 import SmartVideo from '../../../components/SmartVideo';
 import { Asset } from '../../../types';
-import { fmtBytes, docCategoryOf, formatDateTime } from '../../../lib/utils';
+import { fmtBytes, docCategoryOf, formatDateTime, translateSpace } from '../../../lib/utils';
 import * as Icons from '../../../components/Icons';
 import CustomSelect from '../../../components/CustomSelect';
 import { useGridSelection } from '../hooks/useGridSelection';
 import DashboardView from '../components/DashboardView';
 import SpacesDirectoryView from '../components/SpacesDirectoryView';
-
-export const translateSpace = (sp: any, t: any) => {
-  if (!sp) return sp;
-  const isGeneral =
-    sp.name === 'General' &&
-    sp.type === 'journal' &&
-    (sp.description === 'General discussion space for the group' || sp.description === 'Write journal entries with attachments.');
-  if (isGeneral) {
-    const isAlt = sp.description === 'Write journal entries with attachments.';
-    return {
-      ...sp,
-      name: t('spaces.generalName') || sp.name,
-      description: isAlt
-        ? (t('spaces.generalDescAlternative') || sp.description)
-        : (t('spaces.generalDesc') || sp.description)
-    };
-  }
-  return sp;
-};
 
 function useGridColumns(container: HTMLDivElement | null, minWidth: number, gap: number) {
   const [columns, setColumns] = React.useState(3);

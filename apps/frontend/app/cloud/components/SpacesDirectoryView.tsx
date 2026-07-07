@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import * as Icons from '../../../components/Icons';
 import styles from './SpacesDirectoryView.module.css';
+import { translateSpace } from '../../../lib/utils';
 
 interface SpacesDirectoryViewProps {
   t: (key: string, replacements?: Record<string, string | number>) => string;
@@ -19,25 +20,6 @@ interface SpacesDirectoryViewProps {
   togglePick: (id: string) => void;
   setShowCreateSpaceModal: (show: boolean) => void;
 }
-
-const translateSpace = (sp: any, t: any) => {
-  if (!sp) return sp;
-  const isGeneral =
-    sp.name === 'General' &&
-    sp.type === 'journal' &&
-    (sp.description === 'General discussion space for the group' || sp.description === 'Write journal entries with attachments.');
-  if (isGeneral) {
-    const isAlt = sp.description === 'Write journal entries with attachments.';
-    return {
-      ...sp,
-      name: t('spaces.generalName') || sp.name,
-      description: isAlt
-        ? (t('spaces.generalDescAlternative') || sp.description)
-        : (t('spaces.generalDesc') || sp.description),
-    };
-  }
-  return sp;
-};
 
 export default function SpacesDirectoryView({
   t,

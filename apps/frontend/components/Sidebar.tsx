@@ -9,25 +9,7 @@ import styles from './Sidebar.module.css';
 import WorkspaceSwitcher from './sidebar/WorkspaceSwitcher';
 import ProfileMenu from './sidebar/ProfileMenu';
 import StorageProgress from './sidebar/StorageProgress';
-
-export const translateSpace = (sp: any, t: any) => {
-  if (!sp) return sp;
-  const isGeneral = 
-    sp.name === 'General' && 
-    sp.type === 'journal' && 
-    (sp.description === 'General discussion space for the group' || sp.description === 'Write journal entries with attachments.');
-  if (isGeneral) {
-    const isAlt = sp.description === 'Write journal entries with attachments.';
-    return {
-      ...sp,
-      name: t('spaces.generalName') || sp.name,
-      description: isAlt 
-        ? (t('spaces.generalDescAlternative') || sp.description)
-        : (t('spaces.generalDesc') || sp.description)
-    };
-  }
-  return sp;
-};
+import { translateSpace } from '../lib/utils';
 
 interface SidebarProps {
   tab: 'photos' | 'docs' | 'dashboard' | 'space' | 'space-all' | 'spaces';

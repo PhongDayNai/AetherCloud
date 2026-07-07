@@ -195,3 +195,22 @@ export function hasWritePermission(asset: Asset, user: any, groups: any[]): bool
   return isCreator || isManager;
 }
 
+export function translateSpace(sp: any, t: (key: string, replacements?: Record<string, string | number>) => string): any {
+  if (!sp) return sp;
+  const isGeneral =
+    sp.name === 'General' &&
+    sp.type === 'journal' &&
+    (sp.description === 'General discussion space for the group' || sp.description === 'Write journal entries with attachments.');
+  if (isGeneral) {
+    const isAlt = sp.description === 'Write journal entries with attachments.';
+    return {
+      ...sp,
+      name: t('spaces.generalName') || sp.name,
+      description: isAlt
+        ? (t('spaces.generalDescAlternative') || sp.description)
+        : (t('spaces.generalDesc') || sp.description),
+    };
+  }
+  return sp;
+}
+
