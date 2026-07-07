@@ -15,7 +15,7 @@ import hljs from 'highlight.js';
 import mermaid from 'mermaid';
 import DOMPurify from 'isomorphic-dompurify';
 import * as Icons from '../../components/Icons';
-import { docViewerTips, getLocalizedText, TipIcon } from './tipsViewerTips';
+import { docViewerTips, getLocalizedText } from './tipsViewerTips';
 
 import MascotTipsWidget from '../../components/MascotTipsWidget';
 

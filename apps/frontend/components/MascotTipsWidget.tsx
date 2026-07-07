@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { DocTip, TipIcon, getLocalizedText } from '../app/doc-viewer/tipsViewerTips';
+import { DocTip, getLocalizedText } from '../app/doc-viewer/tipsViewerTips';
 import * as Icons from './Icons';
+import { TipIcon } from './Icons';
 import TipsCatalogModal from './TipsCatalogModal';
 import './mascotTipsWidget.css';
 

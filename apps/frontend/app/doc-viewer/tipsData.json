@@ -1,0 +1,386 @@
+[
+  {
+    "key": "tip.sandbox_toggle",
+    "icon": "shield",
+    "category": {
+      "vi": "Bảo mật",
+      "en": "Security"
+    },
+    "title": {
+      "vi": "Chế độ Sandbox",
+      "en": "Sandbox Mode"
+    },
+    "content": {
+      "vi": "Nhấn biểu tượng SANDBOX MODE trên thanh công cụ để bật/tắt chế độ Chỉ đọc, tránh vô tính chỉnh sửa tệp.",
+      "en": "Click the SANDBOX MODE icon on the toolbar to toggle Read-only and prevent accidental changes."
+    }
+  },
+  {
+    "key": "tip.version_compare",
+    "icon": "history",
+    "category": {
+      "vi": "Lịch sử",
+      "en": "History"
+    },
+    "title": {
+      "vi": "So sánh phiên bản",
+      "en": "Version Compare"
+    },
+    "content": {
+      "vi": "Nhấn nút Phiên bản để xem lịch sử chỉnh sửa. Chọn một bản cũ để chia đôi màn hình đối chiếu trực tiếp.",
+      "en": "Click the Version button to view edit history. Select an older version to split the screen and compare."
+    },
+    "deepTip": {
+      "vi": "Màu đỏ thể hiện nội dung bị xóa ở bản cũ, màu xanh lá là nội dung được thêm mới.",
+      "en": "Red highlights show deletions from the old version, while green shows additions."
+    }
+  },
+  {
+    "key": "tip.sync_scroll",
+    "icon": "sync",
+    "category": {
+      "vi": "Trải nghiệm",
+      "en": "Experience"
+    },
+    "title": {
+      "vi": "Cuộn đồng bộ",
+      "en": "Sync Scroll"
+    },
+    "content": {
+      "vi": "Khi so sánh phiên bản, hai màn hình sẽ tự động cuộn cùng nhau để bạn dễ đối chiếu các dòng văn bản.",
+      "en": "In split screen, both panels scroll together automatically to keep lines aligned."
+    },
+    "deepTip": {
+      "vi": "Muốn cuộn độc lập một bên? Chỉ cần di chuột sang bên đó và cuộn bình thường.",
+      "en": "Move your cursor to either side to scroll that pane independently."
+    }
+  },
+  {
+    "key": "tip.save_shortcut",
+    "icon": "keyboard",
+    "category": {
+      "vi": "Hiệu suất",
+      "en": "Productivity"
+    },
+    "title": {
+      "vi": "Phím tắt lưu nhanh",
+      "en": "Save Shortcut"
+    },
+    "content": {
+      "vi": "Nhấn tổ hợp Ctrl + S (hoặc Cmd + S trên macOS) để lưu nhanh tài liệu mà không cần click nút Lưu.",
+      "en": "Press Ctrl + S (or Cmd + S on macOS) to save your changes instantly without clicking."
+    }
+  },
+  {
+    "key": "tip.copy_raw",
+    "icon": "copy",
+    "category": {
+      "vi": "Tiện ích",
+      "en": "Utility"
+    },
+    "title": {
+      "vi": "Sao chép nhanh",
+      "en": "Copy Raw"
+    },
+    "content": {
+      "vi": "Nhấn nút Sao chép trên thanh công cụ để sao chép toàn bộ nội dung gốc của tệp vào bộ nhớ đệm.",
+      "en": "Click the Copy icon on the toolbar to copy the entire raw file content to your clipboard."
+    }
+  },
+  {
+    "key": "tip.export_pdf",
+    "icon": "print",
+    "category": {
+      "vi": "Tiện ích",
+      "en": "Utility"
+    },
+    "title": {
+      "vi": "Xuất file PDF",
+      "en": "Export PDF"
+    },
+    "content": {
+      "vi": "Nhấn Xuất PDF để in tài liệu. Trang in được tối ưu hóa đặc biệt, tự động ẩn các thanh công cụ và sidebar.",
+      "en": "Click Export PDF to print. The layout is optimized to hide all sidebars and toolbars."
+    }
+  },
+  {
+    "key": "tip.playground_preview",
+    "icon": "beaker",
+    "category": {
+      "vi": "Xem thử",
+      "en": "Preview"
+    },
+    "title": {
+      "vi": "Chế độ Xem thử",
+      "en": "Playground Mode"
+    },
+    "content": {
+      "vi": "Khi không có quyền sửa file nhóm, bạn vẫn có thể soạn thảo để xem trước nhưng không thể lưu đè lên file gốc.",
+      "en": "Edit shared files locally to preview changes without modifying the protected original."
+    }
+  },
+  {
+    "key": "tip.local_theme_toggle",
+    "icon": "moon",
+    "category": {
+      "vi": "Trải nghiệm",
+      "en": "Experience"
+    },
+    "title": {
+      "vi": "Đổi giao diện nhanh",
+      "en": "Toggle Theme"
+    },
+    "content": {
+      "vi": "Bấm biểu tượng Mặt trăng/Mặt trời để chuyển chế độ Sáng/Tối riêng cho DocViewer mà không ảnh hưởng Dashboard.",
+      "en": "Toggle Light/Dark mode for DocViewer without affecting the general dashboard theme."
+    }
+  },
+  {
+    "key": "tip.mermaid_charts",
+    "icon": "flowchart",
+    "category": {
+      "vi": "Soạn thảo",
+      "en": "Editor"
+    },
+    "title": {
+      "vi": "Vẽ sơ đồ Mermaid",
+      "en": "Mermaid Diagrams"
+    },
+    "content": {
+      "vi": "Tạo sơ đồ quy trình, lưu đồ trực quan bằng cách viết mã khai báo Mermaid trong các khối code Markdown.",
+      "en": "Draw flowcharts and mind maps using text-based Mermaid code blocks inside Markdown."
+    },
+    "deepTip": {
+      "vi": "Hệ thống sẽ tự động vẽ sơ đồ trực quan khi bạn chuyển sang chế độ xem trước (Preview) hoặc Sandbox.",
+      "en": "Diagrams render automatically when switching to Preview or Sandbox Mode."
+    }
+  },
+  {
+    "key": "tip.auto_syntax_highlight",
+    "icon": "code",
+    "category": {
+      "vi": "Hiệu suất",
+      "en": "Productivity"
+    },
+    "title": {
+      "vi": "Tô màu cú pháp",
+      "en": "Syntax Highlight"
+    },
+    "content": {
+      "vi": "Trình xem tự động nhận diện ngôn ngữ và tô màu mã nguồn (JS, Python, HTML, CSS...), giúp bạn dễ đọc mã.",
+      "en": "Code syntax is highlighted automatically based on file language to improve readability."
+    }
+  },
+  {
+    "key": "tip.unsaved_warning",
+    "icon": "alert",
+    "category": {
+      "vi": "Bảo mật",
+      "en": "Security"
+    },
+    "title": {
+      "vi": "Cảnh báo chưa lưu",
+      "en": "Unsaved Guard"
+    },
+    "content": {
+      "vi": "Hệ thống sẽ hiển thị cảnh báo nếu bạn chuyển tệp hoặc đóng tab khi có những chỉnh sửa chưa được lưu.",
+      "en": "Warning dialog protects your work if you close the tab or switch files with unsaved edits."
+    }
+  },
+  {
+    "key": "tip.load_large_files",
+    "icon": "flash",
+    "category": {
+      "vi": "Hiệu suất",
+      "en": "Productivity"
+    },
+    "title": {
+      "vi": "Tệp dung lượng lớn",
+      "en": "Large File Loading"
+    },
+    "content": {
+      "vi": "Hệ thống tự động tối ưu hóa hiệu năng giúp mở và cuộn các tệp tin cực lớn mượt mà, không lag.",
+      "en": "High-performance rendering loads and scrolls large files seamlessly without memory lag."
+    }
+  },
+  {
+    "key": "tip.three_way_merge",
+    "icon": "git-merge",
+    "category": {
+      "vi": "Lịch sử",
+      "en": "History"
+    },
+    "title": {
+      "vi": "Giải quyết xung đột",
+      "en": "Conflict Merge"
+    },
+    "content": {
+      "vi": "Khi hai người cùng sửa một file, trình trộn 3 bên sẽ mở ra giúp bạn chọn nội dung chính xác để lưu.",
+      "en": "If concurrent edits occur, the 3-way merge editor helps you resolve differences before saving."
+    }
+  },
+  {
+    "key": "tip.sidebar_nav",
+    "icon": "sidebar",
+    "category": {
+      "vi": "Tiện ích",
+      "en": "Utility"
+    },
+    "title": {
+      "vi": "Thu gọn thanh bên",
+      "en": "Sidebar Collapse"
+    },
+    "content": {
+      "vi": "Bấm biểu tượng menu ở góc trên bên trái để thu gọn thanh bên, mở rộng 100% diện tích soạn thảo.",
+      "en": "Click the top-left menu icon to collapse the sidebar and maximize your editor layout."
+    }
+  },
+  {
+    "key": "tip.custom_confirm",
+    "icon": "handshake",
+    "category": {
+      "vi": "Trải nghiệm",
+      "en": "Experience"
+    },
+    "title": {
+      "vi": "Hộp thoại xác nhận",
+      "en": "Smart Dialogs"
+    },
+    "content": {
+      "vi": "Hộp thoại xác nhận được thiết kế sang trọng, tự động làm mờ hậu cảnh để bảo vệ bạn trước tác vụ quan trọng.",
+      "en": "Confirm modals blur the background to prevent accidental clicks on destructive actions."
+    }
+  },
+  {
+    "key": "tip.version_rollback",
+    "icon": "rotate-ccw",
+    "category": {
+      "vi": "Lịch sử",
+      "en": "History"
+    },
+    "title": {
+      "vi": "Khôi phục phiên bản",
+      "en": "Version Rollback"
+    },
+    "content": {
+      "vi": "Bạn có thể khôi phục tài liệu về bất kỳ trạng thái nào trong lịch sử chỉnh sửa của tệp tin.",
+      "en": "Roll back the file to any previous version state stored in the history."
+    },
+    "deepTip": {
+      "vi": "Phiên bản hiện tại trước khi khôi phục sẽ tự động được lưu lại thành một bản ghi mới trong lịch sử.",
+      "en": "The active draft is saved as a new version before rolling back, ensuring zero data loss."
+    }
+  },
+  {
+    "key": "tip.auto_bracket_indent",
+    "icon": "sparkles",
+    "category": {
+      "vi": "Soạn thảo",
+      "en": "Editor"
+    },
+    "title": {
+      "vi": "Thụt lề tự động",
+      "en": "Auto Indentation"
+    },
+    "content": {
+      "vi": "Trình soạn thảo tự động căn lề thụt đầu dòng khi xuống dòng, giúp cấu trúc văn bản luôn ngay ngắn.",
+      "en": "The editor automatically indents lines on enter, keeping your document structure clean."
+    }
+  },
+  {
+    "key": "tip.stage_tall_blur",
+    "icon": "film",
+    "category": {
+      "vi": "Trải nghiệm",
+      "en": "Experience"
+    },
+    "title": {
+      "vi": "Làm mờ viền video dọc",
+      "en": "Portrait Video Blur"
+    },
+    "content": {
+      "vi": "Khi xem video dọc trên máy tính, trình phát tự động làm mờ hai bên sườn để lấp đầy khoảng đen.",
+      "en": "Playing vertical videos automatically blurs the sides to fill wide screen space beautifully."
+    }
+  },
+  {
+    "key": "tip.merge_undo_redo",
+    "icon": "undo",
+    "category": {
+      "vi": "Trộn file",
+      "en": "Merge Editor"
+    },
+    "title": {
+      "vi": "Hoàn tác khi trộn",
+      "en": "Undo/Redo Merge"
+    },
+    "content": {
+      "vi": "Sử dụng tổ hợp Ctrl + Z / Ctrl + Y trong màn hình trộn để hoàn tác/làm lại các dòng đã chọn.",
+      "en": "Press Ctrl + Z or Ctrl + Y inside the merge editor to undo or redo line selections."
+    }
+  },
+  {
+    "key": "tip.merge_scroll_sync",
+    "icon": "scroll-sync",
+    "category": {
+      "vi": "Trải nghiệm",
+      "en": "Experience"
+    },
+    "title": {
+      "vi": "Cuộn đồng bộ 3 cột",
+      "en": "3-Column Scroll Sync"
+    },
+    "content": {
+      "vi": "Cuộn bất kỳ cột nào trong trình trộn (Server, Kết quả, Local), hai cột còn lại sẽ cuộn theo tương ứng.",
+      "en": "Scrolling any pane in the 3-way merge automatically scrolls the other two to align lines."
+    }
+  },
+  {
+    "key": "tip.auto_merge_non_conflicting",
+    "icon": "merge",
+    "category": {
+      "vi": "Trộn file",
+      "en": "Merge Editor"
+    },
+    "title": {
+      "vi": "Tự động gộp dòng",
+      "en": "Auto-Merge lines"
+    },
+    "content": {
+      "vi": "Hệ thống tự động gộp các dòng chỉnh sửa không bị chồng chéo, bạn chỉ cần xử lý các dòng bị đỏ.",
+      "en": "Non-overlapping edits are merged automatically, letting you focus only on red conflict lines."
+    }
+  },
+  {
+    "key": "tip.merge_screen_constraint",
+    "icon": "monitor",
+    "category": {
+      "vi": "Trải nghiệm",
+      "en": "Experience"
+    },
+    "title": {
+      "vi": "Độ rộng màn hình trộn",
+      "en": "Merge Screen Width"
+    },
+    "content": {
+      "vi": "Trình trộn 3 bên hiển thị song song nhiều thông tin, yêu cầu độ rộng màn hình tối thiểu là 1024px.",
+      "en": "The 3-way merge editor displays complex columns and requires a minimum width of 1024px."
+    }
+  },
+  {
+    "key": "tip.default_sandbox_setting",
+    "icon": "settings-shield",
+    "category": {
+      "vi": "Bảo mật",
+      "en": "Security"
+    },
+    "title": {
+      "vi": "Cấu hình mặc định",
+      "en": "Default Sandbox"
+    },
+    "content": {
+      "vi": "Bạn có thể cài đặt mặc định mở DocViewer ở chế độ \"Chỉ đọc\" (Sandbox Mode) hoặc \"Chỉnh sửa ngay\".",
+      "en": "Set your preference to always open files in Read-only (Sandbox) or Edit Mode by default."
+    }
+  }
+]
