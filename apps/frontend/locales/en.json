@@ -569,5 +569,10 @@
   "merge.reset": "Re-merge",
   "dialogs.warning": "Warning",
   "dialogs.confirmTitle": "Confirm",
-  "dialogs.confirmButton": "Confirm"
+  "dialogs.confirmButton": "Confirm",
+  "viewer.settingsTitle": "Viewer Settings",
+  "viewer.settingsSandboxDesc": "Automatically open documents in read-only sandbox mode to prevent accidental changes.",
+  "viewer.settingsDone": "Done",
+  "viewer.sandboxOn": "Enabled",
+  "viewer.sandboxOff": "Disabled"
 }

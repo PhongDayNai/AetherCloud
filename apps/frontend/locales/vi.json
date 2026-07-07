@@ -569,5 +569,10 @@
   "merge.reset": "Trộn lại",
   "dialogs.warning": "Cảnh báo",
   "dialogs.confirmTitle": "Xác nhận",
-  "dialogs.confirmButton": "Xác nhận"
+  "dialogs.confirmButton": "Xác nhận",
+  "viewer.settingsTitle": "Cài đặt trình xem",
+  "viewer.settingsSandboxDesc": "Tự động mở tài liệu ở chế độ sandbox (chỉ đọc) để tránh chỉnh sửa ngoài ý muốn.",
+  "viewer.settingsDone": "Hoàn tất",
+  "viewer.sandboxOn": "Bật",
+  "viewer.sandboxOff": "Tắt"
 }
