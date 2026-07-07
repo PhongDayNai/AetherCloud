@@ -1,0 +1,465 @@
+.spaceTimelineView {
+  width: 75%;
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.flexHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+}
+
+.headerText h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.spaceMetaInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.spaceTypeRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.spaceDescRow {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.headerActions {
+  display: flex;
+  gap: 10px;
+}
+
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border-input);
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.actionBtn:hover {
+  background: var(--bg-item-hover);
+  border-color: var(--border-input-focus);
+}
+
+.editBtn {
+  color: var(--text-primary);
+}
+
+.deleteBtn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.deleteBtn:hover {
+  background: rgba(239, 68, 68, 0.2) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+  color: #ffffff !important;
+}
+
+.viewAllBtn {
+  background: var(--button-primary-bg) !important;
+  border-color: var(--button-primary-bg) !important;
+  color: var(--button-primary-text) !important;
+  box-shadow: 0 2px 8px var(--button-primary-shadow);
+}
+
+.viewAllBtn:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.postComposer {
+  background: var(--bg-tile);
+  border: 1px solid var(--border-tile);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.composerInput {
+  width: 100%;
+  min-height: 80px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  color: var(--text-primary);
+  border-radius: 12px;
+  padding: 12px;
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.composerInput:focus {
+  border-color: var(--border-input-focus);
+  background: var(--bg-input-focus);
+}
+
+.composerActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.attachBtn {
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.attachBtn:hover {
+  background: var(--bg-item-hover);
+  color: var(--text-primary);
+}
+
+.submitPostBtn {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border: 0;
+  padding: 8px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 10px var(--button-primary-shadow);
+}
+
+.submitPostBtn:hover:not(:disabled) {
+  background: var(--button-primary-hover);
+  transform: translateY(-1px);
+}
+
+.submitPostBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.composerCheckboxContainer {
+  display: flex;
+  margin-top: 4px;
+}
+
+.saveToPersonalPostLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.hidden-checkbox {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.custom-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-input);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.saveToPersonalPostLabel:hover .custom-checkbox {
+  border-color: var(--border-tile-hover);
+}
+
+.saveToPersonalPostLabel.active .custom-checkbox {
+  background: var(--button-primary-bg);
+  border-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+}
+
+.checkbox-text {
+  font-weight: 500;
+}
+
+.attachedFiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+}
+
+.attachedFileChip {
+  background: var(--bg-item-active);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.removeFileBtn {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.removeFileBtn:hover {
+  color: #f87171;
+}
+
+.postsList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.emptyHint {
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 14px;
+  padding: 40px 0;
+}
+
+.postCard {
+  background: var(--bg-tile);
+  border: 1px solid var(--border-tile);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.postHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+}
+
+.postAuthor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatarCircle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.authorName {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.postTime {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.postCaption {
+  font-size: 14.5px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.postAssets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.postAssetCard {
+  border: 1px solid var(--border-tile);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-input);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  aspect-ratio: 4/3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.postAssetCard:hover {
+  transform: scale(1.02);
+  border-color: var(--border-tile-hover);
+}
+
+.postAssetCard img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.postVideoThumb {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.postVideoProcessingPlaceholder {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-input);
+  gap: 12px;
+}
+
+.doubleRingLoader {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.doubleRingLoader .ring1 {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #eab308;
+  animation: ring1Pulse 1.6s ease-in-out infinite;
+}
+
+.doubleRingLoader .ring2 {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(234, 179, 8, 0.4);
+  animation: ring2Pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ring1Pulse {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0.5; }
+}
+
+@keyframes ring2Pulse {
+  0% { transform: scale(1.2); opacity: 1; border-color: rgba(234, 179, 8, 0.4); }
+  50% { transform: scale(0.8); opacity: 0.2; border-color: rgba(234, 179, 8, 0.1); }
+  100% { transform: scale(1.2); opacity: 1; border-color: rgba(234, 179, 8, 0.4); }
+}
+
+.processingText {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.postFileThumb {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fileName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.fileSize {
+  font-size: 10px;
+  color: var(--text-muted);
+}
