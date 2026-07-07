@@ -207,6 +207,8 @@
   "groups.demoteFailed": "Failed to demote member",
   "groups.error.noPermission": "You no longer have permission to access this group.",
   "groups.confirmKick": "Are you sure you want to expel this member?",
+  "groups.confirmPromote": "Are you sure you want to promote this member to Admin?",
+  "groups.confirmDemote": "Are you sure you want to demote this member to Member?",
   "groups.confirmTransfer": "WARNING: You will lose Group Owner privileges after transferring. Do you want to proceed?",
   "groups.confirmLeave": "Are you sure you want to leave this group?",
   "groups.confirmDisband": "THIS ACTION CANNOT BE UNDONE! Are you sure you want to disband this group?",

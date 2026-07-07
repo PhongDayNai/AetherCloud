@@ -207,6 +207,8 @@
   "groups.demoteFailed": "Hạ cấp Quản trị viên thất bại",
   "groups.error.noPermission": "Bạn không còn quyền truy cập nhóm này.",
   "groups.confirmKick": "Bạn có chắc chắn muốn trục xuất thành viên này?",
+  "groups.confirmPromote": "Bạn có chắc chắn muốn thăng chức thành viên này lên Quản trị viên không?",
+  "groups.confirmDemote": "Bạn có chắc chắn muốn hạ cấp thành viên này xuống Thành viên thường không?",
   "groups.confirmTransfer": "CẢNH BÁO: Bạn sẽ mất quyền Chủ nhóm sau khi chuyển nhượng. Tiếp tục?",
   "groups.confirmLeave": "Bạn có chắc muốn rời khỏi nhóm này không?",
   "groups.confirmDisband": "HÀNH ĐỘNG NÀY KHÔNG THỂ PHỤC HỒI! Bạn có chắc chắn giải tán nhóm này?",

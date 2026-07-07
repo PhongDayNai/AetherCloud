@@ -138,6 +138,9 @@ export default function GroupMembersList({
   };
 
   const handleUpdateRole = async (userId: string, newRole: 'admin' | 'member') => {
+    const confirmKey = newRole === 'admin' ? 'groups.confirmPromote' : 'groups.confirmDemote';
+    if (!await confirm(t(confirmKey))) return;
+
     setActionLoadingId(userId);
     try {
       const res = await fetch(`${api}/api/groups/${groupId}/members/${userId}`, {
