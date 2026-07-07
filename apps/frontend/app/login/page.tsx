@@ -2,47 +2,16 @@
 
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import LoginForm from '../../components/auth/LoginForm';
+import RegisterForm from '../../components/auth/RegisterForm';
 
 function getApiOrigin(): string {
   return process.env.NEXT_PUBLIC_API_ORIGIN || 'http://localhost:45174';
 }
 
-// Bộ icon SVG đồng bộ phong cách tối giản (Outline Theme, strokeWidth=2)
-const Icons = {
-  User: (): React.JSX.Element => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  ),
-  Mail: (): React.JSX.Element => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-      <polyline points="22,6 12,13 2,6" />
-    </svg>
-  ),
-  Lock: (): React.JSX.Element => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  ),
-  Key: (): React.JSX.Element => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-    </svg>
-  )
-};
-
 export default function LoginPage(): React.JSX.Element {
   const { language, setLanguage, t } = useLanguage();
   const [isLogin, setIsLogin] = useState<boolean>(true);
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [name, setName] = useState<string>('');
-  const [inviteCode, setInviteCode] = useState<string>('');
-  const [msg, setMsg] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   useEffect(() => {
     let mounted = true;
@@ -58,53 +27,6 @@ export default function LoginPage(): React.JSX.Element {
 
     return () => { mounted = false; };
   }, []);
-
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setMsg('');
-    setIsLoading(true);
-
-    const payload = isLogin 
-      ? { email, password } 
-      : { email, password, name, invite_code: inviteCode };
-
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-
-    try {
-      const ctrl = new AbortController();
-      const tSig = setTimeout(() => ctrl.abort(), 15000);
-
-      const res = await fetch(`${getApiOrigin()}${endpoint}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: ctrl.signal,
-      });
-
-      clearTimeout(tSig);
-      setIsLoading(false);
-
-      if (res.ok) {
-        setMsg(isLogin ? t('messages.loginSuccess') : t('messages.registerSuccess'));
-        const redirectUrl = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
-        setTimeout(() => {
-          window.location.href = redirectUrl;
-        }, 1000);
-        return;
-      }
-
-      const data = await res.json().catch(() => ({}));
-      setMsg(data.message ? `${t('messages.error')}: ${data.message}` : t(isLogin ? 'messages.loginFailed' : 'messages.registerFailed'));
-    } catch (err: any) {
-      setIsLoading(false);
-      if (err?.name === 'AbortError') {
-        setMsg(t('messages.timeout'));
-      } else {
-        setMsg(err?.message ? `${t('messages.error')}: ${err.message}` : t('messages.connectionError'));
-      }
-    }
-  }
 
   return (
     <div className="container">
@@ -154,110 +76,18 @@ export default function LoginPage(): React.JSX.Element {
           {isLogin ? t('login.subtitle') : t('register.subtitle')}
         </p>
 
-        <form onSubmit={onSubmit} className="form">
-          {!isLogin && (
-            <div className="input-group">
-              <label className="label">{t('fields.name')}</label>
-              <div className="input-wrapper">
-                <span className="input-icon"><Icons.User /></span>
-                <input 
-                  value={name} 
-                  onChange={(e) => setName(e.target.value)} 
-                  placeholder={t('placeholders.name')} 
-                  required
-                  className="input"
-                />
-              </div>
-            </div>
-          )}
-          
-          <div className="input-group">
-            <label className="label">{t('fields.email')}</label>
-            <div className="input-wrapper">
-              <span className="input-icon"><Icons.Mail /></span>
-              <input 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                placeholder={t('placeholders.email')} 
-                type="text"
-                required
-                className="input"
-              />
-            </div>
-          </div>
-          
-          <div className="input-group">
-            <label className="label">{t('fields.password')}</label>
-            <div className="input-wrapper">
-              <span className="input-icon"><Icons.Lock /></span>
-              <input 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                placeholder={t('placeholders.password')} 
-                type="password" 
-                required
-                className="input"
-              />
-            </div>
-          </div>
-          
-          {!isLogin && (
-            <div className="input-group">
-              <label className="label">{t('fields.inviteCode')}</label>
-              <div className="input-wrapper">
-                <span className="input-icon"><Icons.Key /></span>
-                <input 
-                  value={inviteCode} 
-                  onChange={(e) => setInviteCode(e.target.value)} 
-                  placeholder={t('placeholders.inviteCode')} 
-                  maxLength={6}
-                  required
-                  className="input invite-input"
-                />
-              </div>
-            </div>
-          )}
-
-          <button 
-            disabled={isLoading}
-            className="submit-btn"
-          >
-            {isLoading ? (
-              <span className="spinner-container">
-                <span className="spinner" /> {t('buttons.processing')}
-              </span>
-            ) : (isLogin ? t('buttons.login') : t('buttons.register'))}
-          </button>
-        </form>
-
-        <div className="toggle-container">
-          {isLogin ? (
-            <p>
-              {t('toggle.noAccount')}{' '}
-              <span 
-                onClick={() => { setIsLogin(false); setMsg(''); }} 
-                className="toggle-link"
-              >
-                {t('toggle.registerNow')}
-              </span>
-            </p>
-          ) : (
-            <p>
-              {t('toggle.hasAccount')}{' '}
-              <span 
-                onClick={() => { setIsLogin(true); setMsg(''); }} 
-                className="toggle-link"
-              >
-                {t('toggle.loginNow')}
-              </span>
-            </p>
-          )}
-        </div>
-
-        {msg && (
-          <div className={`message ${msg.startsWith(t('messages.error')) ? 'error-msg' : 'success-msg'}`}>
-            {msg}
-          </div>
+        {isLogin ? (
+          <LoginForm 
+            apiOrigin={getApiOrigin()}
+            t={t}
+            onToggleToRegister={() => setIsLogin(false)}
+          />
+        ) : (
+          <RegisterForm 
+            apiOrigin={getApiOrigin()}
+            t={t}
+            onToggleToLogin={() => setIsLogin(true)}
+          />
         )}
       </main>
 
@@ -398,19 +228,19 @@ export default function LoginPage(): React.JSX.Element {
           line-height: 1.5;
         }
 
-        .form {
+        :global(.form) {
           display: flex;
           flex-direction: column;
           gap: 20px;
         }
 
-        .input-group {
+        :global(.input-group) {
           display: flex;
           flex-direction: column;
           gap: 8px;
         }
 
-        .label {
+        :global(.label) {
           font-size: 12.5px;
           font-weight: 600;
           color: #a1a1aa;
@@ -418,12 +248,12 @@ export default function LoginPage(): React.JSX.Element {
         }
 
         /* Icon wrapper inside input */
-        .input-wrapper {
+        :global(.input-wrapper) {
           position: relative;
           display: flex;
           align-items: center;
         }
-        .input-icon {
+        :global(.input-icon) {
           position: absolute;
           left: 14px;
           color: #71717a;
@@ -433,7 +263,7 @@ export default function LoginPage(): React.JSX.Element {
           justify-content: center;
         }
 
-        .input {
+        :global(.input) {
           background: rgba(9, 9, 11, 0.8);
           border: 1px solid #27272a;
           border-radius: 10px;
@@ -445,25 +275,25 @@ export default function LoginPage(): React.JSX.Element {
           width: 100%;
           box-sizing: border-box;
         }
-        .input::placeholder {
+        :global(.input::placeholder) {
           color: #52525b;
         }
-        .input:focus {
+        :global(.input:focus) {
           border-color: #3b82f6;
           box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
           background: #09090b;
         }
-        .input:focus + .input-icon {
+        :global(.input:focus + .input-icon) {
           color: #3b82f6; /* Đổi màu icon đồng bộ khi focus input */
         }
 
-        .invite-input {
+        :global(.invite-input) {
           text-transform: uppercase;
           font-weight: 700;
           letter-spacing: 2px;
         }
 
-        .submit-btn {
+        :global(.submit-btn) {
           background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
           border: none;
           border-radius: 10px;
@@ -478,28 +308,29 @@ export default function LoginPage(): React.JSX.Element {
           align-items: center;
           justify-content: center;
           box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+          width: 100%;
         }
-        .submit-btn:hover:not(:disabled) {
+        :global(.submit-btn:hover:not(:disabled)) {
           transform: translateY(-1px);
           box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
           filter: brightness(1.05);
         }
-        .submit-btn:active:not(:disabled) {
+        :global(.submit-btn:active:not(:disabled)) {
           transform: translateY(0);
         }
-        .submit-btn:disabled {
+        :global(.submit-btn:disabled) {
           background: #27272a;
           color: #52525b;
           cursor: not-allowed;
           box-shadow: none;
         }
 
-        .spinner-container {
+        :global(.spinner-container) {
           display: flex;
           align-items: center;
           gap: 10px;
         }
-        .spinner {
+        :global(.spinner) {
           width: 16px;
           height: 16px;
           border: 2px solid rgba(255, 255, 255, 0.3);
@@ -509,24 +340,24 @@ export default function LoginPage(): React.JSX.Element {
           display: inline-block;
         }
 
-        .toggle-container {
+        :global(.toggle-container) {
           margin-top: 24px;
           text-align: center;
           font-size: 13.5px;
           color: #71717a;
         }
-        .toggle-link {
+        :global(.toggle-link) {
           color: #3b82f6;
           cursor: pointer;
           font-weight: 700;
           transition: color 0.2s ease;
         }
-        .toggle-link:hover {
+        :global(.toggle-link:hover) {
           color: #60a5fa;
           text-decoration: underline;
         }
 
-        .message {
+        :global(.message) {
           margin-top: 24px;
           padding: 12px 16px;
           border-radius: 8px;
@@ -535,12 +366,12 @@ export default function LoginPage(): React.JSX.Element {
           animation: slideIn 0.3s ease-out;
           line-height: 1.5;
         }
-        .error-msg {
+        :global(.error-msg) {
           background-color: rgba(239, 68, 68, 0.1);
           border: 1px solid rgba(239, 68, 68, 0.15);
           color: #fca5a5;
         }
-        .success-msg {
+        :global(.success-msg) {
           background-color: rgba(16, 185, 129, 0.1);
           border: 1px solid rgba(16, 185, 129, 0.15);
           color: #a7f3d0;
