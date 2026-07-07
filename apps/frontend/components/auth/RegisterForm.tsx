@@ -34,6 +34,12 @@ interface RegisterFormProps {
   onToggleToLogin: () => void;
 }
 
+interface MsgState {
+  key?: string;
+  text?: string;
+  type: 'success' | 'error';
+}
+
 export default function RegisterForm({
   apiOrigin,
   t,
@@ -43,13 +49,28 @@ export default function RegisterForm({
   const [password, setPassword] = useState<string>('');
   const [name, setName] = useState<string>('');
   const [inviteCode, setInviteCode] = useState<string>('');
-  const [msg, setMsg] = useState<string>('');
+  const [msg, setMsg] = useState<MsgState | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setMsg('');
+    setMsg(null);
     setIsLoading(true);
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setMsg({ key: 'messages.invalidEmail', type: 'error' });
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate password length
+    if (password.length < 8) {
+      setMsg({ key: 'messages.passwordTooShort', type: 'error' });
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const ctrl = new AbortController();
@@ -67,7 +88,7 @@ export default function RegisterForm({
       setIsLoading(false);
 
       if (res.ok) {
-        setMsg(t('messages.registerSuccess'));
+        setMsg({ key: 'messages.registerSuccess', type: 'success' });
         const redirectUrl = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
         setTimeout(() => {
           window.location.href = redirectUrl;
@@ -76,20 +97,28 @@ export default function RegisterForm({
       }
 
       const data = await res.json().catch(() => ({}));
-      setMsg(data.message ? `${t('messages.error')}: ${data.message}` : t('messages.registerFailed'));
+      setMsg({
+        type: 'error',
+        key: data.message ? undefined : 'messages.registerFailed',
+        text: data.message ? data.message : undefined
+      });
     } catch (err: any) {
       setIsLoading(false);
       if (err?.name === 'AbortError') {
-        setMsg(t('messages.timeout'));
+        setMsg({ key: 'messages.timeout', type: 'error' });
       } else {
-        setMsg(err?.message ? `${t('messages.error')}: ${err.message}` : t('messages.connectionError'));
+        setMsg({
+          type: 'error',
+          key: err?.message ? undefined : 'messages.connectionError',
+          text: err?.message ? err.message : undefined
+        });
       }
     }
   };
 
   return (
     <>
-      <form onSubmit={onSubmit} className="form">
+      <form onSubmit={onSubmit} className="form" noValidate>
         <div className="input-group">
           <label className="label">{t('fields.name')}</label>
           <div className="input-wrapper">
@@ -112,7 +141,7 @@ export default function RegisterForm({
               value={email} 
               onChange={(e) => setEmail(e.target.value)} 
               placeholder={t('placeholders.email')} 
-              type="text"
+              type="email"
               required
               className="input"
             />
@@ -128,6 +157,7 @@ export default function RegisterForm({
               onChange={(e) => setPassword(e.target.value)} 
               placeholder={t('placeholders.password')} 
               type="password" 
+              minLength={8}
               required
               className="input"
             />
@@ -174,8 +204,8 @@ export default function RegisterForm({
       </div>
 
       {msg && (
-        <div className={`message ${msg.startsWith(t('messages.error')) ? 'error-msg' : 'success-msg'}`}>
-          {msg}
+        <div className={`message ${msg.type === 'error' ? 'error-msg' : 'success-msg'}`}>
+          {msg.key ? t(msg.key) : msg.text}
         </div>
       )}
     </>

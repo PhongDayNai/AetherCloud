@@ -23,6 +23,12 @@ interface LoginFormProps {
   onToggleToRegister: () => void;
 }
 
+interface MsgState {
+  key?: string;
+  text?: string;
+  type: 'success' | 'error';
+}
+
 export default function LoginForm({
   apiOrigin,
   t,
@@ -30,12 +36,12 @@ export default function LoginForm({
 }: LoginFormProps): React.JSX.Element {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
-  const [msg, setMsg] = useState<string>('');
+  const [msg, setMsg] = useState<MsgState | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setMsg('');
+    setMsg(null);
     setIsLoading(true);
 
     try {
@@ -54,7 +60,7 @@ export default function LoginForm({
       setIsLoading(false);
 
       if (res.ok) {
-        setMsg(t('messages.loginSuccess'));
+        setMsg({ key: 'messages.loginSuccess', type: 'success' });
         const redirectUrl = new URLSearchParams(window.location.search).get('redirect') || '/dashboard';
         setTimeout(() => {
           window.location.href = redirectUrl;
@@ -63,20 +69,28 @@ export default function LoginForm({
       }
 
       const data = await res.json().catch(() => ({}));
-      setMsg(data.message ? `${t('messages.error')}: ${data.message}` : t('messages.loginFailed'));
+      setMsg({
+        type: 'error',
+        key: data.message ? undefined : 'messages.loginFailed',
+        text: data.message ? data.message : undefined
+      });
     } catch (err: any) {
       setIsLoading(false);
       if (err?.name === 'AbortError') {
-        setMsg(t('messages.timeout'));
+        setMsg({ key: 'messages.timeout', type: 'error' });
       } else {
-        setMsg(err?.message ? `${t('messages.error')}: ${err.message}` : t('messages.connectionError'));
+        setMsg({
+          type: 'error',
+          key: err?.message ? undefined : 'messages.connectionError',
+          text: err?.message ? err.message : undefined
+        });
       }
     }
   };
 
   return (
     <>
-      <form onSubmit={onSubmit} className="form">
+      <form onSubmit={onSubmit} className="form" noValidate>
         <div className="input-group">
           <label className="label">{t('fields.email')}</label>
           <div className="input-wrapper">
@@ -132,8 +146,8 @@ export default function LoginForm({
       </div>
 
       {msg && (
-        <div className={`message ${msg.startsWith(t('messages.error')) ? 'error-msg' : 'success-msg'}`}>
-          {msg}
+        <div className={`message ${msg.type === 'error' ? 'error-msg' : 'success-msg'}`}>
+          {msg.key ? t(msg.key) : msg.text}
         </div>
       )}
     </>
