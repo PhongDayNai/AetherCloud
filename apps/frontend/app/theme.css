@@ -1,0 +1,159 @@
+:root {
+  --bg-page: #09090b;
+  --bg-sidebar: rgba(15, 15, 18, 0.7);
+  --bg-card: rgba(20, 20, 25, 0.75);
+  --bg-popover: #18181b;
+  --border-color: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.08);
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --bg-input: rgba(255, 255, 255, 0.03);
+  --bg-input-focus: rgba(255, 255, 255, 0.05);
+  --border-input: rgba(255, 255, 255, 0.08);
+  --border-input-focus: rgba(255, 255, 255, 0.2);
+  --bg-item-hover: rgba(255, 255, 255, 0.05);
+  --bg-item-active: rgba(255, 255, 255, 0.08);
+  --button-primary-bg: #ffffff;
+  --button-primary-text: #09090b;
+  --button-primary-hover: #f4f4f5;
+  --button-primary-shadow: rgba(255, 255, 255, 0.1);
+  --button-primary-hover-shadow: rgba(255, 255, 255, 0.15);
+  
+  --popover-divider: #27272a;
+  --popover-badge-bg: rgba(59, 130, 246, 0.15);
+  --popover-badge-text: #60a5fa;
+  --popover-badge-border: rgba(59, 130, 246, 0.2);
+  
+  --bg-tile: #111113;
+  --border-tile: rgba(255, 255, 255, 0.04);
+  --border-tile-hover: rgba(255, 255, 255, 0.15);
+  --caption-border: rgba(255, 255, 255, 0.02);
+  
+  --bg-backdrop: rgba(5, 5, 5, 0.85);
+  --dialog-logout-text: #71717a;
+  --dialog-logout-hover: #fff;
+  
+  --accent-color: #3b82f6;
+  --accent-color-hover: #1d4ed8;
+  --glass-blur: 20px;
+  
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --card-shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.5);
+  
+  --bg-active-count: rgba(255, 255, 255, 0.15);
+  --text-active-count: #ffffff;
+  --bg-tag-active-count: rgba(255, 255, 255, 0.03);
+  
+  --bg-modal-wrapper: rgba(20, 20, 25, 0.9);
+  --bg-modal-content: rgba(10, 10, 12, 0.45);
+  --modal-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.8);
+  
+  --scrollbar-track: rgba(255, 255, 255, 0.01);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme='light'] {
+  --bg-page: transparent;
+  --bg-sidebar: hsla(36, 45%, 98%, 0.85);
+  --bg-card: hsla(0, 0%, 100%, 0.45);
+  --bg-popover: hsl(36, 45%, 98%);
+  --border-color: hsla(28, 12%, 8%, 0.08);
+  --border-strong: hsla(28, 12%, 8%, 0.15);
+  --text-primary: hsl(28, 22%, 10%);
+  --text-secondary: hsl(28, 18%, 28%);
+  --text-muted: hsl(28, 12%, 44%);
+  --bg-input: hsla(0, 0%, 100%, 0.6);
+  --bg-input-focus: hsla(0, 0%, 100%, 0.85);
+  --border-input: hsla(28, 12%, 8%, 0.15);
+  --border-input-focus: hsl(36, 85%, 50%);
+  --bg-item-hover: hsla(36, 45%, 88%, 0.6);
+  --bg-item-active: hsla(36, 45%, 82%, 0.8);
+  --button-primary-bg: hsl(28, 20%, 12%);
+  --button-primary-text: hsl(36, 45%, 98%);
+  --button-primary-hover: hsl(28, 20%, 20%);
+  --button-primary-shadow: rgba(120, 95, 75, 0.15);
+  --button-primary-hover-shadow: rgba(120, 95, 75, 0.25);
+  
+  --popover-divider: hsla(28, 12%, 8%, 0.08);
+  --popover-badge-bg: hsla(36, 85%, 50%, 0.1);
+  --popover-badge-text: hsl(36, 85%, 40%);
+  --popover-badge-border: hsla(36, 85%, 50%, 0.2);
+  
+  --bg-tile: hsla(0, 0%, 100%, 0.45);
+  --border-tile: hsla(28, 12%, 8%, 0.05);
+  --border-tile-hover: hsla(28, 12%, 8%, 0.12);
+  --caption-border: hsla(28, 12%, 8%, 0.03);
+  
+  --bg-backdrop: rgba(28, 12, 8, 0.3);
+  --dialog-logout-text: hsl(28, 15%, 32%);
+  --dialog-logout-hover: hsl(28, 20%, 12%);
+  
+  --accent-color: hsl(36, 85%, 50%);
+  --accent-color-hover: hsl(36, 85%, 40%);
+  --glass-blur: 16px;
+  
+  --card-shadow: 0 8px 32px 0 rgba(120, 95, 75, 0.06), 0 2px 8px 0 rgba(120, 95, 75, 0.04);
+  --card-shadow-hover: 0 16px 48px 0 rgba(120, 95, 75, 0.12), 0 4px 12px 0 rgba(120, 95, 75, 0.06);
+  
+  --bg-active-count: rgba(28, 12, 8, 0.15);
+  --text-active-count: hsl(28, 22%, 10%);
+  --bg-tag-active-count: rgba(255, 255, 255, 0.35);
+  
+  --bg-modal-wrapper: hsla(36, 40%, 97%, 0.95);
+  --bg-modal-content: hsla(0, 0%, 100%, 0.45);
+  --modal-shadow: var(--card-shadow-hover);
+  
+  --scrollbar-track: rgba(28, 12, 8, 0.02);
+  --scrollbar-thumb: rgba(28, 12, 8, 0.15);
+  --scrollbar-thumb-hover: rgba(28, 12, 8, 0.3);
+}
+
+body {
+  font-family: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, sans-serif;
+  margin: 0;
+  background-color: var(--bg-page);
+  background-image: none;
+  color: var(--text-primary);
+  transition: background 0.25s ease, background-image 0.25s ease, color 0.25s ease;
+}
+
+[data-theme='light'] body {
+  background-color: hsl(36, 40%, 95%);
+  background-image: 
+    linear-gradient(rgba(28, 12, 8, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(28, 12, 8, 0.02) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, hsla(36, 85%, 90%, 0.5) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(145, 50%, 90%, 0.4) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, hsla(28, 80%, 92%, 0.4) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsla(36, 70%, 88%, 0.5) 0px, transparent 50%),
+    linear-gradient(135deg, hsl(36, 40%, 96%) 0%, hsl(20, 25%, 93%) 100%);
+  background-size: 32px 32px, 32px 32px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-attachment: fixed;
+}
+
+/* Custom Scrollbar Global */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
