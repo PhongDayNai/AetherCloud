@@ -1689,10 +1689,9 @@ function DocViewerContent() {
                 {t('viewer.noFilesFound') || 'No files found'}
               </div>
             )}
+            {/* Empty item at the bottom of the scroll list to allow scrolling past the mascot tips */}
+            {!isSidebarCollapsed && <div style={{ height: '35vh', flexShrink: 0 }} />}
           </div>
-
-          {/* Bottom spacer for overlay tips widget */}
-          {!isSidebarCollapsed && <div className="sidebarBottomSpacer" />}
         </aside>
 
         {/* Floating Tips Overlay */}
