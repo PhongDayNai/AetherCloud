@@ -14,16 +14,16 @@ import CustomSelect from '../../../components/CustomSelect';
 
 export const translateSpace = (sp: any, t: any) => {
   if (!sp) return sp;
-  const isGeneral = 
-    sp.name === 'General' && 
-    sp.type === 'journal' && 
+  const isGeneral =
+    sp.name === 'General' &&
+    sp.type === 'journal' &&
     (sp.description === 'General discussion space for the group' || sp.description === 'Write journal entries with attachments.');
   if (isGeneral) {
     const isAlt = sp.description === 'Write journal entries with attachments.';
     return {
       ...sp,
       name: t('spaces.generalName') || sp.name,
-      description: isAlt 
+      description: isAlt
         ? (t('spaces.generalDescAlternative') || sp.description)
         : (t('spaces.generalDesc') || sp.description)
     };
@@ -98,7 +98,7 @@ export default function DashboardPage(): React.JSX.Element {
     handleUpdateSpace,
     saveToPersonalPost,
     setSaveToPersonalPost,
-    
+
     // operations
     handleCreatePost,
     loadData,
@@ -106,7 +106,7 @@ export default function DashboardPage(): React.JSX.Element {
     deleteSelectedSpaces,
     restoreSelectedSpaces,
     purgeSelectedSpaces,
-    
+
     // derived memos
     filteredAssets,
     basePhotoAssets,
@@ -130,7 +130,7 @@ export default function DashboardPage(): React.JSX.Element {
     hasMore,
     isLoadingMore,
     loadMoreAssets,
-    
+
     // extra properties for dashboard
     usage,
     assets
@@ -195,7 +195,7 @@ export default function DashboardPage(): React.JSX.Element {
   // 1. Tính toán các sub-formats khả dụng trong spaceAssets dựa theo tab chính (sắp xếp đồng bộ)
   const availableSubFormats = React.useMemo(() => {
     const order = ['all', 'image', 'video', 'pdf', 'word', 'excel', 'powerpoint', 'markdown', 'text', 'ebook', 'database', 'archive', 'installer', 'disk-image', 'font', 'certificate', 'design', 'cad', 'executable', 'code', 'config', 'other'];
-    
+
     if (spaceFileTypeTab === 'media') {
       const hasImg = spaceAssets.some(a => a.type === 'image');
       const hasVid = spaceAssets.some(a => a.type === 'video');
@@ -204,7 +204,7 @@ export default function DashboardPage(): React.JSX.Element {
       }
       return [];
     }
-    
+
     if (spaceFileTypeTab === 'docs') {
       const cats = new Set<string>();
       spaceAssets.forEach(a => {
@@ -217,7 +217,7 @@ export default function DashboardPage(): React.JSX.Element {
       }
       return [];
     }
-    
+
     // spaceFileTypeTab === 'all'
     const allTypes = new Set<string>();
     spaceAssets.forEach(a => {
@@ -237,34 +237,34 @@ export default function DashboardPage(): React.JSX.Element {
 
   const processedSpaceAssets = React.useMemo(() => {
     let list = spaceAssets;
-    
+
     // 1. Lọc theo search
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter((a) => (a.originalName || '').toLowerCase().includes(q) || (a.tags || []).some(tVal => tVal.toLowerCase().includes(q)));
     }
-    
+
     // 2. Lọc theo tab chính (Tất cả, Media, Docs)
     if (spaceFileTypeTab === 'media') {
       list = list.filter(a => a.type === 'image' || a.type === 'video');
     } else if (spaceFileTypeTab === 'docs') {
       list = list.filter(a => a.type !== 'image' && a.type !== 'video');
     }
-    
+
     // 3. Lọc theo định dạng chi tiết (SubFormats - Đa chọn)
     if (availableSubFormats.length > 0 && !spaceSubFormats.includes('all')) {
       list = list.filter(a => {
         const itemType = a.type;
         const itemCat = docCategoryOf(a);
-        
+
         if (itemType === 'image' && spaceSubFormats.includes('image')) return true;
         if (itemType === 'video' && spaceSubFormats.includes('video')) return true;
         if (itemType !== 'image' && itemType !== 'video' && spaceSubFormats.includes(itemCat)) return true;
-        
+
         return false;
       });
     }
-    
+
     // 4. Sắp xếp (Sort)
     return list.slice().sort((a, b) => {
       if (spaceSortBy === 'newest') {
@@ -305,7 +305,7 @@ export default function DashboardPage(): React.JSX.Element {
 
   const recentDocsData = React.useMemo(() => {
     if (!stats?.recentDocs) return [];
-    
+
     // 1. Tính thời gian tệp mới nhất của mỗi category hoạt động
     const catLatestTime = Object.entries(stats.recentDocs).map(([category, files]) => {
       const fileList = files as Asset[];
@@ -313,13 +313,13 @@ export default function DashboardPage(): React.JSX.Element {
       const latestTime = Math.max(...fileList.map(f => new Date(f.uploadedAt || f.takenAt || 0).getTime()));
       return { category, latestTime };
     }).filter(c => c.latestTime > 0);
-    
+
     // 2. Sắp xếp các category theo latestTime giảm dần và lấy tối đa 3 category hàng đầu
     const topCategories = catLatestTime
       .sort((a, b) => b.latestTime - a.latestTime)
       .slice(0, 3)
       .map(c => c.category);
-      
+
     // 3. Với mỗi category hàng đầu, lấy docCols - 1 file đầu tiên để chừa 1 ô cuối cho nút Xem tất cả
     const docFilesPerRow = docCols - 1;
     return topCategories.map(category => {
@@ -559,7 +559,7 @@ export default function DashboardPage(): React.JSX.Element {
             <p>{t('photos.subtitle') || 'Không gian lưu trữ hình ảnh và thước phim kỷ niệm sinh động của bạn.'}</p>
           </div>
           <div className="viewTabs">
-            <button 
+            <button
               className={`tabBtn ${collectionView === 'all' ? 'active' : ''}`}
               onClick={() => setCollectionView('all')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -567,7 +567,7 @@ export default function DashboardPage(): React.JSX.Element {
               <Icons.Photos size={14} />
               {t('sidebar.allPhotosVideos') || 'Tất cả ảnh/video'}
             </button>
-            <button 
+            <button
               className={`tabBtn ${collectionView === 'recent' ? 'active' : ''}`}
               onClick={() => setCollectionView('recent')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -575,7 +575,7 @@ export default function DashboardPage(): React.JSX.Element {
               <Icons.Flash size={14} />
               {t('sidebar.recentlyAdded') || 'Mới thêm'}
             </button>
-            <button 
+            <button
               className={`tabBtn ${collectionView === 'images' ? 'active' : ''}`}
               onClick={() => setCollectionView('images')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -583,7 +583,7 @@ export default function DashboardPage(): React.JSX.Element {
               <Icons.Photos size={14} />
               {t('sidebar.imagesOnly') || 'Ảnh'}
             </button>
-            <button 
+            <button
               className={`tabBtn ${collectionView === 'videos' ? 'active' : ''}`}
               onClick={() => setCollectionView('videos')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -591,7 +591,7 @@ export default function DashboardPage(): React.JSX.Element {
               <Icons.Video size={14} />
               {t('sidebar.videosOnly') || 'Video'}
             </button>
-            <button 
+            <button
               className={`tabBtn ${collectionView === 'trash' ? 'active' : ''}`}
               onClick={() => setCollectionView('trash')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -665,24 +665,24 @@ export default function DashboardPage(): React.JSX.Element {
                   <span className="percentText">{usage?.usedPercent !== undefined ? `${usage.usedPercent}%` : '0%'}</span>
                 </div>
                 <div className="progressBarContainer">
-                  <div 
-                    className="progressBar" 
+                  <div
+                    className="progressBar"
                     style={{ width: `${usage?.usedPercent !== undefined ? Math.min(100, Math.max(0, usage.usedPercent)) : 0}%` }}
                   />
                 </div>
                 <div className="storageDetails">
                   <span className="usedText">
-                    {t('dashboard.usedOfTotal', { 
-                      used: fmtBytes(usage?.usedBytes || 0), 
-                      total: fmtBytes(usage?.totalBytes || 0) 
+                    {t('dashboard.usedOfTotal', {
+                      used: fmtBytes(usage?.usedBytes || 0),
+                      total: fmtBytes(usage?.totalBytes || 0)
                     }) || `${fmtBytes(usage?.usedBytes || 0)} / ${fmtBytes(usage?.totalBytes || 0)} đã dùng`}
                   </span>
                   <span className="freeText">
-                    {t('dashboard.freeSpace', { free: fmtBytes(usage?.freeBytes || 0) }) || 
+                    {t('dashboard.freeSpace', { free: fmtBytes(usage?.freeBytes || 0) }) ||
                       `Còn trống ${fmtBytes(usage?.freeBytes || 0)}`}
                   </span>
                 </div>
-                
+
                 {/* Storage Breakdown */}
                 {usage?.breakdown && (
                   <div className="storageBreakdown">
@@ -836,7 +836,7 @@ export default function DashboardPage(): React.JSX.Element {
                         );
                       })}
                       {/* Card Xem tất cả loại tài liệu này ở cuối dòng */}
-                      <div 
+                      <div
                         className="docCard viewAllDocCard"
                         title={t('dashboard.viewAllDocsOfCategory', { category: t('categories.' + category) || category.toUpperCase() })}
                         onClick={() => {
@@ -886,7 +886,7 @@ export default function DashboardPage(): React.JSX.Element {
 
             {/* Selector tab Hoạt động / Thùng rác */}
             <div className="spacesSubTabs" style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
-              <button 
+              <button
                 className={`spacesTabBtn ${spacesSubTab === 'active' ? 'active' : ''}`}
                 onClick={() => { setSpacesSubTab('active'); setSelectedIds([]); setSelectionMode(false); }}
                 style={{
@@ -903,7 +903,7 @@ export default function DashboardPage(): React.JSX.Element {
               >
                 {t('spaces.activeTab') || 'Đang hoạt động'} ({activeSpaces.length})
               </button>
-              <button 
+              <button
                 className={`spacesTabBtn ${spacesSubTab === 'trash' ? 'active' : ''}`}
                 onClick={() => { setSpacesSubTab('trash'); setSelectedIds([]); setSelectionMode(false); }}
                 style={{
@@ -936,8 +936,8 @@ export default function DashboardPage(): React.JSX.Element {
                 const sp = translateSpace(rawSp, t);
                 const isSelected = selectedIds.includes(sp.id);
                 return (
-                  <div 
-                    key={sp.id} 
+                  <div
+                    key={sp.id}
                     className={`spaceCard ${isSelected ? 'picked' : ''}`}
                     {...spaceCardHandlers(sp.id, () => {
                       const gId = sp.groupId || sp.group_id;
@@ -996,8 +996,8 @@ export default function DashboardPage(): React.JSX.Element {
               </div>
             </div>
             <div className="headerActions">
-              <button 
-                className="actionBtn editBtn" 
+              <button
+                className="actionBtn editBtn"
                 style={isGeneralSpace ? { visibility: 'hidden', pointerEvents: 'none' } : {}}
                 onClick={() => {
                   const sp = spaces.find(s => s.id === activeWorkspace.id);
@@ -1007,55 +1007,55 @@ export default function DashboardPage(): React.JSX.Element {
                   }
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
                 <span>{t('spaces.editSpace')}</span>
               </button>
-              
-              {(!groups.find(g => g.id === activeWorkspace.groupId) || 
+
+              {(!groups.find(g => g.id === activeWorkspace.groupId) ||
                 ['owner', 'admin'].includes(groups.find(g => g.id === activeWorkspace.groupId)?.role)) && (
-                <button 
-                  className="actionBtn deleteBtn danger" 
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    color: '#fca5a5',
-                    borderRadius: '12px',
-                    padding: '8px 14px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onClick={async () => {
-                    if (await confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?', { isDanger: true })) {
-                      const success = await handleDeleteSpace(activeWorkspace.id);
-                      if (success) {
-                        if (activeWorkspace.groupId) {
-                          router.push(`/cloud/group/${activeWorkspace.groupId}/spaces`);
-                        } else {
-                          router.push('/cloud/spaces');
+                  <button
+                    className="actionBtn deleteBtn danger"
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      color: '#fca5a5',
+                      borderRadius: '12px',
+                      padding: '8px 14px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s'
+                    }}
+                    onClick={async () => {
+                      if (await confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?', { isDanger: true })) {
+                        const success = await handleDeleteSpace(activeWorkspace.id);
+                        if (success) {
+                          if (activeWorkspace.groupId) {
+                            router.push(`/cloud/group/${activeWorkspace.groupId}/spaces`);
+                          } else {
+                            router.push('/cloud/spaces');
+                          }
                         }
                       }
-                    }
-                  }}
-                  onMouseEnter={(e: any) => {
-                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
-                    e.currentTarget.style.color = '#ffffff';
-                  }}
-                  onMouseLeave={(e: any) => {
-                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
-                    e.currentTarget.style.color = '#fca5a5';
-                  }}
-                >
-                  <Icons.Trash size={14} />
-                  <span>{t('spaces.deleteSpace') || 'Xóa không gian'}</span>
-                </button>
-              )}
+                    }}
+                    onMouseEnter={(e: any) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+                      e.currentTarget.style.color = '#ffffff';
+                    }}
+                    onMouseLeave={(e: any) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                      e.currentTarget.style.color = '#fca5a5';
+                    }}
+                  >
+                    <Icons.Trash size={14} />
+                    <span>{t('spaces.deleteSpace') || 'Xóa không gian'}</span>
+                  </button>
+                )}
 
               <button className="actionBtn viewAllBtn" onClick={() => {
                 router.push(activeWorkspace.type === 'space' && activeWorkspace.groupId ? `/cloud/group/${activeWorkspace.groupId}/space/${activeWorkspace.id}/all` : `/cloud/space/${activeWorkspace.id}/all`);
@@ -1118,8 +1118,8 @@ export default function DashboardPage(): React.JSX.Element {
               </div>
             </div>
             <div className="headerActions">
-              <button 
-                className="actionBtn editBtn" 
+              <button
+                className="actionBtn editBtn"
                 style={isGeneralSpace ? { visibility: 'hidden', pointerEvents: 'none' } : {}}
                 onClick={() => {
                   const sp = spaces.find(s => s.id === activeWorkspace.id);
@@ -1129,55 +1129,55 @@ export default function DashboardPage(): React.JSX.Element {
                   }
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
                 <span>{t('spaces.editSpace')}</span>
               </button>
-              
-              {(!groups.find(g => g.id === activeWorkspace.groupId) || 
+
+              {(!groups.find(g => g.id === activeWorkspace.groupId) ||
                 ['owner', 'admin'].includes(groups.find(g => g.id === activeWorkspace.groupId)?.role)) && (
-                <button 
-                  className="actionBtn deleteBtn danger" 
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    color: '#fca5a5',
-                    borderRadius: '12px',
-                    padding: '8px 14px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onClick={async () => {
-                    if (await confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?', { isDanger: true })) {
-                      const success = await handleDeleteSpace(activeWorkspace.id);
-                      if (success) {
-                        if (activeWorkspace.groupId) {
-                          router.push(`/cloud/group/${activeWorkspace.groupId}/spaces`);
-                        } else {
-                          router.push('/cloud/spaces');
+                  <button
+                    className="actionBtn deleteBtn danger"
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      color: '#fca5a5',
+                      borderRadius: '12px',
+                      padding: '8px 14px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s'
+                    }}
+                    onClick={async () => {
+                      if (await confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?', { isDanger: true })) {
+                        const success = await handleDeleteSpace(activeWorkspace.id);
+                        if (success) {
+                          if (activeWorkspace.groupId) {
+                            router.push(`/cloud/group/${activeWorkspace.groupId}/spaces`);
+                          } else {
+                            router.push('/cloud/spaces');
+                          }
                         }
                       }
-                    }
-                  }}
-                  onMouseEnter={(e: any) => {
-                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
-                    e.currentTarget.style.color = '#ffffff';
-                  }}
-                  onMouseLeave={(e: any) => {
-                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
-                    e.currentTarget.style.color = '#fca5a5';
-                  }}
-                >
-                  <Icons.Trash size={14} />
-                  <span>{t('spaces.deleteSpace') || 'Xóa không gian'}</span>
-                </button>
-              )}
+                    }}
+                    onMouseEnter={(e: any) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+                      e.currentTarget.style.color = '#ffffff';
+                    }}
+                    onMouseLeave={(e: any) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                      e.currentTarget.style.color = '#fca5a5';
+                    }}
+                  >
+                    <Icons.Trash size={14} />
+                    <span>{t('spaces.deleteSpace') || 'Xóa không gian'}</span>
+                  </button>
+                )}
 
               <button className="actionBtn viewAllBtn" onClick={() => {
                 router.push(activeWorkspace.type === 'space' && activeWorkspace.groupId ? `/cloud/group/${activeWorkspace.groupId}/space/${activeWorkspace.id}/all` : `/cloud/space/${activeWorkspace.id}/all`);
@@ -1188,7 +1188,7 @@ export default function DashboardPage(): React.JSX.Element {
             </div>
           </div>
           <div className="postComposer">
-            <textarea 
+            <textarea
               className="composerInput"
               placeholder={activeWorkspace.spaceType === 'journal' ? t('spaces.composerJournalPlaceholder') : t('spaces.composerCollectionPlaceholder')}
               value={postCaption}
@@ -1196,31 +1196,31 @@ export default function DashboardPage(): React.JSX.Element {
             />
             <div className="composerActions">
               <label htmlFor="space-file-upload" className="attachBtn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
                 <span>{t('actions.attachFiles') || 'Đính kèm tệp tin'} ({postFiles.length})</span>
               </label>
-              <input 
-                type="file" 
-                id="space-file-upload" 
-                multiple 
+              <input
+                type="file"
+                id="space-file-upload"
+                multiple
                 onChange={(e) => {
                   setPostFiles(Array.from(e.target.files || []));
                   e.target.value = '';
-                }} 
+                }}
                 style={{ display: 'none' }}
               />
               <button className="submitPostBtn" onClick={handleCreatePost} disabled={!postCaption.trim() && postFiles.length === 0}>
                 {t('spaces.postButton')}
               </button>
             </div>
-            
+
             {postFiles.length > 0 && (
               <div className="composerCheckboxContainer">
                 <label className={`saveToPersonalPostLabel ${saveToPersonalPost ? 'active' : ''}`}>
-                  <input 
-                    type="checkbox" 
-                    checked={saveToPersonalPost} 
-                    onChange={(e) => setSaveToPersonalPost(e.target.checked)} 
+                  <input
+                    type="checkbox"
+                    checked={saveToPersonalPost}
+                    onChange={(e) => setSaveToPersonalPost(e.target.checked)}
                     className="hidden-checkbox"
                   />
                   <span className="custom-checkbox">
@@ -1272,7 +1272,7 @@ export default function DashboardPage(): React.JSX.Element {
                       return (
                         <div key={asset.id} className="postAssetCard" onClick={() => openSpaceAsset(asset.id)}>
                           {isImg && <img src={src} alt={asset.originalName} />}
-                           {isVid && (
+                          {isVid && (
                             asset.processingStatus === 'processing' ? (
                               <div className="postVideoProcessingPlaceholder" onClick={(e) => e.stopPropagation()}>
                                 <div className="doubleRingLoader">
@@ -1283,10 +1283,10 @@ export default function DashboardPage(): React.JSX.Element {
                               </div>
                             ) : (
                               <div className="postVideoThumb">
-                                <SmartVideo 
-                                  hlsSrc={asset.hlsRelPath ? `${api}/api/assets/_media/hls/${asset.id}/master.m3u8` : undefined} 
-                                  mp4Src={asset.playRelPath ? `${api}/api/assets/_media/play/${asset.id}` : `${api}/api/assets/_media/original/${asset.id}`} 
-                                  controls 
+                                <SmartVideo
+                                  hlsSrc={asset.hlsRelPath ? `${api}/api/assets/_media/hls/${asset.id}/master.m3u8` : undefined}
+                                  mp4Src={asset.playRelPath ? `${api}/api/assets/_media/play/${asset.id}` : `${api}/api/assets/_media/original/${asset.id}`}
+                                  controls
                                 />
                               </div>
                             )
@@ -1315,14 +1315,14 @@ export default function DashboardPage(): React.JSX.Element {
           <div className="pageHeader flexHeader" style={{ borderBottom: 'none', paddingBottom: '8px' }}>
             <div className="headerText">
               <div className="spaceBreadcrumb" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <span 
-                  className="breadcrumbBack" 
+                <span
+                  className="breadcrumbBack"
                   onClick={() => router.push(activeWorkspace.type === 'space' && activeWorkspace.groupId ? `/cloud/group/${activeWorkspace.groupId}/space/${activeWorkspace.id}` : `/cloud/space/${activeWorkspace.id}`)}
                   style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px', fontWeight: '600', transition: 'color 0.15s ease', display: 'inline-flex', alignItems: 'center' }}
                   onMouseEnter={(e: any) => e.currentTarget.style.color = 'var(--text-primary)'}
                   onMouseLeave={(e: any) => e.currentTarget.style.color = 'var(--text-muted)'}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
                   <span>{t('spaces.backToSpace')}</span>
                 </span>
                 <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>/</span>
@@ -1338,8 +1338,8 @@ export default function DashboardPage(): React.JSX.Element {
               </p>
             </div>
             <div className="headerActions">
-              <button 
-                className="actionBtn editBtn" 
+              <button
+                className="actionBtn editBtn"
                 style={isGeneralSpace ? { visibility: 'hidden', pointerEvents: 'none' } : {}}
                 onClick={() => {
                   const sp = spaces.find(s => s.id === activeWorkspace.id);
@@ -1349,55 +1349,55 @@ export default function DashboardPage(): React.JSX.Element {
                   }
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
                 <span>{t('spaces.editSpace')}</span>
               </button>
 
-              {(!groups.find(g => g.id === activeWorkspace.groupId) || 
+              {(!groups.find(g => g.id === activeWorkspace.groupId) ||
                 ['owner', 'admin'].includes(groups.find(g => g.id === activeWorkspace.groupId)?.role)) && (
-                <button 
-                  className="actionBtn deleteBtn danger" 
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    color: '#fca5a5',
-                    borderRadius: '12px',
-                    padding: '8px 14px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onClick={async () => {
-                    if (await confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?', { isDanger: true })) {
-                      const success = await handleDeleteSpace(activeWorkspace.id);
-                      if (success) {
-                        if (activeWorkspace.groupId) {
-                          router.push(`/cloud/group/${activeWorkspace.groupId}/spaces`);
-                        } else {
-                          router.push('/cloud/spaces');
+                  <button
+                    className="actionBtn deleteBtn danger"
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      color: '#fca5a5',
+                      borderRadius: '12px',
+                      padding: '8px 14px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s'
+                    }}
+                    onClick={async () => {
+                      if (await confirm(t('spaces.confirmDelete') || 'Bạn có chắc chắn muốn xóa không gian con này vào thùng rác?', { isDanger: true })) {
+                        const success = await handleDeleteSpace(activeWorkspace.id);
+                        if (success) {
+                          if (activeWorkspace.groupId) {
+                            router.push(`/cloud/group/${activeWorkspace.groupId}/spaces`);
+                          } else {
+                            router.push('/cloud/spaces');
+                          }
                         }
                       }
-                    }
-                  }}
-                  onMouseEnter={(e: any) => {
-                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
-                    e.currentTarget.style.color = '#ffffff';
-                  }}
-                  onMouseLeave={(e: any) => {
-                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
-                    e.currentTarget.style.color = '#fca5a5';
-                  }}
-                >
-                  <Icons.Trash size={14} />
-                  <span>{t('spaces.deleteSpace') || 'Xóa không gian'}</span>
-                </button>
-              )}
+                    }}
+                    onMouseEnter={(e: any) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)';
+                      e.currentTarget.style.color = '#ffffff';
+                    }}
+                    onMouseLeave={(e: any) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                      e.currentTarget.style.color = '#fca5a5';
+                    }}
+                  >
+                    <Icons.Trash size={14} />
+                    <span>{t('spaces.deleteSpace') || 'Xóa không gian'}</span>
+                  </button>
+                )}
             </div>
           </div>
 
@@ -1407,19 +1407,19 @@ export default function DashboardPage(): React.JSX.Element {
               <div className="filterGroup">
                 <span className="filterLabel">{t('spaces.fileTypeLabel')}</span>
                 <div className="filterButtons">
-                  <button 
+                  <button
                     className={`filterBtn ${spaceFileTypeTab === 'all' ? 'active' : ''}`}
                     onClick={() => { setSpaceFileTypeTab('all'); setSpaceSubFormats(['all']); }}
                   >
                     {t('spaces.typeAll')}
                   </button>
-                  <button 
+                  <button
                     className={`filterBtn ${spaceFileTypeTab === 'media' ? 'active' : ''}`}
                     onClick={() => { setSpaceFileTypeTab('media'); setSpaceSubFormats(['all']); }}
                   >
                     {t('spaces.typeMedia')}
                   </button>
-                  <button 
+                  <button
                     className={`filterBtn ${spaceFileTypeTab === 'docs' ? 'active' : ''}`}
                     onClick={() => { setSpaceFileTypeTab('docs'); setSpaceSubFormats(['all']); }}
                   >
@@ -1431,7 +1431,7 @@ export default function DashboardPage(): React.JSX.Element {
               {/* Lựa chọn sắp xếp sử dụng CustomSelect global */}
               <div className="filterGroup" style={{ marginLeft: 'auto' }}>
                 <span className="filterLabel">{t('spaces.sortByLabel')}</span>
-                <CustomSelect 
+                <CustomSelect
                   value={spaceSortBy}
                   options={[
                     { value: 'newest', label: t('spaces.sortNewest') },
@@ -1455,7 +1455,7 @@ export default function DashboardPage(): React.JSX.Element {
                   {availableSubFormats.map((cat) => {
                     const isActive = spaceSubFormats.includes(cat);
                     return (
-                      <button 
+                      <button
                         key={cat}
                         className={`catChip ${isActive ? 'active' : ''}`}
                         style={{
@@ -1487,10 +1487,10 @@ export default function DashboardPage(): React.JSX.Element {
                           }
                         }}
                       >
-                        {cat === 'all' 
-                          ? t('sidebar.all') 
-                          : isActive 
-                            ? `✓ ${getSubFormatLabel(cat)}` 
+                        {cat === 'all'
+                          ? t('sidebar.all')
+                          : isActive
+                            ? `✓ ${getSubFormatLabel(cat)}`
                             : `+ ${getSubFormatLabel(cat)}`}
                       </button>
                     );
@@ -1506,8 +1506,8 @@ export default function DashboardPage(): React.JSX.Element {
             </div>
           ) : (
             /* Animation key thay đổi theo bộ lọc để trigger lại animation xuất hiện */
-            <div 
-              key={`${spaceFileTypeTab}-${spaceSubFormats.join(',')}-${spaceSortBy}`} 
+            <div
+              key={`${spaceFileTypeTab}-${spaceSubFormats.join(',')}-${spaceSortBy}`}
               className="spaceAssetsGrid"
             >
               {processedSpaceAssets.map((item, idx) => {
@@ -1516,10 +1516,10 @@ export default function DashboardPage(): React.JSX.Element {
                 const srcOriginal = `${api}/api/assets/_media/original/${item.id}`;
                 const srcPlay = `${api}/api/assets/_media/play/${item.id}`;
                 const picked = selectedIds.includes(item.id);
-                
+
                 return (
-                  <div 
-                    key={item.id} 
+                  <div
+                    key={item.id}
                     data-id={item.id}
                     className={`assetCard ${picked ? 'picked' : ''} ${!isImg && !isVid ? 'docCardStyle' : 'mediaCardStyle'}`}
                     style={{ animationDelay: `${(idx % 24) * 0.02}s` }}
@@ -1550,7 +1550,7 @@ export default function DashboardPage(): React.JSX.Element {
                         <div className="mediaWrapper">
                           <video src={srcPlay} className="thumb" muted preload="none" />
                           <div className="videoPlayIcon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3" /></svg>
                           </div>
                           <div className="mediaHoverOverlay">
                             <span className="fileNameOverlay">{item.originalName}</span>
@@ -1581,23 +1581,23 @@ export default function DashboardPage(): React.JSX.Element {
       )}
 
       {hasMore && (
-        tab === 'photos' || 
-        tab === 'docs' || 
+        tab === 'photos' ||
+        tab === 'docs' ||
         (tab === 'space' && activeWorkspace.type === 'space' && activeWorkspace.spaceType === 'project')
       ) && (
-        <div ref={sentinelRef} className="sentinelContainer">
-          {isLoadingMore ? (
-            <div className="sentinelLoading">
-              <span className="sentinelSpinner"></span>
-              <span>{t('messages.loading') || 'Đang tải thêm...'}</span>
-            </div>
-          ) : (
-            <button className="sentinelLoadMoreBtn" onClick={() => loadMoreAssets()}>
-              {t('actions.loadMore') || 'Xem thêm'}
-            </button>
-          )}
-        </div>
-      )}
+          <div ref={sentinelRef} className="sentinelContainer">
+            {isLoadingMore ? (
+              <div className="sentinelLoading">
+                <span className="sentinelSpinner"></span>
+                <span>{t('messages.loading') || 'Đang tải thêm...'}</span>
+              </div>
+            ) : (
+              <button className="sentinelLoadMoreBtn" onClick={() => loadMoreAssets()}>
+                {t('actions.loadMore') || 'Xem thêm'}
+              </button>
+            )}
+          </div>
+        )}
 
       <style jsx>{`
         .composerCheckboxContainer {
@@ -2352,7 +2352,8 @@ export default function DashboardPage(): React.JSX.Element {
           color: var(--text-muted);
         }
         .spaceTimelineView {
-          max-width: 800px;
+          width: 75%;
+          max-width: 900px;
           margin: 0 auto;
           display: flex;
           flex-direction: column;
