@@ -13,6 +13,7 @@ import * as Icons from '../../../components/Icons';
 import CustomSelect from '../../../components/CustomSelect';
 import { useGridSelection } from '../hooks/useGridSelection';
 import DashboardView from '../components/DashboardView';
+import SpacesDirectoryView from '../components/SpacesDirectoryView';
 
 export const translateSpace = (sp: any, t: any) => {
   if (!sp) return sp;
@@ -564,112 +565,22 @@ export default function DashboardPage(): React.JSX.Element {
         />
       )}
 
-      {tab === 'spaces' && (() => {
-        const isGroup = activeWorkspace.type === 'group';
-        const myGroupRole = isGroup ? activeWorkspace.role : null;
-        const canCreateSpace = !isGroup || myGroupRole === 'owner' || myGroupRole === 'admin';
-
-        const activeSpaces = spaces.filter(sp => !sp.is_deleted && !sp.isDeleted);
-        const trashedSpaces = spaces.filter(sp => sp.is_deleted || sp.isDeleted);
-        const spacesToRender = spacesSubTab === 'active' ? activeSpaces : trashedSpaces;
-
-        return (
-          <div className="spacesDirectory">
-            <div className="pageHeader flexHeader">
-              <div className="headerText">
-                <h1>{isGroup ? t('spaces.groupTitle') : (t('spaces.title') || 'Không gian con cá nhân')}</h1>
-                <p>{isGroup ? (t('spaces.groupSubtitle') || 'Quản lý các nhật ký, bộ sưu tập tệp tin và dự án tài liệu chia sẻ trong nhóm.') : (t('spaces.subtitle') || 'Quản lý các nhật ký, bộ sưu tập tệp tin và dự án tài liệu riêng tư của bạn.')}</p>
-              </div>
-            </div>
-
-            {/* Selector tab Hoạt động / Thùng rác */}
-            <div className="spacesSubTabs" style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
-              <button
-                className={`spacesTabBtn ${spacesSubTab === 'active' ? 'active' : ''}`}
-                onClick={() => { setSpacesSubTab('active'); setSelectedIds([]); setSelectionMode(false); }}
-                style={{
-                  background: spacesSubTab === 'active' ? 'var(--bg-item-active)' : 'transparent',
-                  border: 0,
-                  color: spacesSubTab === 'active' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '13.5px',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {t('spaces.activeTab') || 'Đang hoạt động'} ({activeSpaces.length})
-              </button>
-              <button
-                className={`spacesTabBtn ${spacesSubTab === 'trash' ? 'active' : ''}`}
-                onClick={() => { setSpacesSubTab('trash'); setSelectedIds([]); setSelectionMode(false); }}
-                style={{
-                  background: spacesSubTab === 'trash' ? 'var(--bg-item-active)' : 'transparent',
-                  border: 0,
-                  color: spacesSubTab === 'trash' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '13.5px',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {t('spaces.trashTab') || 'Thùng rác'} ({trashedSpaces.length})
-              </button>
-            </div>
-
-            <div className="spacesGrid">
-              {/* Card tạo mới: chỉ hiển thị ở tab Active và khi người dùng có quyền */}
-              {spacesSubTab === 'active' && canCreateSpace && (
-                <div className="spaceCard createCard" onClick={() => setShowCreateSpaceModal(true)}>
-                  <div className="createIcon"><Icons.Plus size={28} /></div>
-                  <div className="createLabel">{t('spaces.create') || 'Tạo không gian con'}</div>
-                  <div className="createSub">{t('spaces.createTypes')}</div>
-                </div>
-              )}
-
-              {spacesToRender.map((rawSp) => {
-                const sp = translateSpace(rawSp, t);
-                const isSelected = selectedIds.includes(sp.id);
-                return (
-                  <div
-                    key={sp.id}
-                    className={`spaceCard ${isSelected ? 'picked' : ''}`}
-                    {...spaceCardHandlers(sp.id, () => {
-                      const gId = sp.groupId || sp.group_id;
-                      router.push(gId ? `/cloud/group/${gId}/space/${sp.id}` : `/cloud/space/${sp.id}`);
-                    })}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      if (spacesSubTab === 'trash') return;
-                      setSelectionMode(true);
-                      togglePick(sp.id);
-                    }}
-                  >
-                    <div className="spaceCardHeader">
-                      <span className="spaceTypeIcon" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        {sp.type === 'journal' ? <Icons.Journal size={24} /> : sp.type === 'collection' ? <Icons.Collection size={24} /> : <Icons.Project size={24} />}
-                      </span>
-                      <span className="spaceBadge">
-                        {sp.type === 'journal' ? (t('spaces.journal') || 'Nhật ký') : sp.type === 'collection' ? (t('spaces.collection') || 'Bộ sưu tập') : (t('spaces.project') || 'Dự án')}
-                      </span>
-                    </div>
-                    <h3 className="spaceCardName">{sp.name}</h3>
-                    <p className="spaceCardDesc">{sp.description || t('spaces.noDescription')}</p>
-                    <div className="spaceCardFooter">
-                      <span>{t('spaces.createdLabel') || 'Đã tạo'}: {new Date(sp.createdAt || sp.created_at).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US')}</span>
-                    </div>
-
-                    {isSelected && <div className="badge">✓</div>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
+      {tab === 'spaces' && (
+        <SpacesDirectoryView
+          t={t}
+          language={language}
+          activeWorkspace={activeWorkspace}
+          spaces={spaces}
+          spacesSubTab={spacesSubTab}
+          setSpacesSubTab={setSpacesSubTab}
+          setSelectedIds={setSelectedIds}
+          setSelectionMode={setSelectionMode}
+          selectedIds={selectedIds}
+          spaceCardHandlers={spaceCardHandlers}
+          togglePick={togglePick}
+          setShowCreateSpaceModal={setShowCreateSpaceModal}
+        />
+      )}
 
       {tab === 'space' && activeWorkspace.type === 'space' && activeWorkspace.spaceType === 'project' && (
         <>
@@ -1801,96 +1712,7 @@ export default function DashboardPage(): React.JSX.Element {
           margin-top: 0;
           margin-bottom: 0;
         }
-        .spacesGrid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 20px;
-        }
-        .spaceCard {
-          background: var(--bg-tile);
-          border: 1px solid var(--border-tile);
-          border-radius: 16px;
-          padding: 20px;
-          cursor: pointer;
-          box-shadow: var(--card-shadow);
-          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          position: relative;
-        }
-        .spaceCard:hover {
-          transform: translateY(-4px);
-          border-color: var(--border-tile-hover);
-          box-shadow: var(--card-shadow-hover);
-        }
-        .spaceCardHeader {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .spaceTypeIcon {
-          font-size: 24px;
-        }
-        .spaceBadge {
-          font-size: 11px;
-          font-weight: 700;
-          padding: 4px 10px;
-          border-radius: 99px;
-          background: var(--bg-item-active);
-          color: var(--text-secondary);
-          border: 1px solid var(--border-color);
-        }
-        .spaceCardName {
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--text-primary);
-          margin: 0;
-        }
-        .spaceCardDesc {
-          font-size: 13px;
-          color: var(--text-secondary);
-          line-height: 1.5;
-          margin: 0;
-          flex-grow: 1;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .spaceCardFooter {
-          font-size: 11px;
-          color: var(--text-muted);
-          border-top: 1px solid var(--border-color);
-          padding-top: 8px;
-        }
-        .createCard {
-          border: 2px dashed var(--border-color);
-          background: transparent;
-          justify-content: center;
-          align-items: center;
-          text-align: center;
-          box-shadow: none;
-        }
-        .createCard:hover {
-          border-color: var(--border-input-focus);
-          background: rgba(255, 255, 255, 0.01);
-        }
-        .createIcon {
-          font-size: 32px;
-          color: var(--text-muted);
-          margin-bottom: 8px;
-        }
-        .createLabel {
-          font-size: 15px;
-          font-weight: 700;
-          color: var(--text-primary);
-        }
-        .createSub {
-          font-size: 12px;
-          color: var(--text-muted);
-        }
+
         .spaceTimelineView {
           width: 75%;
           max-width: 900px;
