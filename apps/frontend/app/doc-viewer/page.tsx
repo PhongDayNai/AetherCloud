@@ -60,6 +60,11 @@ function splitHtmlIntoLines(html: string): string[] {
 
 
 
+const getDefaultSandboxMode = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  return localStorage.getItem('default_sandbox_mode') !== 'off';
+};
+
 function DocViewerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -94,8 +99,7 @@ function DocViewerContent() {
   const draftContentRef = useRef<string>('');
 
   useEffect(() => {
-    const saved = localStorage.getItem('default_sandbox_mode');
-    setSandboxMode(saved === 'off' ? false : true);
+    setSandboxMode(getDefaultSandboxMode());
   }, []);
 
   // Lắng nghe sự kiện group_kick để kiểm tra quyền truy cập tài liệu realtime
@@ -608,6 +612,10 @@ function DocViewerContent() {
       setError(t('viewer.missingParam') || 'Missing document ID parameter');
       setIsLoading(false);
       return;
+    }
+
+    if (getDefaultSandboxMode()) {
+      setSandboxMode(true);
     }
 
     const loadData = async () => {
