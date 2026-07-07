@@ -382,5 +382,22 @@
       "vi": "Bạn có thể cài đặt mặc định mở DocViewer ở chế độ \"Chỉ đọc\" (Sandbox Mode) hoặc \"Chỉnh sửa ngay\".",
       "en": "Set your preference to always open files in Read-only (Sandbox) or Edit Mode by default."
     }
+  },
+  {
+    "key": "tip.change_default_sandbox_in_settings",
+    "icon": "settings",
+    "category": {
+      "vi": "Tiện ích",
+      "en": "Utility"
+    },
+    "title": {
+      "vi": "Đổi Sandbox mặc định",
+      "en": "Change Default Sandbox"
+    },
+    "content": {
+      "vi": "Bạn có thể cấu hình chế độ mở tệp mặc định (Chỉ đọc hoặc Chỉnh sửa) tại biểu tượng Cài đặt (bánh răng) ở góc trên bên phải.",
+      "en": "You can configure the default file opening mode (Read-only or Edit) in the Settings (gear icon) at the top right."
+    }
   }
 ]
+
