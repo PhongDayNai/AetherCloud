@@ -156,7 +156,8 @@
   filter: brightness(1.1);
 }
 
-.btnClose {
+.btnClose,
+.btnSettings {
   background: transparent;
   border: none;
   color: #71717a;
@@ -169,9 +170,14 @@
   transition: all 0.15s ease;
 }
 
-.btnClose:hover {
+.btnClose:hover,
+.btnSettings:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #ffffff;
+}
+
+.btnSettings {
+  margin-right: 8px;
 }
 
 /* Body layout */
@@ -643,11 +649,13 @@
   border-color: rgba(0, 0, 0, 0.12);
 }
 
-[data-theme='light'] .btnClose {
+[data-theme='light'] .btnClose,
+[data-theme='light'] .btnSettings {
   color: #71717a;
 }
 
-[data-theme='light'] .btnClose:hover {
+[data-theme='light'] .btnClose:hover,
+[data-theme='light'] .btnSettings:hover {
   background: rgba(0, 0, 0, 0.04);
   color: #18181b;
 }
