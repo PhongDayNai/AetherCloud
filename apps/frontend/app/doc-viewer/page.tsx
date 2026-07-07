@@ -1328,16 +1328,6 @@ function DocViewerContent() {
 
           {['markdown', 'code', 'config', 'text'].includes(category) && (
             <div className="saveActionGroup">
-              {!isWritable && (
-                <span className="readOnlyReasonLabel" title={t('viewer.readOnlyReason')}>
-                  {t('viewer.readOnlyReason')}
-                </span>
-              )}
-              {asset?.isDeleted && (
-                <span className="readOnlyReasonLabel">
-                  {t('viewer.fileInTrash')}
-                </span>
-              )}
               <button
                 className="btn primary btnSave"
                 onClick={() => handleSave()}
@@ -1704,6 +1694,17 @@ function DocViewerContent() {
         <MascotTipsWidget tips={docViewerTips} theme={docTheme} language={currentLang} />
 
         <main className="viewerContent">
+          {(!isWritable || asset?.isDeleted) && !isLoading && asset && (
+            <div className="viewerContentWarning">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: '1.5px' }}>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+              </svg>
+              <span style={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                {asset?.isDeleted ? t('viewer.fileInTrash') : t('viewer.readOnlyReason')}
+              </span>
+            </div>
+          )}
           {isLoading ? (
             <div className="centerOverlay" style={{ position: 'relative', height: '100%', minHeight: '300px' }}>
               <QuantumLoader size="large" text={t('viewer.loadingFile') || 'Loading file...'} />
