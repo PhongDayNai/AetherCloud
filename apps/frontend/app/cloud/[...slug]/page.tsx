@@ -11,6 +11,7 @@ import { Asset } from '../../../types';
 import { fmtBytes, docCategoryOf, formatDateTime } from '../../../lib/utils';
 import * as Icons from '../../../components/Icons';
 import CustomSelect from '../../../components/CustomSelect';
+import { useGridSelection } from '../hooks/useGridSelection';
 
 export const translateSpace = (sp: any, t: any) => {
   if (!sp) return sp;
@@ -74,8 +75,6 @@ export default function DashboardPage(): React.JSX.Element {
     posts, setPosts,
     postCaption, setPostCaption,
     postFiles, setPostFiles,
-    selectionMode, setSelectionMode,
-    selectedIds, setSelectedIds,
     activeIndex, setActiveIndex,
     setSpaceAssetsFiltered,
     collectionView, setCollectionView,
@@ -135,6 +134,16 @@ export default function DashboardPage(): React.JSX.Element {
     usage,
     assets
   } = useCloud();
+
+  const {
+    selectionMode,
+    setSelectionMode,
+    selectedIds,
+    setSelectedIds,
+    togglePick,
+    cardHandlers,
+    spaceCardHandlers,
+  } = useGridSelection();
 
   // Compute dashboard metrics from stats
   const { stats } = useCloud();
@@ -476,78 +485,6 @@ export default function DashboardPage(): React.JSX.Element {
   function openSpaceAsset(id: string) {
     const idx = spaceAssets.findIndex((x) => x.id === id);
     if (idx >= 0) setActiveIndex(idx);
-  }
-
-  const suppressClickRef = React.useRef<string | null>(null);
-  const longPressRef = React.useRef<NodeJS.Timeout | null>(null);
-  const LONG_PRESS_MS = 420;
-
-  function clearLongPress() {
-    if (longPressRef.current) {
-      clearTimeout(longPressRef.current);
-      longPressRef.current = null;
-    }
-  }
-
-  function togglePick(id: string) {
-    setSelectedIds((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-      if (next.length === 0) setSelectionMode(false);
-      return next;
-    });
-  }
-
-  function beginLongPress(id: string) {
-    clearLongPress();
-    longPressRef.current = setTimeout(() => {
-      suppressClickRef.current = id;
-      setSelectionMode(true);
-      setSelectedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-    }, LONG_PRESS_MS);
-  }
-
-  function endLongPress() {
-    clearLongPress();
-  }
-
-  function spaceCardHandlers(spaceId: string, onNormalClick?: () => void) {
-    return {
-      onMouseDown: () => beginLongPress(spaceId),
-      onMouseUp: endLongPress,
-      onMouseLeave: endLongPress,
-      onTouchStart: () => beginLongPress(spaceId),
-      onTouchEnd: endLongPress,
-      onClick: () => {
-        if (suppressClickRef.current === spaceId) {
-          suppressClickRef.current = null;
-          return;
-        }
-        if (selectionMode || spacesSubTab === 'trash') {
-          if (!selectionMode) setSelectionMode(true);
-          togglePick(spaceId);
-        } else {
-          onNormalClick?.();
-        }
-      },
-    };
-  }
-
-  function cardHandlers(item: Asset, onNormalClick?: () => void) {
-    return {
-      onMouseDown: () => beginLongPress(item.id),
-      onMouseUp: endLongPress,
-      onMouseLeave: endLongPress,
-      onTouchStart: () => beginLongPress(item.id),
-      onTouchEnd: endLongPress,
-      onClick: () => {
-        if (suppressClickRef.current === item.id) {
-          suppressClickRef.current = null;
-          return;
-        }
-        if (selectionMode) togglePick(item.id);
-        else onNormalClick?.();
-      },
-    };
   }
 
   return (
