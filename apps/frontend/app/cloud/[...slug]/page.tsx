@@ -12,6 +12,7 @@ import { fmtBytes, docCategoryOf, formatDateTime } from '../../../lib/utils';
 import * as Icons from '../../../components/Icons';
 import CustomSelect from '../../../components/CustomSelect';
 import { useGridSelection } from '../hooks/useGridSelection';
+import DashboardView from '../components/DashboardView';
 
 export const translateSpace = (sp: any, t: any) => {
   if (!sp) return sp;
@@ -168,15 +169,7 @@ export default function DashboardPage(): React.JSX.Element {
     );
   }, [activeWorkspace, spaces]);
 
-  const dashboardStats = React.useMemo(() => {
-    return {
-      photosVideosCount: stats?.counts?.photosCount || 0,
-      docsCount: stats?.counts?.docsCount || 0,
-      spacesCount: spaces.length,
-      trashCount: stats?.counts?.trashCount || 0,
-      trashSize: stats?.storage?.breakdown?.trashBytes || 0
-    };
-  }, [stats, spaces]);
+
 
   const [dashboardContainer, setDashboardContainer] = React.useState<HTMLDivElement | null>(null);
   const photoCols = useGridColumns(dashboardContainer, 200, 16);
@@ -306,39 +299,6 @@ export default function DashboardPage(): React.JSX.Element {
     }
   }, [processedSpaceAssets, tab, setSpaceAssetsFiltered]);
 
-  const recentPhotos = React.useMemo(() => {
-    if (!stats?.recentPhotos) return [];
-    const totalCount = 3 * photoCols;
-    return stats.recentPhotos.slice(0, totalCount);
-  }, [stats, photoCols]);
-
-  const recentDocsData = React.useMemo(() => {
-    if (!stats?.recentDocs) return [];
-
-    // 1. Tính thời gian tệp mới nhất của mỗi category hoạt động
-    const catLatestTime = Object.entries(stats.recentDocs).map(([category, files]) => {
-      const fileList = files as Asset[];
-      if (fileList.length === 0) return { category, latestTime: 0 };
-      const latestTime = Math.max(...fileList.map(f => new Date(f.uploadedAt || f.takenAt || 0).getTime()));
-      return { category, latestTime };
-    }).filter(c => c.latestTime > 0);
-
-    // 2. Sắp xếp các category theo latestTime giảm dần và lấy tối đa 3 category hàng đầu
-    const topCategories = catLatestTime
-      .sort((a, b) => b.latestTime - a.latestTime)
-      .slice(0, 3)
-      .map(c => c.category);
-
-    // 3. Với mỗi category hàng đầu, lấy docCols - 1 file đầu tiên để chừa 1 ô cuối cho nút Xem tất cả
-    const docFilesPerRow = docCols - 1;
-    return topCategories.map(category => {
-      const files = (stats.recentDocs[category] || []).slice(0, docFilesPerRow);
-      return {
-        category,
-        files
-      };
-    });
-  }, [stats, docCols]);
 
   const sentinelRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -584,223 +544,24 @@ export default function DashboardPage(): React.JSX.Element {
       )}
 
       {tab === 'dashboard' && (
-        <div ref={setDashboardContainer}>
-          <div className="pageHeader">
-            <h1>{t('sidebar.dashboard') || 'Tổng quan'}</h1>
-            <p>{t('dashboard.subtitle') || 'Xem và quản lý toàn bộ tệp tin, hình ảnh, tài liệu của bạn tại một nơi.'}</p>
-          </div>
-
-          {/* Dashboard Section */}
-          <div className="dashboardSection">
-
-
-            <div className="dashboardGrid">
-              {/* Storage Usage Card */}
-              <div className="dashboardCard storageCard">
-                <div className="cardHeader">
-                  <h3>{t('dashboard.storageUsage') || 'Dung lượng lưu trữ'}</h3>
-                  <span className="percentText">{usage?.usedPercent !== undefined ? `${usage.usedPercent}%` : '0%'}</span>
-                </div>
-                <div className="progressBarContainer">
-                  <div
-                    className="progressBar"
-                    style={{ width: `${usage?.usedPercent !== undefined ? Math.min(100, Math.max(0, usage.usedPercent)) : 0}%` }}
-                  />
-                </div>
-                <div className="storageDetails">
-                  <span className="usedText">
-                    {t('dashboard.usedOfTotal', {
-                      used: fmtBytes(usage?.usedBytes || 0),
-                      total: fmtBytes(usage?.totalBytes || 0)
-                    }) || `${fmtBytes(usage?.usedBytes || 0)} / ${fmtBytes(usage?.totalBytes || 0)} đã dùng`}
-                  </span>
-                  <span className="freeText">
-                    {t('dashboard.freeSpace', { free: fmtBytes(usage?.freeBytes || 0) }) ||
-                      `Còn trống ${fmtBytes(usage?.freeBytes || 0)}`}
-                  </span>
-                </div>
-
-                {/* Storage Breakdown */}
-                {usage?.breakdown && (
-                  <div className="storageBreakdown">
-                    <div className="breakdownItem">
-                      <span className="dot originalDot"></span>
-                      <span className="label">{t('dashboard.originals') || 'Tệp gốc'}:</span>
-                      <span className="value">{fmtBytes(usage.breakdown.originalsBytes || 0)}</span>
-                    </div>
-                    <div className="breakdownItem">
-                      <span className="dot derivedDot"></span>
-                      <span className="label">{t('dashboard.derived') || 'Tệp tối ưu'}:</span>
-                      <span className="value">{fmtBytes(usage.breakdown.derivedBytes || 0)}</span>
-                    </div>
-                    <div className="breakdownItem">
-                      <span className="dot trashDot"></span>
-                      <span className="label">{t('dashboard.trash') || 'Thùng rác'}:</span>
-                      <span className="value">{fmtBytes(usage.breakdown.trashBytes || 0)}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Actions & Quick Stats Grid */}
-              <div className="statsGrid">
-                {/* Photos & Videos Card */}
-                <div className="statCard clickableCard" onClick={() => { setTab('photos'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/photos` : '/cloud/photos'); }}>
-                  <div className="statIcon iconPhotos">
-                    <Icons.Photos size={20} />
-                  </div>
-                  <div className="statInfo">
-                    <h4>{t('sidebar.allPhotosVideos') || 'Ảnh & Video'}</h4>
-                    <p className="statCount">{t('dashboard.photosVideosCount', { count: dashboardStats.photosVideosCount }) || `${dashboardStats.photosVideosCount} tệp`}</p>
-                    <p className="statSize">{t('dashboard.albumsCount', { count: stats?.albums?.length || 0 }) || `${stats?.albums?.length || 0} album`}</p>
-                  </div>
-                </div>
-
-                {/* Documents Card */}
-                <div className="statCard clickableCard" onClick={() => { setTab('docs'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/docs` : '/cloud/docs'); }}>
-                  <div className="statIcon iconDocs">
-                    <Icons.Documents size={20} />
-                  </div>
-                  <div className="statInfo">
-                    <h4>{t('sidebar.documents') || 'Tài liệu'}</h4>
-                    <p className="statCount">{t('dashboard.docsCount', { count: dashboardStats.docsCount }) || `${dashboardStats.docsCount} tài liệu`}</p>
-                    <p className="statSize">{t('dashboard.docProjectsCount', { count: stats?.docProjects?.length || 0 }) || `${stats?.docProjects?.length || 0} tập tài liệu`}</p>
-                  </div>
-                </div>
-
-                {/* Spaces Card */}
-                <div className="statCard clickableCard" onClick={() => { setTab('spaces'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/spaces` : '/cloud/spaces'); }}>
-                  <div className="statIcon iconSpaces">
-                    <Icons.Spaces size={20} />
-                  </div>
-                  <div className="statInfo">
-                    <h4>{t('sidebar.spaces') || 'Không gian con'}</h4>
-                    <p className="statCount">{t('dashboard.spacesCount', { count: dashboardStats.spacesCount }) || `${dashboardStats.spacesCount} không gian`}</p>
-                    <p className="statSize">{t('dashboard.spacesDesc') || 'Ghi chép & Lưu trữ'}</p>
-                  </div>
-                </div>
-
-                {/* Trash Card */}
-                <div className="statCard clickableCard" onClick={() => { setTab('photos'); setCollectionView('trash'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/photos` : '/cloud/photos'); }}>
-                  <div className="statIcon iconTrash">
-                    <Icons.Trash size={20} />
-                  </div>
-                  <div className="statInfo">
-                    <h4>{t('sidebar.trashBin') || 'Thùng rác'}</h4>
-                    <p className="statCount">{t('dashboard.trashCount', { count: dashboardStats.trashCount }) || `${dashboardStats.trashCount} tệp đã xóa`}</p>
-                    <p className="statSize">{fmtBytes(dashboardStats.trashSize)}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Photos & Videos Section */}
-          <div className="recentSection">
-            <div className="recentSectionHeader">
-              <h2>{t('dashboard.recentPhotosVideos')}</h2>
-            </div>
-            {recentPhotos.length === 0 ? (
-              <div className="recentEmptyHint">{t('dashboard.noRecentPhotosVideos')}</div>
-            ) : (
-              <>
-                <div className="recentPhotosGrid" style={{ gridTemplateColumns: `repeat(${photoCols}, 1fr)` }}>
-                  {recentPhotos.map((a) => {
-                    const srcOriginal = `${api}/api/assets/_media/original/${a.id}`;
-                    const srcPlay = `${api}/api/assets/_media/play/${a.id}`;
-                    const picked = selectedIds.includes(a.id);
-                    return (
-                      <div key={a.id} data-id={a.id} className={`tile ${picked ? 'picked' : ''} ${a.processingStatus === 'processing' ? 'tileProcessing' : ''}`} {...cardHandlers(a, () => openAll(a.id))}>
-                        {a.type === 'image' ? (
-                          <img src={srcOriginal} alt={a.originalName} className="thumb" loading="lazy" />
-                        ) : a.type === 'video' ? (
-                          a.processingStatus === 'processing' ? (
-                            <div className="processingPlaceholder">
-                              <div className="doubleRingLoader">
-                                <div className="ring1" />
-                                <div className="ring2" />
-                              </div>
-                              <span className="processingText">{t('buttons.processing') || 'Đang xử lý...'}</span>
-                            </div>
-                          ) : (
-                            <video src={srcPlay} className="thumb" muted preload="none" />
-                          )
-                        ) : null}
-                        <div className="caption">{a.originalName}</div>
-                        {picked && <div className="badge">✓</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="sectionFooter">
-                  <button className="viewAllBtn" onClick={() => { setTab('photos'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/photos` : '/cloud/photos'); }}>
-                    {t('dashboard.viewAllPhotosVideos')} &rarr;
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Recent Documents Section */}
-          <div className="recentSection" style={{ marginTop: '32px' }}>
-            <div className="recentSectionHeader">
-              <h2>{t('dashboard.recentDocs')}</h2>
-            </div>
-            {recentDocsData.length === 0 ? (
-              <div className="recentEmptyHint">{t('dashboard.noRecentDocs')}</div>
-            ) : (
-              <>
-                {recentDocsData.map(({ category, files }) => (
-                  <div className="recentDocRow" key={category}>
-                    <h3 className="docCategoryTitle">
-                      {t('categories.' + category) || category.toUpperCase()}
-                    </h3>
-                    <div className="recentDocsGrid" style={{ gridTemplateColumns: `repeat(${docCols}, 1fr)` }}>
-                      {files.map((d) => {
-                        const picked = selectedIds.includes(d.id);
-                        return (
-                          <div key={d.id} data-id={d.id} title={d.originalName} className={`docCard ${picked ? 'picked' : ''}`} {...cardHandlers(d, () => openAll(d.id))}>
-                            <div className="docIconWrapper">
-                              <Icons.DocIcon item={d} size={28} />
-                              <span className="docIconTypeBadge">{d.originalName.split('.').pop()?.toUpperCase() || 'FILE'}</span>
-                            </div>
-                            <div className="docTextWrap" style={{ flex: 1, minWidth: 0 }}>
-                              <div className="docName" title={d.originalName}>{d.originalName}</div>
-                              <div className="docMeta">{fmtBytes(d.size)}</div>
-                            </div>
-                            {picked && <div className="badge">✓</div>}
-                          </div>
-                        );
-                      })}
-                      {/* Card Xem tất cả loại tài liệu này ở cuối dòng */}
-                      <div
-                        className="docCard viewAllDocCard"
-                        title={t('dashboard.viewAllDocsOfCategory', { category: t('categories.' + category) || category.toUpperCase() })}
-                        onClick={() => {
-                          setTab('docs');
-                          setDocCategoryFilter(category);
-                          router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/docs` : '/cloud/docs');
-                        }}
-                      >
-                        <div className="viewAllDocContent">
-                          <span className="viewAllDocText">
-                            {t('dashboard.viewAllDocsOfCategory', { category: t('categories.' + category) || category.toUpperCase() })}
-                          </span>
-                          <span className="viewAllDocArrow">&rarr;</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <div className="sectionFooter">
-                  <button className="viewAllBtn" onClick={() => { setTab('docs'); setDocCategoryFilter('all'); router.push(activeWorkspace.type === 'group' ? `/cloud/group/${activeWorkspace.id}/docs` : '/cloud/docs'); }}>
-                    {t('dashboard.viewAllDocs')} &rarr;
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        <DashboardView
+          api={api}
+          t={t}
+          setCollectionView={setCollectionView}
+          activeWorkspace={activeWorkspace}
+          setSelectedIds={setSelectedIds}
+          setSelectionMode={setSelectionMode}
+          spaces={spaces}
+          usage={usage}
+          stats={stats}
+          photoCols={photoCols}
+          docCols={docCols}
+          selectedIds={selectedIds}
+          cardHandlers={cardHandlers}
+          openAll={openAll}
+          setDocCategoryFilter={setDocCategoryFilter}
+          setDashboardContainer={setDashboardContainer}
+        />
       )}
 
       {tab === 'spaces' && (() => {
@@ -1994,165 +1755,7 @@ export default function DashboardPage(): React.JSX.Element {
           display: inline-flex;
           animation: spin 2s linear infinite;
         }
-        .dashboardGrid {
-          display: grid;
-          grid-template-columns: 1.2fr 1.8fr;
-          gap: 16px;
-        }
-        @media (max-width: 900px) {
-          .dashboardGrid {
-            grid-template-columns: 1fr;
-          }
-        }
-        .dashboardCard {
-          background: var(--bg-tile);
-          border: 1px solid var(--border-tile);
-          border-radius: 16px;
-          padding: 20px;
-          box-shadow: var(--card-shadow);
-        }
-        .storageCard {
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          gap: 14px;
-        }
-        .storageCard .cardHeader {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .storageCard .cardHeader h3 {
-          font-size: 16px;
-          font-weight: 700;
-          margin: 0;
-          color: var(--text-primary);
-        }
-        .storageCard .percentText {
-          font-size: 20px;
-          font-weight: 800;
-          color: var(--button-primary-bg);
-        }
-        .progressBarContainer {
-          width: 100%;
-          height: 10px;
-          background: var(--bg-input);
-          border-radius: 99px;
-          overflow: hidden;
-        }
-        .progressBar {
-          height: 100%;
-          background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-          border-radius: 99px;
-          transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .storageDetails {
-          display: flex;
-          justify-content: space-between;
-          font-size: 12px;
-        }
-        .usedText {
-          color: var(--text-secondary);
-          font-weight: 600;
-        }
-        .freeText {
-          color: var(--text-muted);
-        }
-        .storageBreakdown {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          border-top: 1px solid var(--border-color);
-          padding-top: 12px;
-          margin-top: 4px;
-        }
-        .breakdownItem {
-          display: flex;
-          align-items: center;
-          font-size: 11.5px;
-          gap: 6px;
-        }
-        .breakdownItem .dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-        }
-        .originalDot { background: #3b82f6; }
-        .derivedDot { background: #8b5cf6; }
-        .trashDot { background: #f87171; }
-        
-        .breakdownItem .label {
-          color: var(--text-muted);
-          flex-grow: 1;
-        }
-        .breakdownItem .value {
-          color: var(--text-primary);
-          font-weight: 600;
-        }
-        .statsGrid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 12px;
-        }
-        @media (max-width: 500px) {
-          .statsGrid {
-            grid-template-columns: 1fr;
-          }
-        }
-        .statCard {
-          background: var(--bg-tile);
-          border: 1px solid var(--border-tile);
-          border-radius: 16px;
-          padding: 16px;
-          box-shadow: var(--card-shadow);
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-          transition: all 0.2s ease;
-        }
-        .clickableCard {
-          cursor: pointer;
-        }
-        .clickableCard:hover {
-          transform: translateY(-2px);
-          border-color: var(--border-tile-hover);
-          box-shadow: var(--card-shadow-hover);
-        }
-        .statIcon {
-          width: 38px;
-          height: 38px;
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .iconPhotos { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-        .iconDocs { background: rgba(52, 211, 153, 0.1); color: #34d399; }
-        .iconSpaces { background: rgba(167, 139, 250, 0.1); color: #a78bfa; }
-        .iconTrash { background: rgba(248, 113, 113, 0.1); color: #f87171; }
-        
-        .statInfo {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .statInfo h4 {
-          margin: 0;
-          font-size: 13.5px;
-          font-weight: 700;
-          color: var(--text-primary);
-        }
-        .statCount {
-          margin: 0;
-          font-size: 12px;
-          color: var(--text-secondary);
-          font-weight: 500;
-        }
-        .statSize {
-          margin: 0;
-          font-size: 10.5px;
-          color: var(--text-muted);
-        }
+
 
         .tabBtn {
           background: transparent;
