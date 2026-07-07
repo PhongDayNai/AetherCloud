@@ -22,6 +22,7 @@ import MascotTipsWidget from '../../components/MascotTipsWidget';
 import QuantumLoader from '../../components/QuantumLoader';
 import { useDocViewerTheme } from './hooks/useDocViewerTheme';
 import DocSidebarFiles from './components/DocSidebarFiles';
+import DiffSplitView from './components/DiffSplitView';
 
 import './docViewer.css';
 import 'highlight.js/styles/github-dark.css';
@@ -1658,278 +1659,37 @@ function DocViewerContent() {
                     </div>
                   )}
                   {previewVersion !== null ? (
-                    <div className="splitLayout">
-                      {mdCompareMode === 'diff' ? (
-                        <>
-                          {/* Left: Active Source Code Diff */}
-                          <div className="leftPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                            <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
-                              <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {t('viewer.compareCurrent') || 'Current Version'}
-                              </h3>
-                              <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
-                                <span>v{asset.version || 1}</span>
-                                <span>•</span>
-                                <span>{fmtBytes(asset.size)}</span>
-                                {asset.uploadedAt && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{new Date(asset.uploadedAt).toLocaleString()}</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            {!sandboxMode ? (
-                              <div
-                                ref={leftCodeContainerRef}
-                                className={getCodeContainerClass('hljs')}
-                                onScroll={handleLeftCodeScroll}
-                                style={{ flex: 1, overflow: 'auto' }}
-                              >
-                                <div className="codeWrapper">
-                                  <div className="lineNumbers">
-                                    {markdownText.split('\n').map((_, i) => {
-                                      const lineNum = i + 1;
-                                      const diffType = leftLineDiffTypes[lineNum] || 'normal';
-                                      return (
-                                        <div key={i} className={`lineNo diff-line ${diffType}`}>
-                                          {lineNum}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                  <pre className="codePre" style={{ flex: 1, margin: 0, padding: '24px 16px', overflow: 'visible', position: 'relative' }}>
-                                    <code className="hljs markdown" style={{ display: 'block', position: 'relative' }}>
-                                      <div style={{ pointerEvents: 'none' }}>
-                                        {mdHighlightedLines.map((line, i) => {
-                                          const lineNum = i + 1;
-                                          const diffType = leftLineDiffTypes[lineNum] || 'normal';
-                                          return (
-                                            <div
-                                              key={i}
-                                              className={`codeLine diff-line ${diffType}`}
-                                              dangerouslySetInnerHTML={{ __html: line || '&nbsp;' }}
-                                            />
-                                          );
-                                        })}
-                                      </div>
-                                      <textarea
-                                        ref={textareaRef}
-                                        className="editorInput codeEditorInput hljs"
-                                        value={markdownText}
-                                        onChange={(e) => setMarkdownText(e.target.value)}
-                                        spellCheck={false}
-                                        style={{
-                                          position: 'absolute',
-                                          top: 0,
-                                          left: 0,
-                                          width: '100%',
-                                          height: '100%',
-                                          border: 'none',
-                                          resize: 'none',
-                                          outline: 'none',
-                                          background: 'transparent',
-                                          color: 'transparent',
-                                          caretColor: docTheme === 'light' ? '#18181b' : '#ffffff',
-                                          overflow: 'hidden',
-                                          whiteSpace: 'pre',
-                                          wordWrap: 'normal',
-                                          padding: 0,
-                                          margin: 0,
-                                          fontFamily: 'inherit',
-                                          fontSize: 'inherit',
-                                          lineHeight: 'inherit',
-                                          zIndex: 2
-                                        }}
-                                      />
-                                    </code>
-                                  </pre>
-                                </div>
-                              </div>
-                            ) : (
-                              <div
-                                ref={leftCodeContainerRef}
-                                className={getCodeContainerClass('hljs')}
-                                onScroll={handleLeftCodeScroll}
-                                style={{ flex: 1, overflow: 'auto' }}
-                              >
-                                <div className="codeWrapper">
-                                  <div className="lineNumbers">
-                                    {mdDiffRows.map((row, i) => (
-                                      <div key={i} className={`lineNo diff-line ${row.type === 'added' ? 'diff-empty' : row.type}`}>
-                                        {row.leftLineNo || ' '}
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <pre className="codePre" style={{ flex: 1, margin: 0, padding: '24px 16px', overflow: 'visible' }}>
-                                    <code className="hljs markdown">
-                                      {mdDiffRows.map((row, i) => (
-                                        <div
-                                          key={i}
-                                          className={`codeLine diff-line ${row.type === 'added' ? 'diff-empty' : row.type}`}
-                                          style={{ height: '21.6px', lineHeight: '21.6px' }}
-                                          dangerouslySetInnerHTML={{
-                                            __html: row.type === 'added' ? '' : (row.leftLineNo ? (currentCompareHighlightedLines[Number(row.leftLineNo) - 1] || ' ') : ' ')
-                                          }}
-                                        />
-                                      ))}
-                                    </code>
-                                  </pre>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Right: History Source Code Diff */}
-                          <div className="rightPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                            <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
-                              <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {t('viewer.compareHistory', { ver: previewVersion.versionNumber }) || `History Version v${previewVersion.versionNumber}`}
-                              </h3>
-                              <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
-                                <span>v{previewVersion.versionNumber}</span>
-                                <span>•</span>
-                                <span>{previewVersion.size ? fmtBytes(previewVersion.size) : ''}</span>
-                                {previewVersion.createdAt && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{new Date(previewVersion.createdAt).toLocaleString()}</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <div
-                              ref={rightCodeContainerRef}
-                              className={getCodeContainerClass('hljs')}
-                              onScroll={handleRightCodeScroll}
-                              style={{ flex: 1, overflow: 'auto' }}
-                            >
-                              <div className="codeWrapper">
-                                {sandboxMode ? (
-                                  <>
-                                    <div className="lineNumbers">
-                                      {mdDiffRows.map((row, i) => (
-                                        <div key={i} className={`lineNo diff-line ${row.type === 'deleted' ? 'diff-empty' : row.type}`}>
-                                          {row.rightLineNo || ' '}
-                                        </div>
-                                      ))}
-                                    </div>
-                                    <pre className="codePre" style={{ flex: 1, margin: 0, padding: '24px 16px', overflow: 'visible' }}>
-                                      <code className="hljs markdown">
-                                        {mdDiffRows.map((row, i) => (
-                                          <div
-                                            key={i}
-                                            className={`codeLine diff-line ${row.type === 'deleted' ? 'diff-empty' : row.type}`}
-                                            style={{ height: '21.6px', lineHeight: '21.6px' }}
-                                            dangerouslySetInnerHTML={{
-                                              __html: row.type === 'deleted' ? '' : (row.rightLineNo ? (historyCompareHighlightedLines[Number(row.rightLineNo) - 1] || ' ') : ' ')
-                                            }}
-                                          />
-                                        ))}
-                                      </code>
-                                    </pre>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="lineNumbers">
-                                      {historyContent.split('\n').map((_, i) => {
-                                        const lineNum = i + 1;
-                                        const diffType = rightLineDiffTypes[lineNum] || 'normal';
-                                        return (
-                                          <div key={i} className={`lineNo diff-line ${diffType}`}>
-                                            {lineNum}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                    <pre className="codePre" style={{ flex: 1, margin: 0, padding: '24px 16px', overflow: 'visible' }}>
-                                      <code className="hljs markdown">
-                                        {historyContent.split('\n').map((_, i) => {
-                                          const lineNum = i + 1;
-                                          const diffType = rightLineDiffTypes[lineNum] || 'normal';
-                                          return (
-                                            <div
-                                              key={i}
-                                              className={`codeLine diff-line ${diffType}`}
-                                              style={{ height: '21.6px', lineHeight: '21.6px' }}
-                                              dangerouslySetInnerHTML={{
-                                                __html: historyCompareHighlightedLines[i] || '&nbsp;'
-                                              }}
-                                            />
-                                          );
-                                        })}
-                                      </code>
-                                    </pre>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          {/* Left: Active HTML Preview */}
-                          <div className="leftPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                            <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
-                              <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {t('viewer.compareCurrent') || 'Current Version'}
-                              </h3>
-                              <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
-                                <span>v{asset.version || 1}</span>
-                                <span>•</span>
-                                <span>{fmtBytes(asset.size)}</span>
-                                {asset.uploadedAt && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{new Date(asset.uploadedAt).toLocaleString()}</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <div
-                              ref={leftCodeContainerRef}
-                              onScroll={handleLeftCodeScroll}
-                              style={{ flex: 1, overflow: 'auto', padding: '24px' }}
-                            >
-                              <div
-                                className={`previewContainer markdown-body ${justifyClass}`}
-                                dangerouslySetInnerHTML={{ __html: previewHtml }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Right: History HTML Preview */}
-                          <div className="rightPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                            <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
-                              <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {t('viewer.compareHistory', { ver: previewVersion.versionNumber }) || `History Version v${previewVersion.versionNumber}`}
-                              </h3>
-                              <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
-                                <span>v{previewVersion.versionNumber}</span>
-                                <span>•</span>
-                                <span>{previewVersion.size ? fmtBytes(previewVersion.size) : ''}</span>
-                                {previewVersion.createdAt && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{new Date(previewVersion.createdAt).toLocaleString()}</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <div
-                              ref={rightCodeContainerRef}
-                              onScroll={handleRightCodeScroll}
-                              style={{ flex: 1, overflow: 'auto', padding: '24px' }}
-                            >
-                              <div
-                                className={`previewContainer markdown-body ${justifyClass}`}
-                                dangerouslySetInnerHTML={{ __html: historyPreviewHtml }}
-                              />
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                    <DiffSplitView
+                      category="markdown"
+                      previewVersion={previewVersion}
+                      asset={asset}
+                      mdCompareMode={mdCompareMode}
+                      sandboxMode={sandboxMode}
+                      markdownText={markdownText}
+                      historyContent={historyContent}
+                      codeText={codeText}
+                      leftLineDiffTypes={leftLineDiffTypes}
+                      rightLineDiffTypes={rightLineDiffTypes}
+                      mdDiffRows={mdDiffRows}
+                      codeDiffRows={codeDiffRows}
+                      mdHighlightedLines={mdHighlightedLines}
+                      highlightedLines={highlightedLines}
+                      currentCompareHighlightedLines={currentCompareHighlightedLines}
+                      historyCompareHighlightedLines={historyCompareHighlightedLines}
+                      previewHtml={previewHtml}
+                      historyPreviewHtml={historyPreviewHtml}
+                      leftCodeContainerRef={leftCodeContainerRef}
+                      rightCodeContainerRef={rightCodeContainerRef}
+                      textareaRef={textareaRef}
+                      handleLeftCodeScroll={handleLeftCodeScroll}
+                      handleRightCodeScroll={handleRightCodeScroll}
+                      getCodeContainerClass={getCodeContainerClass}
+                      docTheme={docTheme}
+                      setMarkdownText={setMarkdownText}
+                      setCodeText={setCodeText}
+                      justifyClass={justifyClass}
+                      t={t}
+                    />
                   ) : (
                     <div className="splitLayout">
                       <div className="leftPane no-print" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -2058,212 +1818,36 @@ function DocViewerContent() {
                   )}
                   <div className="codeViewContainer" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     {previewVersion !== null ? (
-                      <div className="splitLayout">
-                        {/* Left Pane: Active Version */}
-                        <div className="leftPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                          <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
-                            <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {t('viewer.compareCurrent') || 'Current Version'}
-                            </h3>
-                            <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
-                              <span>v{asset.version || 1}</span>
-                              <span>•</span>
-                              <span>{fmtBytes(asset.size)}</span>
-                              {asset.uploadedAt && (
-                                <>
-                                  <span>•</span>
-                                  <span>{new Date(asset.uploadedAt).toLocaleString()}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          {!sandboxMode ? (
-                            <div
-                              ref={leftCodeContainerRef}
-                              className={getCodeContainerClass('hljs')}
-                              onScroll={handleLeftCodeScroll}
-                              style={{ flex: 1, overflow: 'auto' }}
-                            >
-                              <div className="codeWrapper">
-                                <div className="lineNumbers">
-                                  {codeText.split('\n').map((_, i) => {
-                                    const lineNum = i + 1;
-                                    const diffType = leftLineDiffTypes[lineNum] || 'normal';
-                                    return (
-                                      <div key={i} className={`lineNo diff-line ${diffType}`}>
-                                        {lineNum}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                                <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'visible', position: 'relative' }}>
-                                  <code className="hljs" style={{ display: 'block', position: 'relative' }}>
-                                    <div style={{ pointerEvents: 'none' }}>
-                                      {highlightedLines.map((line, i) => {
-                                        const lineNum = i + 1;
-                                        const diffType = leftLineDiffTypes[lineNum] || 'normal';
-                                        return (
-                                          <div
-                                            key={i}
-                                            className={`codeLine diff-line ${diffType}`}
-                                            dangerouslySetInnerHTML={{ __html: line || '&nbsp;' }}
-                                          />
-                                        );
-                                      })}
-                                    </div>
-                                    <textarea
-                                      ref={textareaRef}
-                                      className="editorInput codeEditorInput hljs"
-                                      value={codeText}
-                                      onChange={(e) => setCodeText(e.target.value)}
-                                      spellCheck={false}
-                                      style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        left: 0,
-                                        width: '100%',
-                                        height: '100%',
-                                        border: 'none',
-                                        resize: 'none',
-                                        outline: 'none',
-                                        background: 'transparent',
-                                        color: 'transparent',
-                                        caretColor: docTheme === 'light' ? '#18181b' : '#ffffff',
-                                        overflow: 'hidden',
-                                        whiteSpace: 'pre',
-                                        wordWrap: 'normal',
-                                        padding: 0,
-                                        margin: 0,
-                                        fontFamily: 'inherit',
-                                        fontSize: 'inherit',
-                                        lineHeight: 'inherit',
-                                        zIndex: 2
-                                      }}
-                                    />
-                                  </code>
-                                </pre>
-                              </div>
-                            </div>
-                          ) : (
-                            <div
-                              ref={leftCodeContainerRef}
-                              className={getCodeContainerClass('hljs')}
-                              onScroll={handleLeftCodeScroll}
-                              style={{ flex: 1, overflow: 'auto' }}
-                            >
-                              <div className="codeWrapper">
-                                <div className="lineNumbers">
-                                  {codeDiffRows.map((row, i) => (
-                                    <div key={i} className={`lineNo diff-line ${row.type === 'added' ? 'diff-empty' : row.type}`}>
-                                      {row.leftLineNo || ' '}
-                                    </div>
-                                  ))}
-                                </div>
-                                <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'visible' }}>
-                                  <code className="hljs">
-                                    {codeDiffRows.map((row, i) => (
-                                      <div
-                                        key={i}
-                                        className={`codeLine diff-line ${row.type === 'added' ? 'diff-empty' : row.type}`}
-                                        style={{ height: '21.6px', lineHeight: '21.6px' }}
-                                        dangerouslySetInnerHTML={{
-                                          __html: row.type === 'added' ? '' : (row.leftLineNo ? (currentCompareHighlightedLines[Number(row.leftLineNo) - 1] || ' ') : ' ')
-                                        }}
-                                      />
-                                    ))}
-                                  </code>
-                                </pre>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Right Pane: History Version */}
-                        <div className="rightPane" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                          <div className="docContentHeader" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '12px 24px', flexShrink: 0 }}>
-                            <h3 className="docContentTitle" style={{ fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {t('viewer.compareHistory', { ver: previewVersion.versionNumber }) || `History Version v${previewVersion.versionNumber}`}
-                            </h3>
-                            <div className="docContentMeta" style={{ display: 'flex', gap: '8px', fontSize: '11px', marginTop: '4px', opacity: 0.8 }}>
-                              <span>v{previewVersion.versionNumber}</span>
-                              <span>•</span>
-                              <span>{previewVersion.size ? fmtBytes(previewVersion.size) : ''}</span>
-                              {previewVersion.createdAt && (
-                                <>
-                                  <span>•</span>
-                                  <span>{new Date(previewVersion.createdAt).toLocaleString()}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div
-                            ref={rightCodeContainerRef}
-                            className={getCodeContainerClass('hljs')}
-                            onScroll={handleRightCodeScroll}
-                            style={{ flex: 1, overflow: 'auto' }}
-                          >
-                            <div className="codeWrapper">
-                              {sandboxMode ? (
-                                <>
-                                  <div className="lineNumbers">
-                                    {codeDiffRows.map((row, i) => (
-                                      <div key={i} className={`lineNo diff-line ${row.type === 'deleted' ? 'diff-empty' : row.type}`}>
-                                        {row.rightLineNo || ' '}
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'visible' }}>
-                                    <code className="hljs">
-                                      {codeDiffRows.map((row, i) => (
-                                        <div
-                                          key={i}
-                                          className={`codeLine diff-line ${row.type === 'deleted' ? 'diff-empty' : row.type}`}
-                                          style={{ height: '21.6px', lineHeight: '21.6px' }}
-                                          dangerouslySetInnerHTML={{
-                                            __html: row.type === 'deleted' ? '' : (row.rightLineNo ? (historyCompareHighlightedLines[Number(row.rightLineNo) - 1] || ' ') : ' ')
-                                          }}
-                                        />
-                                      ))}
-                                    </code>
-                                  </pre>
-                                </>
-                              ) : (
-                                <>
-                                  <div className="lineNumbers">
-                                    {historyContent.split('\n').map((_, i) => {
-                                      const lineNum = i + 1;
-                                      const diffType = rightLineDiffTypes[lineNum] || 'normal';
-                                      return (
-                                        <div key={i} className={`lineNo diff-line ${diffType}`}>
-                                          {lineNum}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                  <pre className="codePre" style={{ flex: 1, margin: 0, overflow: 'visible' }}>
-                                    <code className="hljs">
-                                      {historyContent.split('\n').map((_, i) => {
-                                        const lineNum = i + 1;
-                                        const diffType = rightLineDiffTypes[lineNum] || 'normal';
-                                        return (
-                                          <div
-                                            key={i}
-                                            className={`codeLine diff-line ${diffType}`}
-                                            style={{ height: '21.6px', lineHeight: '21.6px' }}
-                                            dangerouslySetInnerHTML={{
-                                              __html: historyCompareHighlightedLines[i] || '&nbsp;'
-                                            }}
-                                          />
-                                        );
-                                      })}
-                                    </code>
-                                  </pre>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <DiffSplitView
+                        category="code"
+                        previewVersion={previewVersion}
+                        asset={asset}
+                        sandboxMode={sandboxMode}
+                        markdownText={markdownText}
+                        historyContent={historyContent}
+                        codeText={codeText}
+                        leftLineDiffTypes={leftLineDiffTypes}
+                        rightLineDiffTypes={rightLineDiffTypes}
+                        mdDiffRows={mdDiffRows}
+                        codeDiffRows={codeDiffRows}
+                        mdHighlightedLines={mdHighlightedLines}
+                        highlightedLines={highlightedLines}
+                        currentCompareHighlightedLines={currentCompareHighlightedLines}
+                        historyCompareHighlightedLines={historyCompareHighlightedLines}
+                        previewHtml={previewHtml}
+                        historyPreviewHtml={historyPreviewHtml}
+                        leftCodeContainerRef={leftCodeContainerRef}
+                        rightCodeContainerRef={rightCodeContainerRef}
+                        textareaRef={textareaRef}
+                        handleLeftCodeScroll={handleLeftCodeScroll}
+                        handleRightCodeScroll={handleRightCodeScroll}
+                        getCodeContainerClass={getCodeContainerClass}
+                        docTheme={docTheme}
+                        setMarkdownText={setMarkdownText}
+                        setCodeText={setCodeText}
+                        justifyClass={justifyClass}
+                        t={t}
+                      />
                     ) : !sandboxMode ? (
                       <div className={getCodeContainerClass('hljs')}>
                         <div className="codeWrapper" style={{ display: 'flex', width: '100%' }}>
