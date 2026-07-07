@@ -55,49 +55,7 @@ function splitHtmlIntoLines(html: string): string[] {
   });
 }
 
-function renderFileIcon(file: Asset, size = 18) {
-  const cat = docCategoryOf(file);
-  switch (cat) {
-    case 'pdf':
-      return <Icons.DocPdf size={size} style={{ color: '#f87171' }} />;
-    case 'word':
-      return <Icons.DocWord size={size} style={{ color: '#60a5fa' }} />;
-    case 'excel':
-      return <Icons.DocExcel size={size} style={{ color: '#34d399' }} />;
-    case 'powerpoint':
-      return <Icons.DocPowerpoint size={size} style={{ color: '#fb923c' }} />;
-    case 'markdown':
-      return <Icons.DocMarkdown size={size} style={{ color: '#c084fc' }} />;
-    case 'text':
-      return <Icons.DocText size={size} style={{ color: '#9ca3af' }} />;
-    case 'ebook':
-      return <Icons.DocEbook size={size} style={{ color: '#fbbf24' }} />;
-    case 'database':
-      return <Icons.DocDatabase size={size} style={{ color: '#eab308' }} />;
-    case 'archive':
-      return <Icons.DocArchive size={size} style={{ color: '#a78bfa' }} />;
-    case 'installer':
-      return <Icons.DocInstaller size={size} style={{ color: '#3b82f6' }} />;
-    case 'disk-image':
-      return <Icons.DocDiskImage size={size} style={{ color: '#94a3b8' }} />;
-    case 'font':
-      return <Icons.DocFont size={size} style={{ color: '#2dd4bf' }} />;
-    case 'certificate':
-      return <Icons.DocCertificate size={size} style={{ color: '#f97316' }} />;
-    case 'design':
-      return <Icons.DocDesign size={size} style={{ color: '#f472b6' }} />;
-    case 'cad':
-      return <Icons.DocCad size={size} style={{ color: '#818cf8' }} />;
-    case 'executable':
-      return <Icons.DocExecutable size={size} style={{ color: '#ef4444' }} />;
-    case 'code':
-      return <Icons.DocCode size={size} style={{ color: '#22d3ee' }} />;
-    case 'config':
-      return <Icons.DocConfig size={size} style={{ color: '#6b7280' }} />;
-    default:
-      return <Icons.DocOther size={size} style={{ color: '#9ca3af' }} />;
-  }
-}
+
 
 function DocViewerContent() {
   const searchParams = useSearchParams();
@@ -1715,7 +1673,7 @@ function DocViewerContent() {
                   title={file.originalName}
                 >
                   <span className="fileItemIcon">
-                    {renderFileIcon(file, 18)}
+                    <Icons.DocIcon item={file} size={18} />
                   </span>
                   <span className="fileItemName">{file.originalName}</span>
                 </div>
@@ -2490,7 +2448,7 @@ function DocViewerContent() {
                   <div className="fallbackContainer">
                     <div className="fallbackCard">
                       <div className="fallbackIcon" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                        {renderFileIcon(asset, 64)}
+                        <Icons.DocIcon item={asset} size={64} />
                       </div>
                       <div className="fallbackName">{asset.originalName}</div>
                       <div className="fallbackMeta">
