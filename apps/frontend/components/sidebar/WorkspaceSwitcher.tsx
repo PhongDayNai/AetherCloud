@@ -147,7 +147,7 @@ export default function WorkspaceSwitcher({
       </div>
 
       {/* Nút settings độc lập ở bên ngoài */}
-      {activeWorkspace.type === 'group' && !showWsDropdown && (
+      {(activeWorkspace.type === 'group' || (activeWorkspace.type === 'space' && activeWorkspace.groupId)) && !showWsDropdown && (
         <button 
           className={styles.wsExternalSettingsBtn}
           onClick={() => setShowGroupSettingsModal(true)}

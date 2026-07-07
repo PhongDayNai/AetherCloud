@@ -275,7 +275,13 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
       <GroupSettingsModal
         isOpen={showGroupSettingsModal}
         onClose={() => setShowGroupSettingsModal(false)}
-        group={activeWorkspace.type === 'group' ? activeWorkspace : null}
+        group={
+          activeWorkspace.type === 'group'
+            ? activeWorkspace
+            : activeWorkspace.type === 'space' && activeWorkspace.groupId
+            ? groups.find((g) => g.id === activeWorkspace.groupId) || null
+            : null
+        }
       />
       <BulkShareModal
         isOpen={showBulkShareModal}
