@@ -578,6 +578,8 @@
   "viewer.hintTitle": "Utility Tip",
   "viewer.sandboxHintMessage": "Tired of switching? Disable 'Default Sandbox Mode' in Settings to start editing immediately.",
   "viewer.disableDefaultSandbox": "Disable Default",
-  "viewer.sandboxDisabledToast": "Default sandbox mode disabled!"
+  "viewer.sandboxDisabledToast": "Default sandbox mode disabled!",
+  "viewer.introHintTitle": "Read/Edit Mode",
+  "viewer.introHintMessage": "Document is currently in read-only mode. Click here to switch to edit mode to modify the file."
 }
 

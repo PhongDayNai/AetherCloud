@@ -79,6 +79,7 @@ function DocViewerContent() {
   const { user, groups, addToast } = useCloud();
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [showSandboxHint, setShowSandboxHint] = useState<boolean>(false);
+  const [showIntroHint, setShowIntroHint] = useState<boolean>(false);
   const confirm = useConfirm();
 
   // Tự động đóng gợi ý Sandbox sau 45 giây
@@ -90,6 +91,16 @@ function DocViewerContent() {
       return () => clearTimeout(timer);
     }
   }, [showSandboxHint]);
+
+  // Tự động đóng gợi ý giới thiệu chế độ đọc/sửa sau 45 giây
+  useEffect(() => {
+    if (showIntroHint) {
+      const timer = setTimeout(() => {
+        setShowIntroHint(false);
+      }, 45000);
+      return () => clearTimeout(timer);
+    }
+  }, [showIntroHint]);
 
   const handleToggleSandboxMode = () => {
     const nextMode = !sandboxMode;
@@ -142,6 +153,24 @@ function DocViewerContent() {
   useEffect(() => {
     setSandboxMode(getDefaultSandboxMode());
   }, []);
+
+  // Trigger gợi ý giới thiệu chế độ đọc/sửa khi lần đầu mở tài liệu và đang ở chế độ chỉ đọc (sandbox)
+  useEffect(() => {
+    if (!isLoading && asset && sandboxMode) {
+      const hasSeenIntro = localStorage.getItem('has_seen_edit_mode_intro') === 'true';
+      if (!hasSeenIntro) {
+        setShowIntroHint(true);
+        localStorage.setItem('has_seen_edit_mode_intro', 'true');
+      }
+    }
+  }, [isLoading, asset, sandboxMode]);
+
+  // Tự động tắt gợi ý intro khi chế độ sandbox bị tắt
+  useEffect(() => {
+    if (!sandboxMode) {
+      setShowIntroHint(false);
+    }
+  }, [sandboxMode]);
 
   // Lắng nghe sự kiện group_kick để kiểm tra quyền truy cập tài liệu realtime
   useEffect(() => {
@@ -1270,6 +1299,15 @@ function DocViewerContent() {
                   placement="bottom-center"
                 />
               )}
+
+              {showIntroHint && (
+                <HintPopover
+                  title={t('viewer.introHintTitle') || 'Chế độ đọc/sửa'}
+                  message={t('viewer.introHintMessage') || 'Tài liệu đang mở ở chế độ chỉ đọc. Nhấn vào đây để chuyển sang chế độ chỉnh sửa để có thể sửa tệp tin.'}
+                  onClose={() => setShowIntroHint(false)}
+                  placement="bottom-center"
+                />
+              )}
             </div>
           )}
         </div>
@@ -2038,6 +2076,7 @@ function DocViewerContent() {
         onDefaultSandboxChange={(val) => {
           if (val === 'off') {
             setShowSandboxHint(false);
+            setShowIntroHint(false);
           }
         }}
       />

@@ -578,6 +578,8 @@
   "viewer.hintTitle": "Mẹo tiện ích",
   "viewer.sandboxHintMessage": "Bạn thường xuyên chuyển sang chế độ chỉnh sửa? Hãy tắt chế độ \"Chỉ đọc\" mặc định để tiết kiệm thời gian.",
   "viewer.disableDefaultSandbox": "Tắt mặc định",
-  "viewer.sandboxDisabledToast": "Đã tắt chế độ chỉ đọc mặc định!"
+  "viewer.sandboxDisabledToast": "Đã tắt chế độ chỉ đọc mặc định!",
+  "viewer.introHintTitle": "Chế độ đọc/sửa",
+  "viewer.introHintMessage": "Tài liệu đang mở ở chế độ chỉ đọc. Nhấn vào đây để chuyển sang chế độ chỉnh sửa để có thể sửa tệp tin."
 }
 
