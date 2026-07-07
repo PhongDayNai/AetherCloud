@@ -20,6 +20,7 @@ import { docViewerTips, getLocalizedText } from './tipsViewerTips';
 
 import MascotTipsWidget from '../../components/MascotTipsWidget';
 import QuantumLoader from '../../components/QuantumLoader';
+import { useDocViewerTheme } from './hooks/useDocViewerTheme';
 
 import './docViewer.css';
 import 'highlight.js/styles/github-dark.css';
@@ -62,92 +63,15 @@ function DocViewerContent() {
   const router = useRouter();
   const { t, language } = useLanguage();
   const { resolvedTheme: globalTheme } = useTheme();
-  const [docTheme, setDocTheme] = useState<'light' | 'dark'>('dark');
+  const { docTheme, toggleDocTheme } = useDocViewerTheme(globalTheme as 'light' | 'dark' | undefined);
 
   const currentLang = (language === 'vi' || language === 'en') ? language : 'vi';
 
-  const tabId = useRef('');
   const { user, groups, addToast } = useCloud();
   const confirm = useConfirm();
 
   const id = searchParams.get('id');
   console.log('[DocViewer] Global Resolved Theme:', globalTheme);
-
-  // Tab tracking to clean up temporary theme when all DocViewer tabs close
-  useEffect(() => {
-    tabId.current = Math.random().toString(36).substring(2, 9);
-
-    const registerTab = () => {
-      try {
-        const activeTabs = JSON.parse(localStorage.getItem('docviewer_active_tabs') || '[]');
-        if (!activeTabs.includes(tabId.current)) {
-          activeTabs.push(tabId.current);
-          localStorage.setItem('docviewer_active_tabs', JSON.stringify(activeTabs));
-        }
-      } catch (err) {
-        console.error('Failed to register docviewer tab:', err);
-      }
-    };
-
-    const unregisterTab = () => {
-      try {
-        const activeTabs = JSON.parse(localStorage.getItem('docviewer_active_tabs') || '[]');
-        const updated = activeTabs.filter((id: string) => id !== tabId.current);
-        if (updated.length === 0) {
-          localStorage.removeItem('docviewer_active_tabs');
-          localStorage.removeItem('docviewer_theme');
-        } else {
-          localStorage.setItem('docviewer_active_tabs', JSON.stringify(updated));
-        }
-      } catch (err) {
-        console.error('Failed to unregister docviewer tab:', err);
-      }
-    };
-
-    registerTab();
-
-    const handleUnload = () => {
-      unregisterTab();
-    };
-    window.addEventListener('beforeunload', handleUnload);
-    return () => {
-      unregisterTab();
-      window.removeEventListener('beforeunload', handleUnload);
-    };
-  }, []);
-
-  // Sync docTheme with globalTheme whenever globalTheme changes
-  useEffect(() => {
-    if (globalTheme === 'light' || globalTheme === 'dark') {
-      setDocTheme(globalTheme);
-      localStorage.setItem('docviewer_theme', globalTheme);
-    }
-  }, [globalTheme]);
-
-  // Apply theme to document element
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', docTheme);
-  }, [docTheme]);
-
-  // Sync temporary theme across docviewer tabs via storage event
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'docviewer_theme') {
-        const val = e.newValue as 'light' | 'dark';
-        if (val === 'light' || val === 'dark') {
-          setDocTheme(val);
-        }
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
-
-  const toggleDocTheme = () => {
-    const next = docTheme === 'light' ? 'dark' : 'light';
-    setDocTheme(next);
-    localStorage.setItem('docviewer_theme', next);
-  };
 
   const [asset, setAsset] = useState<Asset | null>(null);
   const [markdownText, setMarkdownText] = useState<string>('');
