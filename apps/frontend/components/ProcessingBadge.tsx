@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCloud } from '../context/CloudContext';
 import styles from './ProcessingBadge.module.css';
+import QuantumLoader from './QuantumLoader';
 
 export default function ProcessingBadge(): React.JSX.Element | null {
   const { stats, usage, language } = useCloud();
@@ -87,10 +88,7 @@ export default function ProcessingBadge(): React.JSX.Element | null {
       onTouchStart={handleTouchStart}
     >
       <div className={styles.badgeContent}>
-        <div className={styles.doubleRingLoader}>
-          <div className={styles.ring1} />
-          <div className={styles.ring2} />
-        </div>
+        <QuantumLoader size="small" />
         <span className={styles.badgeNumber}>{processingCount}</span>
         <div className={styles.badgeTextContainer}>
           <span className={styles.badgeText1}>{badgeText1}</span>

@@ -6,6 +6,7 @@ import { fmtBytes, docCategoryOf, formatDateTime } from '../lib/utils';
 import SmartVideo from './SmartVideo';
 import * as Icons from './Icons';
 import { useCloud } from '../context/CloudContext';
+import QuantumLoader from './QuantumLoader';
 
 interface MediaViewerProps {
   active: Asset | null;
@@ -218,10 +219,7 @@ export default function MediaViewer({
         {active.type === 'video' && (
           active.processingStatus === 'processing' ? (
             <div className="videoProcessingOverlay mediaEnter" onClick={(e) => e.stopPropagation()}>
-              <div className="doubleRingLoader">
-                <div className="ring1" />
-                <div className="ring2" />
-              </div>
+              <QuantumLoader size="medium" />
               <div className="overlayTitle">{t('viewer.videoOptimizing')}</div>
               <div className="overlayDesc">{t('viewer.videoOptimizingDesc')}</div>
               <a href={`${api}/api/assets/_media/original/${active.id}`} download={active.originalName} className="downloadOriginalBtn" onClick={(e) => e.stopPropagation()}>

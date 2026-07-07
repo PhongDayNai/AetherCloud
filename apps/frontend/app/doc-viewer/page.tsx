@@ -19,6 +19,7 @@ import * as Icons from '../../components/Icons';
 import { docViewerTips, getLocalizedText } from './tipsViewerTips';
 
 import MascotTipsWidget from '../../components/MascotTipsWidget';
+import QuantumLoader from '../../components/QuantumLoader';
 
 import './docViewer.css';
 import 'highlight.js/styles/github-dark.css';
@@ -1722,7 +1723,7 @@ function DocViewerContent() {
             })}
             {isLoadingMore && (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '12px' }}>
-                <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
+                <QuantumLoader size="small" />
               </div>
             )}
             {sidebarFiles.length === 0 && (
@@ -1742,8 +1743,7 @@ function DocViewerContent() {
         <main className="viewerContent">
           {isLoading ? (
             <div className="centerOverlay" style={{ position: 'relative', height: '100%', minHeight: '300px' }}>
-              <div className="spinner" />
-              <div className="errorDesc">{t('viewer.loadingFile') || 'Loading file...'}</div>
+              <QuantumLoader size="large" text={t('viewer.loadingFile') || 'Loading file...'} />
             </div>
           ) : asset ? (
             <>

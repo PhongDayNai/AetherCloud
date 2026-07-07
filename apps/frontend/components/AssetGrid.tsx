@@ -4,6 +4,7 @@ import { Asset } from '../types';
 import { DocIcon, ChevronRight } from './Icons';
 import { useCloud } from '../context/CloudContext';
 import styles from './AssetGrid.module.css';
+import QuantumLoader from './QuantumLoader';
 
 interface AssetGridProps {
   groupByTimeEnabled: boolean;
@@ -122,11 +123,7 @@ export default function AssetGrid({
                         ) : a.type === 'video' ? (
                           a.processingStatus === 'processing' ? (
                             <div className={styles.processingPlaceholder}>
-                              <div className={styles.doubleRingLoader}>
-                                <div className={styles.ring1} />
-                                <div className={styles.ring2} />
-                              </div>
-                              <span className={styles.processingText}>{t('buttons.processing') || 'Đang xử lý...'}</span>
+                              <QuantumLoader size="small" text={t('buttons.processing') || 'Đang xử lý...'} />
                             </div>
                           ) : (
                             <video src={srcPlay} className={styles.thumb} muted preload="none" />
