@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import styles from './CustomSelect.module.css';
 
 interface CustomSelectProps {
   value: string;
@@ -41,36 +42,14 @@ export default function CustomSelect({ value, options, onChange, width = '130px'
   const popoverMinWidth = hasDesc ? '240px' : '100%';
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: width, userSelect: 'none' }}>
+    <div 
+      ref={containerRef} 
+      className={styles.container}
+      style={{ width }}
+    >
       <div 
         onClick={() => { if (!disabled) setIsOpen(!isOpen); }}
-        style={{
-          background: 'var(--bg-input)',
-          border: '1px solid var(--border-input)',
-          borderRadius: '8px',
-          padding: '8px 14px',
-          color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
-          fontSize: '13px',
-          fontWeight: '500',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          opacity: disabled ? 0.6 : 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          transition: 'all 0.15s ease'
-        }}
-        onMouseEnter={(e) => { 
-          if (disabled) return;
-          e.currentTarget.style.borderColor = 'var(--border-input-focus)'; 
-          e.currentTarget.style.background = 'var(--bg-input-focus)'; 
-        }}
-        onMouseLeave={(e) => { 
-          if (disabled) return;
-          if (!isOpen) {
-            e.currentTarget.style.borderColor = 'var(--border-input)'; 
-            e.currentTarget.style.background = 'var(--bg-input)'; 
-          }
-        }}
+        className={`${styles.selectBox} ${disabled ? styles.disabled : ''} ${isOpen ? styles.open : ''}`}
       >
         <span>{selectedParts.main}</span>
         <svg 
@@ -82,35 +61,16 @@ export default function CustomSelect({ value, options, onChange, width = '130px'
           strokeWidth="2.5" 
           strokeLinecap="round" 
           strokeLinejoin="round"
-          style={{ 
-            marginLeft: '8px', 
-            color: 'var(--text-secondary)', 
-            transition: 'transform 0.2s',
-            transform: isOpen ? 'rotate(180deg)' : 'none'
-          }}
+          className={`${styles.chevronIcon} ${isOpen ? styles.open : ''}`}
         >
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </div>
 
-      <div style={{
-        position: 'absolute',
-        top: 'calc(100% + 6px)',
-        left: 0,
-        background: 'var(--bg-popover)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '8px',
-        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
-        padding: '4px',
-        zIndex: 1000,
-        minWidth: popoverMinWidth,
-        boxSizing: 'border-box',
-        opacity: isOpen ? 1 : 0,
-        transform: isOpen ? 'translateY(0)' : 'translateY(-8px)',
-        visibility: isOpen ? 'visible' : 'hidden',
-        pointerEvents: isOpen ? 'auto' : 'none',
-        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-      }}>
+      <div 
+        className={`${styles.popover} ${isOpen ? styles.open : ''}`}
+        style={{ minWidth: popoverMinWidth }}
+      >
         {options.map((opt) => {
           const isSel = opt.value === value;
           const optParts = getLabelParts(opt.label);
@@ -121,34 +81,12 @@ export default function CustomSelect({ value, options, onChange, width = '130px'
                 onChange(opt.value);
                 setIsOpen(false);
               }}
-              style={{
-                padding: '8px 12px',
-                borderRadius: '6px',
-                color: isSel ? 'var(--text-primary)' : 'var(--text-secondary)',
-                background: isSel ? 'var(--bg-item-active)' : 'transparent',
-                fontSize: '12.5px',
-                fontWeight: isSel ? '600' : '400',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                textAlign: 'left'
-              }}
-              onMouseEnter={(e) => {
-                if (!isSel) {
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                  e.currentTarget.style.background = 'var(--bg-item-hover)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isSel) {
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-                  e.currentTarget.style.background = 'transparent';
-                }
-              }}
+              className={`${styles.option} ${isSel ? styles.selected : ''}`}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', width: '100%' }}>
-                <span style={{ fontSize: '13px' }}>{optParts.main}</span>
+              <div className={styles.optionContent}>
+                <span className={styles.optionMain}>{optParts.main}</span>
                 {optParts.desc && (
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted, #71717a)', fontWeight: '400', opacity: 0.75 }}>
+                  <span className={styles.optionDesc}>
                     {optParts.desc}
                   </span>
                 )}
