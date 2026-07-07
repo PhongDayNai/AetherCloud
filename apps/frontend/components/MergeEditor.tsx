@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { alignAndDiffThreeWay } from '../lib/utils';
+import { alignAndDiffThreeWay } from '../lib/diffUtils';
 
 interface MergeEditorProps {
   serverContent: string;
