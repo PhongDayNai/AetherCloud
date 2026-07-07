@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { alignAndDiffThreeWay } from '../lib/diffUtils';
+import MergePane from './merge-editor/MergePane';
+import MergeGutterActions from './merge-editor/MergeGutterActions';
 
 interface MergeEditorProps {
   serverContent: string;
@@ -35,6 +37,8 @@ export default function MergeEditor({
   const serverScrollRef = useRef<HTMLDivElement>(null);
   const mergedScrollRef = useRef<HTMLDivElement>(null);
   const localScrollRef = useRef<HTMLDivElement>(null);
+  const gutter1ScrollRef = useRef<HTMLDivElement>(null);
+  const gutter2ScrollRef = useRef<HTMLDivElement>(null);
   const activeScrollRef = useRef<'server' | 'merged' | 'local' | null>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -187,6 +191,12 @@ export default function MergeEditor({
     }
     if (source !== 'local' && localScrollRef.current) {
       localScrollRef.current.scrollTop = scrollTop;
+    }
+    if (gutter1ScrollRef.current) {
+      gutter1ScrollRef.current.scrollTop = scrollTop;
+    }
+    if (gutter2ScrollRef.current) {
+      gutter2ScrollRef.current.scrollTop = scrollTop;
     }
 
     scrollTimeoutRef.current = setTimeout(() => {
@@ -377,205 +387,61 @@ export default function MergeEditor({
 
       <div className="mergePanelsContainer">
         {/* Panel 1: Server */}
-        <div className="mergePanel serverPanel">
-          <div className="panelTitleHeader">{t('merge.server')}</div>
-          <div
-            className="panelScrollBody"
-            ref={serverScrollRef}
-            onScroll={handleScroll('server')}
-          >
-            {blocks.map((block, idx) => {
-              const lineCount = getLineCountOfRow(block);
-              return (
-                <div key={idx} className={`lineRow ${block.type}`} style={{ height: `${lineCount * 32}px` }}>
-                  <span className="lineNo">{idx + 1}</span>
-                  <span className="lineVal">{block.serverLine || ' '}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <MergePane
+          title={t('merge.server')}
+          type="server"
+          blocks={blocks}
+          scrollRef={serverScrollRef}
+          onScroll={handleScroll('server')}
+          getLineCountOfRow={getLineCountOfRow}
+          t={t}
+        />
 
         {/* Gutter 1: Server Actions */}
-        <div className="mergeGutter">
-          <div className="panelTitleHeader" />
-          <div className="gutterScrollPlaceholder">
-            {blocks.map((block, idx) => {
-              const lineCount = getLineCountOfRow(block);
-              const showActions = block.serverStatus === 'pending';
-              const showReset = block.serverStatus === 'accepted' || block.serverStatus === 'rejected';
-
-              return (
-                <div key={idx} className="gutterActionRow" style={{ height: `${lineCount * 32}px` }}>
-                  {showActions ? (
-                    <div className="gutterButtons">
-                      <button
-                        type="button"
-                        className={`gutterActionBtn acceptServer ${block.localStatus === 'accepted' ? 'rotate-down' : ''}`}
-                        title="Accept Server Change"
-                        onClick={() => copyFromServer(idx)}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="9 18 15 12 9 6" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        className="gutterActionBtn discard"
-                        title="Discard Server Change"
-                        onClick={() => discardServerLine(idx)}
-                      >
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="18" y1="6" x2="6" y2="18"></line>
-                          <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                      </button>
-                    </div>
-                  ) : showReset ? (
-                    <button
-                      type="button"
-                      className="gutterActionBtn reset"
-                      title="Reset Server Choice"
-                      onClick={() => resetServerLine(idx)}
-                    >
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-                      </svg>
-                    </button>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <MergeGutterActions
+          side="server"
+          blocks={blocks}
+          getLineCountOfRow={getLineCountOfRow}
+          onAccept={copyFromServer}
+          onDiscard={discardServerLine}
+          onReset={resetServerLine}
+          scrollRef={gutter1ScrollRef}
+        />
 
         {/* Panel 2: Merged */}
-        <div className="mergePanel mergedPanel">
-          <div className="panelTitleHeader flex-row-between">
-            <span>{t('merge.result')}</span>
-            <button
-              type="button"
-              className="resetMergeBtn"
-              title="Reset & Auto-Merge"
-              onClick={resetAndAutoMerge}
-            >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-              </svg>
-              <span>{t('merge.reset') || 'Trộn lại'}</span>
-            </button>
-          </div>
-          <div
-            className="panelScrollBody"
-            ref={mergedScrollRef}
-            onScroll={handleScroll('merged')}
-          >
-            {blocks.map((block, idx) => {
-              const lineCount = getLineCountOfRow(block);
-              const isConflictUnresolved =
-                block.type === 'conflict' &&
-                (block.serverStatus === 'pending' || block.localStatus === 'pending');
-
-              return (
-                <div
-                  key={idx}
-                  className={`lineRow ${block.type} ${
-                    block.type === 'conflict'
-                      ? (isConflictUnresolved ? 'unresolved' : 'resolved')
-                      : ''
-                  }`}
-                  style={{ height: `${lineCount * 32}px` }}
-                >
-                  <span className="lineNo">{idx + 1}</span>
-                  {block.type === 'normal' ? (
-                    <span className="lineVal">{block.mergedLine || ' '}</span>
-                  ) : (
-                    <textarea
-                      className="lineInput"
-                      value={block.mergedLine}
-                      onChange={(e) => handleLineChange(idx, e.target.value)}
-                      rows={lineCount}
-                      style={{ height: 'calc(100% - 4px)' }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <MergePane
+          title={t('merge.result')}
+          type="merged"
+          blocks={blocks}
+          scrollRef={mergedScrollRef}
+          onScroll={handleScroll('merged')}
+          getLineCountOfRow={getLineCountOfRow}
+          handleLineChange={handleLineChange}
+          resetAndAutoMerge={resetAndAutoMerge}
+          t={t}
+        />
 
         {/* Gutter 2: Local Actions */}
-        <div className="mergeGutter">
-          <div className="panelTitleHeader" />
-          <div className="gutterScrollPlaceholder">
-            {blocks.map((block, idx) => {
-              const lineCount = getLineCountOfRow(block);
-              const showActions = block.localStatus === 'pending';
-              const showReset = block.localStatus === 'accepted' || block.localStatus === 'rejected';
-
-              return (
-                <div key={idx} className="gutterActionRow" style={{ height: `${lineCount * 32}px` }}>
-                  {showActions ? (
-                    <div className="gutterButtons">
-                      <button
-                        type="button"
-                        className={`gutterActionBtn acceptLocal ${block.serverStatus === 'accepted' ? 'rotate-down' : ''}`}
-                        title="Accept Your Change"
-                        onClick={() => copyFromLocal(idx)}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="15 18 9 12 15 6" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        className="gutterActionBtn discard"
-                        title="Discard Your Change"
-                        onClick={() => discardLocalLine(idx)}
-                      >
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="18" y1="6" x2="6" y2="18"></line>
-                          <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                      </button>
-                    </div>
-                  ) : showReset ? (
-                    <button
-                      type="button"
-                      className="gutterActionBtn reset"
-                      title="Reset Local Choice"
-                      onClick={() => resetLocalLine(idx)}
-                    >
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-                      </svg>
-                    </button>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <MergeGutterActions
+          side="local"
+          blocks={blocks}
+          getLineCountOfRow={getLineCountOfRow}
+          onAccept={copyFromLocal}
+          onDiscard={discardLocalLine}
+          onReset={resetLocalLine}
+          scrollRef={gutter2ScrollRef}
+        />
 
         {/* Panel 3: Local */}
-        <div className="mergePanel localPanel">
-          <div className="panelTitleHeader">{t('merge.local')}</div>
-          <div
-            className="panelScrollBody"
-            ref={localScrollRef}
-            onScroll={handleScroll('local')}
-          >
-            {blocks.map((block, idx) => {
-              const lineCount = getLineCountOfRow(block);
-              return (
-                <div key={idx} className={`lineRow ${block.type}`} style={{ height: `${lineCount * 32}px` }}>
-                  <span className="lineNo">{idx + 1}</span>
-                  <span className="lineVal">{block.localLine || ' '}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <MergePane
+          title={t('merge.local')}
+          type="local"
+          blocks={blocks}
+          scrollRef={localScrollRef}
+          onScroll={handleScroll('local')}
+          getLineCountOfRow={getLineCountOfRow}
+          t={t}
+        />
       </div>
     </div>
   );
