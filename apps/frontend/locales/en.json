@@ -158,6 +158,8 @@
   "groups.nameRequired": "Please enter group name.",
   "groups.createFailed": "Failed to create group.",
   "placeholders.groupName": "e.g. Study Group, Family...",
+  "placeholders.searchGroups": "Search groups...",
+  "groups.selected": "Selected",
   "groups.selectGroupRequired": "Please select a group.",
   "groups.shareSummaryText": "Select a group to share {count} selected files. Members of the group will have permission to view these files.",
   "placeholders.selectGroup": "-- Select group to share --",

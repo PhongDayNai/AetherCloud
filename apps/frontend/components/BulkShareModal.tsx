@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useCloud } from '../context/CloudContext';
+import * as Icons from './Icons';
+import styles from './BulkShareModal.module.css';
 
 interface BulkShareModalProps {
   isOpen: boolean;
@@ -20,39 +22,54 @@ export default function BulkShareModal({
   const { t } = useLanguage();
   const { api, addToast, setSelectionMode, setSelectedIds, loadData } = useCloud();
 
-  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedGroupId(groups[0]?.id || '');
+      setSelectedGroupIds([]);
+      setSearchQuery('');
       setErrorMsg('');
       setLoading(false);
     }
-  }, [isOpen, groups]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
+  const handleToggleGroup = (groupId: string) => {
+    if (loading) return;
+    setSelectedGroupIds(prev => 
+      prev.includes(groupId)
+        ? prev.filter(id => id !== groupId)
+        : [...prev, groupId]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedGroupId) {
-      setErrorMsg(t('groups.selectGroupRequired') || 'Vui lòng chọn một nhóm.');
+    if (selectedGroupIds.length === 0) {
+      setErrorMsg(t('groups.selectGroupRequired') || 'Vui lòng chọn ít nhất một nhóm.');
       return;
     }
     setErrorMsg('');
     setLoading(true);
     try {
-      const res = await fetch(`${api}/api/assets/bulk/share`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: selectedIds, groupId: selectedGroupId })
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || t('messages.shareFailed') || 'Chia sẻ thất bại.');
+      // Loop over and share to each selected group
+      for (const groupId of selectedGroupIds) {
+        const res = await fetch(`${api}/api/assets/bulk/share`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: selectedIds, groupId })
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || t('messages.shareFailed') || 'Chia sẻ thất bại.');
+        }
       }
+
       addToast(t('messages.shareSuccess', { count: selectedIds.length }) || `Đã chia sẻ thành công ${selectedIds.length} tệp tin.`, 'info');
       
       // Reset selection and close
@@ -67,210 +84,131 @@ export default function BulkShareModal({
     }
   };
 
+  // Filter groups by search query
+  const filteredGroups = groups.filter(group => 
+    (group.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Sort groups: unselected first, selected last
+  const sortedGroups = [...filteredGroups].sort((a, b) => {
+    const aSelected = selectedGroupIds.includes(a.id) ? 1 : 0;
+    const bSelected = selectedGroupIds.includes(b.id) ? 1 : 0;
+    return aSelected - bSelected;
+  });
+
+  // Get selected group objects for the pills section
+  const selectedGroups = groups.filter(group => selectedGroupIds.includes(group.id));
+
+  // Determine if we have more than 9 selected items (trigger horizontal 3-row grid)
+  const isScrollGrid = selectedGroupIds.length > 9;
+
   return (
-    <div className="modalBackdrop" onClick={onClose}>
-      <div className="modalContent" onClick={(e) => e.stopPropagation()}>
-        <div className="modalHeader">
+    <div className={styles.modalBackdrop} onClick={onClose}>
+      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
           <h2>{t('actions.shareToGroup') || 'Chia sẻ vào Nhóm'}</h2>
-          <button className="closeBtn" onClick={onClose}>✕</button>
+          <button className={styles.closeBtn} onClick={onClose}><Icons.Close size={18} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modalForm">
-          {errorMsg && <div className="errorBanner">{errorMsg}</div>}
+        <form onSubmit={handleSubmit} className={styles.modalForm}>
+          {errorMsg && <div className={styles.errorBanner}>{errorMsg}</div>}
 
-          <div className="shareSummary">
-            {t('groups.shareSummaryText', { count: selectedIds.length }) || `Chọn nhóm để chia sẻ ${selectedIds.length} tệp tin đã chọn. Các thành viên trong nhóm sẽ có quyền xem các tệp này.`}
+          <div className={styles.shareSummary}>
+            {t('groups.shareSummaryText', { count: selectedIds.length }) || `Chọn các nhóm để chia sẻ ${selectedIds.length} tệp tin đã chọn. Các thành viên trong nhóm sẽ có quyền xem các tệp này.`}
           </div>
 
-          <div className="formGroup">
-            <label htmlFor="groupSelect">{t('sidebar.workspace') || 'Chọn nhóm nhận'}</label>
-            <select
-              id="groupSelect"
-              value={selectedGroupId}
-              onChange={(e) => setSelectedGroupId(e.target.value)}
-              disabled={loading}
-              required
-            >
-              <option value="" disabled>{t('placeholders.selectGroup') || '-- Chọn nhóm chia sẻ --'}</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>{group.name}</option>
-              ))}
-            </select>
+          {/* Selected Pills Section */}
+          {selectedGroups.length > 0 && (
+            <div className={styles.selectedContainer}>
+              <label className={styles.formLabel}>{t('groups.selected') || 'Đã chọn'}</label>
+              <div className={`${styles.selectedPills} ${isScrollGrid ? styles.scrollGrid : ''}`}>
+                {selectedGroups.map((group) => (
+                  <div 
+                    key={group.id} 
+                    className={styles.selectedPill}
+                    onClick={() => handleToggleGroup(group.id)}
+                    title={group.name}
+                  >
+                    <span className={styles.pillCheck}>✓</span>
+                    <span className={styles.pillText}>{group.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Search Bar & Workspace List */}
+          <div className={styles.groupsListContainer}>
+            <label className={styles.formLabel}>{t('sidebar.workspace') || 'Chọn nhóm nhận'}</label>
+            
+            <div className={styles.searchContainer}>
+              <svg 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={styles.searchIcon}
+              >
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                type="text"
+                placeholder={t('placeholders.searchGroups') || 'Tìm kiếm nhóm...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={styles.searchInput}
+                disabled={loading}
+              />
+            </div>
+
+            {sortedGroups.length === 0 ? (
+              <div className={styles.noGroupsText}>
+                {searchQuery ? (t('groups.noSearchResults') || 'Không tìm thấy nhóm phù hợp.') : (t('groups.noGroupsAvailable') || 'Không có nhóm nào khả dụng.')}
+              </div>
+            ) : (
+              <div className={styles.groupsList}>
+                {sortedGroups.map((group) => {
+                  const isChecked = selectedGroupIds.includes(group.id);
+                  return (
+                    <div 
+                      key={group.id} 
+                      className={`${styles.groupRow} ${isChecked ? styles.checkedRow : ''}`}
+                      onClick={() => handleToggleGroup(group.id)}
+                    >
+                      <div className={styles.groupInfo}>
+                        <Icons.Group size={18} className={styles.groupIcon} />
+                        <span className={styles.groupName}>{group.name}</span>
+                      </div>
+                      <div className={styles.checkboxWrapper}>
+                        <input 
+                          type="checkbox" 
+                          checked={isChecked} 
+                          onChange={() => {}} // Controlled click via parent row
+                          className={styles.groupCheckbox}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          <div className="formActions">
-            <button type="button" className="actionBtnCancel" onClick={onClose} disabled={loading}>
+          <div className={styles.formActions}>
+            <button type="button" className={styles.actionBtnCancel} onClick={onClose} disabled={loading}>
               {t('actions.cancel') || 'Hủy'}
             </button>
-            <button type="submit" className="actionBtnSubmit" disabled={!selectedGroupId || loading}>
+            <button type="submit" className={styles.actionBtnSubmit} disabled={selectedGroupIds.length === 0 || loading}>
               {loading ? (t('buttons.processing') || 'Đang chia sẻ...') : (t('actions.share') || 'Chia sẻ')}
             </button>
           </div>
         </form>
       </div>
-
-      <style jsx>{`
-        .modalBackdrop {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: var(--bg-backdrop);
-          backdrop-filter: blur(12px);
-          z-index: 9999;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          animation: backdropFadeIn 0.25s ease-out;
-        }
-        .modalContent {
-          background: var(--bg-modal-wrapper);
-          backdrop-filter: blur(20px);
-          border: 1px solid var(--border-strong);
-          border-radius: 20px;
-          padding: 22px;
-          width: 90%;
-          max-width: 400px;
-          box-shadow: var(--modal-shadow);
-          box-sizing: border-box;
-          animation: modalScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-          color: var(--text-primary);
-        }
-        .modalHeader {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 14px;
-        }
-        .modalHeader h2 {
-          font-size: 18px;
-          font-weight: 700;
-          letter-spacing: -0.4px;
-          margin: 0;
-        }
-        .closeBtn {
-          background: transparent;
-          border: 0;
-          color: var(--text-muted);
-          font-size: 18px;
-          cursor: pointer;
-          transition: color 0.2s;
-          padding: 4px;
-        }
-        .closeBtn:hover {
-          color: var(--text-primary);
-        }
-        .modalForm {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-        .errorBanner {
-          background: rgba(244, 63, 94, 0.08);
-          border: 1px solid rgba(244, 63, 94, 0.15);
-          color: #fca5a5;
-          padding: 8px 12px;
-          border-radius: 8px;
-          font-size: 12.5px;
-        }
-        .shareSummary {
-          font-size: 13px;
-          color: var(--text-secondary);
-          line-height: 1.4;
-          background: var(--bg-input);
-          padding: 10px 12px;
-          border-radius: 8px;
-          border: 1px solid var(--border-color);
-        }
-        .formGroup {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-        .formGroup label {
-          font-size: 12.5px;
-          font-weight: 600;
-          color: var(--text-secondary);
-        }
-        .formGroup select {
-          width: 100%;
-          padding: 10px 12px;
-          box-sizing: border-box;
-          border-radius: 8px;
-          border: 1px solid var(--border-input);
-          background-color: var(--bg-input);
-          color: var(--text-primary);
-          font-size: 13.5px;
-          outline: none;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        .formGroup select:focus {
-          border-color: var(--border-input-focus);
-          background: var(--bg-input-focus);
-        }
-        
-        .formActions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 10px;
-          margin-top: 8px;
-          border-top: 1px solid var(--border-color);
-          padding-top: 16px;
-        }
-        .actionBtnCancel {
-          background: transparent;
-          border: 1px solid var(--border-input);
-          color: var(--text-secondary);
-          border-radius: 8px;
-          padding: 8px 16px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        .actionBtnCancel:hover {
-          background: var(--bg-item-hover);
-          color: var(--text-primary);
-        }
-        .actionBtnSubmit {
-          background: var(--button-primary-bg);
-          border: 1px solid var(--button-primary-bg);
-          color: var(--button-primary-text);
-          border-radius: 8px;
-          padding: 8px 20px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          box-shadow: 0 4px 12px var(--button-primary-shadow);
-          transition: all 0.2s ease;
-        }
-        .actionBtnSubmit:hover {
-          opacity: 0.95;
-          transform: translateY(-1px);
-        }
-        .actionBtnSubmit:disabled,
-        .actionBtnCancel:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        @keyframes backdropFadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes modalScaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.96) translateY(12px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-      `}</style>
     </div>
   );
 }

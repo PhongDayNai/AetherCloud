@@ -158,6 +158,8 @@
   "groups.nameRequired": "Vui lòng nhập tên nhóm.",
   "groups.createFailed": "Tạo nhóm thất bại.",
   "placeholders.groupName": "Ví dụ: Nhóm học tập, Gia đình...",
+  "placeholders.searchGroups": "Tìm kiếm nhóm...",
+  "groups.selected": "Đã chọn",
   "groups.selectGroupRequired": "Vui lòng chọn một nhóm.",
   "groups.shareSummaryText": "Chọn nhóm để chia sẻ {count} tệp tin đã chọn. Các thành viên trong nhóm sẽ có quyền xem các tệp này.",
   "placeholders.selectGroup": "-- Chọn nhóm chia sẻ --",

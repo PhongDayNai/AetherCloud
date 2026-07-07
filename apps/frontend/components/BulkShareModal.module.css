@@ -1,0 +1,469 @@
+.modalBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-backdrop);
+  backdrop-filter: blur(12px);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: backdropFadeIn 0.25s ease-out;
+}
+
+.modalContent {
+  background: var(--bg-modal-wrapper);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  padding: 22px;
+  width: 95%;
+  max-width: 800px;
+  height: 85%;
+  max-height: 680px;
+  box-shadow: var(--modal-shadow);
+  box-sizing: border-box;
+  animation: modalScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.modalHeader h2 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  margin: 0;
+}
+
+.closeBtn {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeBtn:hover {
+  color: var(--text-primary);
+}
+
+.modalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.errorBanner {
+  background: rgba(244, 63, 94, 0.08);
+  border: 1px solid rgba(244, 63, 94, 0.15);
+  color: #fca5a5;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+.shareSummary {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  background: var(--bg-input);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+/* Selected Pills Section */
+.selectedContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+  animation: containerSlideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.selectedPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.selectedPills.scrollGrid {
+  display: grid;
+  grid-template-rows: repeat(3, 32px);
+  grid-auto-flow: column;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-height: none;
+  padding-bottom: 6px;
+  gap: 8px;
+}
+
+/* Custom scrollbar for scrollGrid */
+.selectedPills.scrollGrid::-webkit-scrollbar {
+  height: 4px;
+}
+.selectedPills.scrollGrid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.selectedPills.scrollGrid::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+.selectedPills.scrollGrid::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.selectedPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  color: #09090b;
+  border-radius: 99px;
+  padding: 0 14px;
+  height: 32px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-sizing: border-box;
+  animation: pillFadeIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.selectedPill:hover {
+  background: #f4f4f5;
+  transform: translateY(-1px);
+}
+
+.pillCheck {
+  font-size: 12px;
+  color: #09090b;
+}
+
+.pillText {
+  color: #09090b;
+}
+
+/* Search Bar */
+.searchContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  border: 1px solid var(--border-input);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.searchInput:focus {
+  border-color: var(--border-input-focus);
+  background: var(--bg-input-focus);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+/* Groups List Container */
+.groupsListContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.formLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.noGroupsText {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 30px 20px;
+  background: var(--bg-input);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.groupsList {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  align-content: start;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border-input);
+  border-radius: 12px;
+  padding: 8px;
+  background: var(--bg-input);
+}
+
+/* Custom Scrollbar for Groups List */
+.groupsList::-webkit-scrollbar {
+  width: 6px;
+}
+.groupsList::-webkit-scrollbar-track {
+  background: transparent;
+}
+.groupsList::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+.groupsList::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+.groupRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.groupRow:hover {
+  background: var(--bg-item-hover);
+  border-color: var(--border-tile-hover);
+}
+
+.groupRow.checkedRow {
+  background: var(--bg-item-active);
+}
+
+.groupInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.groupIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+}
+
+.checkedRow .groupIcon {
+  color: var(--button-primary-bg);
+}
+
+.groupName {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkboxWrapper {
+  display: flex;
+  align-items: center;
+}
+
+/* Custom Checkbox (matches save copy to personal copy) */
+.groupCheckbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border-input);
+  background: var(--bg-input);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.groupCheckbox:checked {
+  background: var(--button-primary-bg);
+  border-color: var(--button-primary-bg);
+}
+
+.groupCheckbox:checked::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 8px;
+  border: solid var(--button-primary-text);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-0.5px, -1px);
+  animation: checkmarkScale 0.15s cubic-bezier(0.12, 0.4, 0.29, 1.46) forwards;
+}
+
+.groupCheckbox:hover {
+  border-color: var(--border-input-focus);
+  background: var(--bg-input-focus);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px;
+}
+
+.actionBtnCancel {
+  background: transparent;
+  border: 1px solid var(--border-input);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionBtnCancel:hover {
+  background: var(--bg-item-hover);
+  color: var(--text-primary);
+}
+
+.actionBtnSubmit {
+  background: var(--button-primary-bg);
+  border: 1px solid var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px var(--button-primary-shadow);
+  transition: all 0.2s ease;
+}
+
+.actionBtnSubmit:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.actionBtnSubmit:disabled,
+.actionBtnCancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes pillFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes containerSlideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    margin-bottom: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    max-height: 160px;
+    margin-bottom: 4px;
+    transform: translateY(0);
+  }
+}
+
+@keyframes checkmarkScale {
+  from {
+    transform: rotate(45deg) scale(0) translate(-0.5px, -1px);
+    opacity: 0;
+  }
+  to {
+    transform: rotate(45deg) scale(1) translate(-0.5px, -1px);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 580px) {
+  .groupsList {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .modalContent {
+    height: 90%;
+    max-height: 600px;
+    padding: 16px;
+  }
+}
