@@ -1230,7 +1230,7 @@ function DocViewerContent() {
         <div className="headerCenter">
           {['markdown', 'code', 'config', 'text'].includes(category) && (
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}
+              style={{ display: 'inline-flex', alignItems: 'center', position: 'relative' }}
               onMouseEnter={() => setIsModeHovered(true)}
               onMouseLeave={() => setIsModeHovered(false)}
             >
@@ -1271,20 +1271,20 @@ function DocViewerContent() {
                 className="sandboxChangeIcon"
                 title={modeConfig.tooltip}
                 style={{
+                  position: 'absolute',
+                  left: '100%',
+                  marginLeft: '8px',
                   color: 'var(--text-muted, #71717a)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: '6px',
                   pointerEvents: 'none',
                   transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                  transform: isModeHovered ? 'rotate(180deg)' : 'none'
+                  transform: isModeHovered ? 'rotate(180deg)' : 'none',
+                  flexShrink: 0
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M7 16V4M7 4L3 8M7 4L11 8" />
-                  <path d="M17 8v12M17 20l-4-4M17 20l-4-4" />
-                </svg>
+                <Icons.Change size={14} />
               </span>
 
               {showSandboxHint && (
