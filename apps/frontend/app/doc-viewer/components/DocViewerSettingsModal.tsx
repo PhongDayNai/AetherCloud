@@ -9,6 +9,7 @@ interface DocViewerSettingsModalProps {
   language: string;
   setLanguage: (lang: 'en' | 'vi') => void;
   t: (key: string, replacements?: Record<string, string | number>) => string;
+  onDefaultSandboxChange?: (val: 'on' | 'off') => void;
 }
 
 export default function DocViewerSettingsModal({
@@ -16,7 +17,8 @@ export default function DocViewerSettingsModal({
   onClose,
   language,
   setLanguage,
-  t
+  t,
+  onDefaultSandboxChange
 }: DocViewerSettingsModalProps): React.JSX.Element | null {
   const [defaultSandbox, setDefaultSandbox] = useState<'on' | 'off'>('on');
 
@@ -32,6 +34,9 @@ export default function DocViewerSettingsModal({
   const handleSandboxChange = (val: 'on' | 'off') => {
     setDefaultSandbox(val);
     localStorage.setItem('default_sandbox_mode', val);
+    if (onDefaultSandboxChange) {
+      onDefaultSandboxChange(val);
+    }
   };
 
   return (

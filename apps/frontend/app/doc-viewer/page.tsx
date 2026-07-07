@@ -24,6 +24,7 @@ import { useDocViewerTheme } from './hooks/useDocViewerTheme';
 import DocSidebarFiles from './components/DocSidebarFiles';
 import DiffSplitView from './components/DiffSplitView';
 import DocViewerSettingsModal from './components/DocViewerSettingsModal';
+import HintPopover from '../../components/HintPopover';
 
 import './docViewer.css';
 import 'highlight.js/styles/github-dark.css';
@@ -77,7 +78,45 @@ function DocViewerContent() {
 
   const { user, groups, addToast } = useCloud();
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [showSandboxHint, setShowSandboxHint] = useState<boolean>(false);
   const confirm = useConfirm();
+
+  // Tự động đóng gợi ý Sandbox sau 45 giây
+  useEffect(() => {
+    if (showSandboxHint) {
+      const timer = setTimeout(() => {
+        setShowSandboxHint(false);
+      }, 45000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSandboxHint]);
+
+  const handleToggleSandboxMode = () => {
+    const nextMode = !sandboxMode;
+    setSandboxMode(nextMode);
+
+    // Chỉ đếm khi default sandbox mode đang bật, người dùng chuyển sang Edit Mode (nextMode === false),
+    // và người dùng chưa từng thấy gợi ý này bao giờ
+    if (!nextMode && getDefaultSandboxMode()) {
+      const hasSeenHint = localStorage.getItem('has_seen_sandbox_hint') === 'true';
+      if (!hasSeenHint) {
+        const currentClicks = Number(sessionStorage.getItem('sandbox_to_edit_clicks') || '0');
+        const newClicks = currentClicks + 1;
+        sessionStorage.setItem('sandbox_to_edit_clicks', String(newClicks));
+
+        if (newClicks >= 3) {
+          setShowSandboxHint(true);
+          localStorage.setItem('has_seen_sandbox_hint', 'true');
+        }
+      }
+    }
+  };
+
+  const handleDisableDefaultSandbox = () => {
+    localStorage.setItem('default_sandbox_mode', 'off');
+    setShowSandboxHint(false);
+    addToast(t('viewer.sandboxDisabledToast') || 'Đã tắt chế độ chỉ đọc mặc định!', 'info');
+  };
 
   const id = searchParams.get('id');
   console.log('[DocViewer] Global Resolved Theme:', globalTheme);
@@ -1162,13 +1201,13 @@ function DocViewerContent() {
         <div className="headerCenter">
           {['markdown', 'code', 'config', 'text'].includes(category) && (
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}
               onMouseEnter={() => setIsModeHovered(true)}
               onMouseLeave={() => setIsModeHovered(false)}
             >
               <button
                 className="sandboxToggleBtn"
-                onClick={() => setSandboxMode(!sandboxMode)}
+                onClick={handleToggleSandboxMode}
                 title={modeConfig.tooltip}
                 style={{
                   display: 'flex',
@@ -1215,9 +1254,22 @@ function DocViewerContent() {
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M7 16V4M7 4L3 8M7 4L11 8" />
-                  <path d="M17 8v12M17 20l-4-4M17 20l4-4" />
+                  <path d="M17 8v12M17 20l-4-4M17 20l-4-4" />
                 </svg>
               </span>
+
+              {showSandboxHint && (
+                <HintPopover
+                  title={t('viewer.hintTitle') || 'Mẹo tiện ích'}
+                  message={t('viewer.sandboxHintMessage') || 'Bạn thường xuyên chuyển sang chế độ chỉnh sửa? Hãy tắt chế độ "Chỉ đọc" mặc định để tiết kiệm thời gian.'}
+                  onClose={() => setShowSandboxHint(false)}
+                  action={{
+                    label: t('viewer.disableDefaultSandbox') || 'Tắt mặc định',
+                    onClick: handleDisableDefaultSandbox
+                  }}
+                  placement="bottom-center"
+                />
+              )}
             </div>
           )}
         </div>
@@ -1983,6 +2035,11 @@ function DocViewerContent() {
         language={language}
         setLanguage={setLanguage}
         t={t}
+        onDefaultSandboxChange={(val) => {
+          if (val === 'off') {
+            setShowSandboxHint(false);
+          }
+        }}
       />
     </div>
   );

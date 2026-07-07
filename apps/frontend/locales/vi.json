@@ -574,5 +574,10 @@
   "viewer.settingsSandboxDesc": "Tự động mở tài liệu ở chế độ sandbox (chỉ đọc) để tránh chỉnh sửa ngoài ý muốn.",
   "viewer.settingsDone": "Hoàn tất",
   "viewer.sandboxOn": "Bật",
-  "viewer.sandboxOff": "Tắt"
+  "viewer.sandboxOff": "Tắt",
+  "viewer.hintTitle": "Mẹo tiện ích",
+  "viewer.sandboxHintMessage": "Bạn thường xuyên chuyển sang chế độ chỉnh sửa? Hãy tắt chế độ \"Chỉ đọc\" mặc định để tiết kiệm thời gian.",
+  "viewer.disableDefaultSandbox": "Tắt mặc định",
+  "viewer.sandboxDisabledToast": "Đã tắt chế độ chỉ đọc mặc định!"
 }
+

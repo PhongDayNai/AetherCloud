@@ -574,5 +574,10 @@
   "viewer.settingsSandboxDesc": "Automatically open documents in read-only sandbox mode to prevent accidental changes.",
   "viewer.settingsDone": "Done",
   "viewer.sandboxOn": "Enabled",
-  "viewer.sandboxOff": "Disabled"
+  "viewer.sandboxOff": "Disabled",
+  "viewer.hintTitle": "Utility Tip",
+  "viewer.sandboxHintMessage": "Tired of switching? Disable 'Default Sandbox Mode' in Settings to start editing immediately.",
+  "viewer.disableDefaultSandbox": "Disable Default",
+  "viewer.sandboxDisabledToast": "Default sandbox mode disabled!"
 }
+
