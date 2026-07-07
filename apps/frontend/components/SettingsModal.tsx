@@ -6,6 +6,7 @@ import CustomSelect from './CustomSelect';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { useCloud } from '../context/CloudContext';
 
 interface User {
   sub: string;
@@ -109,6 +110,7 @@ export default function SettingsModal({
   const { language, setLanguage, t } = useLanguage();
   const { theme: appearance, setTheme: setAppearance } = useTheme();
   const confirm = useConfirm();
+  const { addToast } = useCloud();
 
   const [showMainPanel, setShowMainPanel] = useState<boolean>(true);
   const [settingsTab, setSettingsTab] = useState<'general' | 'profile' | 'invites'>('general');
@@ -124,7 +126,7 @@ export default function SettingsModal({
   const [expiresInHoursInput, setExpiresInHoursInput] = useState<number | string>('');
   const [expiresDateInput, setExpiresDateInput] = useState<string>('');
   const [createInviteMsg, setCreateInviteMsg] = useState<string>('');
-  const [toastMsg, setToastMsg] = useState<string>('');
+
 
   // Mật khẩu
   const [oldPassword, setOldPassword] = useState<string>('');
@@ -166,7 +168,7 @@ export default function SettingsModal({
       setConfirmPassword('');
       setChangePasswordMsg('');
       setCreateInviteMsg('');
-      setToastMsg('');
+
 
       const savedSandbox = localStorage.getItem('default_sandbox_mode');
       setDefaultSandboxModeState(savedSandbox === 'off' ? 'off' : 'on');
@@ -191,12 +193,7 @@ export default function SettingsModal({
     }
   }
 
-  function showToast(msg: string) {
-    setToastMsg(msg);
-    setTimeout(() => {
-      setToastMsg((curr) => curr === msg ? '' : curr);
-    }, 2500);
-  }
+
 
   const todayStr = useMemo(() => {
     const d = new Date();
@@ -1123,9 +1120,9 @@ export default function SettingsModal({
                                       onClick={() => {
                                         if (isActive) {
                                           navigator.clipboard.writeText(inv.token);
-                                          showToast(t('invite.copySuccess', { token: inv.token }));
+                                          addToast(t('invite.copySuccess', { token: inv.token }) || `Copied link: ${inv.token}`, 'info');
                                         } else {
-                                          showToast(t('invite.copyLocked'));
+                                          addToast(t('invite.copyLocked') || 'Invite code is locked!', 'error');
                                         }
                                       }}
                                       title={isActive ? t('invite.titleCopyActive') : t('invite.titleCopyLocked')}
@@ -1242,27 +1239,7 @@ export default function SettingsModal({
         </div>
       )}
 
-      {toastMsg && (
-        <div style={{
-          position: 'fixed',
-          bottom: '32px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          backgroundColor: 'var(--bg-popover)',
-          color: 'var(--text-primary)',
-          padding: '8px 16px',
-          borderRadius: '6px',
-          fontSize: '12.5px',
-          fontWeight: '600',
-          boxShadow: '0 10px 20px -3px rgba(0,0,0,0.3), 0 4px 6px -2px rgba(0,0,0,0.3)',
-          zIndex: 10000,
-          border: '1px solid var(--border-color)',
-          pointerEvents: 'none',
-          boxSizing: 'border-box'
-        }}>
-          {toastMsg}
-        </div>
-      )}
+
     </>
   );
 }
