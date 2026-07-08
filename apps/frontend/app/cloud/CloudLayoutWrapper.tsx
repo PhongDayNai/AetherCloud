@@ -18,6 +18,7 @@ import { useNotification } from '../../context/NotificationContext';
 
 import Toast from '../../components/Toast';
 import toastStyles from '../../components/Toast.module.css';
+import styles from './CloudLayoutWrapper.module.css';
 
 export default function CloudLayoutWrapper({ children }: { children: React.ReactNode }) {
   const {
@@ -115,7 +116,7 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
   };
 
   return (
-    <div className="shell">
+    <div className={styles.shell}>
       <Sidebar
         tab={tab}
         setTab={setTab}
@@ -166,7 +167,7 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
         groups={groups}
       />
 
-      <main className="main">
+      <main className={styles.main}>
         <Topbar
           search={search}
           setSearch={setSearch}
@@ -192,7 +193,7 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
           ))}
         </div>
 
-        <div key={`${activeWorkspace.type}-${activeWorkspace.type === 'personal' ? 'personal' : activeWorkspace.id}-${tab}-${collectionView}`} className="pageContentTransition">
+        <div key={`${activeWorkspace.type}-${activeWorkspace.type === 'personal' ? 'personal' : activeWorkspace.id}-${tab}-${collectionView}`} className={styles.pageContentTransition}>
           {children}
         </div>
       </main>
@@ -294,91 +295,10 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
       <ProcessingBadge />
 
       {showScrollAnchorBtn && (
-        <button className="scrollAnchorBtn" onClick={scrollToAnchor}>
+        <button className={styles.scrollAnchorBtn} onClick={scrollToAnchor}>
           <span>↓ Tiếp tục xem từ tệp tin cũ</span>
         </button>
       )}
-
-      <style jsx>{`
-        .scrollAnchorBtn {
-          position: fixed;
-          bottom: 24px;
-          left: 50%;
-          transform: translateX(-50%);
-          background: var(--button-primary-bg);
-          color: var(--button-primary-text);
-          border: none;
-          padding: 10px 20px;
-          border-radius: 99px;
-          font-weight: 700;
-          font-size: 13px;
-          box-shadow: 0 8px 24px var(--button-primary-shadow);
-          cursor: pointer;
-          z-index: 9999;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          animation: floatBounce 2s infinite ease-in-out;
-          transition: all 0.2s ease;
-        }
-        .scrollAnchorBtn:hover {
-          transform: translateX(-50%) translateY(-2px);
-          box-shadow: 0 12px 30px var(--button-primary-shadow);
-        }
-        @keyframes floatBounce {
-          0%, 100% { transform: translateX(-50%) translateY(0); }
-          50% { transform: translateX(-50%) translateY(-6px); }
-        }
-
-        /* Glow Highlight Effect */
-        :global(.glowHighlight) {
-          position: relative;
-          animation: glowHighlightPulse 0.8s ease-in-out 3;
-          z-index: 10;
-        }
-        @keyframes glowHighlightPulse {
-          0%, 100% { box-shadow: none; border-color: var(--border-tile); }
-          50% { box-shadow: 0 0 20px var(--button-primary-bg); border-color: var(--button-primary-bg); }
-        }
-
-        .shell {
-          display: grid;
-          grid-template-columns: 260px 1fr;
-          height: 100vh;
-          overflow: hidden;
-          background: var(--bg-page);
-          color: var(--text-primary);
-          transition: background 0.25s ease, color 0.25s ease;
-        }
-        .main {
-          padding: 24px 32px 40px;
-          box-sizing: border-box;
-          overflow-y: auto;
-          height: 100vh;
-        }
-        @media (max-width: 900px) {
-          .shell { grid-template-columns: 1fr; }
-        }
-
-
-        .pageContentTransition {
-          animation: pageFadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          flex: 1;
-        }
-        @keyframes pageFadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </div>
   );
 }

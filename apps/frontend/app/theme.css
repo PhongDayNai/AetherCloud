@@ -157,3 +157,14 @@ body {
   border: 2px solid transparent;
   background-clip: padding-box;
 }
+
+/* Glow Highlight Effect */
+.glowHighlight {
+  position: relative;
+  animation: glowHighlightPulse 0.8s ease-in-out 3;
+  z-index: 10;
+}
+@keyframes glowHighlightPulse {
+  0%, 100% { box-shadow: none; border-color: var(--border-tile); }
+  50% { box-shadow: 0 0 20px var(--button-primary-bg); border-color: var(--button-primary-bg); }
+}
