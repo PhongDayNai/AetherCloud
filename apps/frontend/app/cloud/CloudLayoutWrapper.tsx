@@ -163,6 +163,7 @@ export default function CloudLayoutWrapper({ children }: { children: React.React
         activeWorkspace={activeWorkspace}
         setActiveWorkspace={setActiveWorkspace}
         spaces={spaces}
+        groups={groups}
       />
 
       <main className="main">

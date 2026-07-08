@@ -58,6 +58,7 @@ interface SidebarProps {
   spaces: any[];
   photosCount?: number;
   docsCount?: number;
+  groups: any[];
 }
 
 export default function Sidebar({
@@ -106,7 +107,8 @@ export default function Sidebar({
   setActiveWorkspace,
   spaces,
   photosCount,
-  docsCount
+  docsCount,
+  groups
 }: SidebarProps): React.JSX.Element {
   const router = useRouter();
 
@@ -251,6 +253,8 @@ export default function Sidebar({
         setShowSettingsModal={setShowSettingsModal}
         handleLogout={handleLogout}
         t={t}
+        activeWorkspace={activeWorkspace}
+        groups={groups}
       />
     </aside>
   );

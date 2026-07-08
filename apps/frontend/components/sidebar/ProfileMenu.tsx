@@ -10,13 +10,17 @@ interface ProfileMenuProps {
   setShowSettingsModal: (show: boolean) => void;
   handleLogout: () => void;
   t: (key: string, replacements?: Record<string, string | number>) => string;
+  activeWorkspace: any;
+  groups: any[];
 }
 
 export default function ProfileMenu({
   user,
   setShowSettingsModal,
   handleLogout,
-  t
+  t,
+  activeWorkspace,
+  groups
 }: ProfileMenuProps): React.JSX.Element {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -32,6 +36,35 @@ export default function ProfileMenu({
     return () => document.removeEventListener('click', handleGlobalClick);
   }, [showProfileMenu]);
 
+  const getDisplayRole = () => {
+    if (!user) return '';
+
+    // 1. Nếu đang ở Group Workspace
+    if (activeWorkspace?.type === 'group') {
+      const role = activeWorkspace.role;
+      if (role === 'owner') return t('groups.roleOwner') || 'Chủ nhóm';
+      if (role === 'admin') return t('groups.roleAdmin') || 'Quản trị viên';
+      return t('groups.roleMember') || 'Thành viên';
+    }
+
+    // 2. Nếu đang ở Space Workspace (nằm trong Group)
+    if (activeWorkspace?.type === 'space' && activeWorkspace.groupId) {
+      const group = groups.find((g: any) => g.id === activeWorkspace.groupId);
+      const role = group?.role || 'member';
+      if (role === 'owner') return t('groups.roleOwner') || 'Chủ nhóm';
+      if (role === 'admin') return t('groups.roleAdmin') || 'Quản trị viên';
+      return t('groups.roleMember') || 'Thành viên';
+    }
+
+    // 3. Nếu đang ở Personal Workspace hoặc Space cá nhân
+    return user.email;
+  };
+
+  const getDisplayName = () => {
+    if (!user) return t('sidebar.loading');
+    return user.name;
+  };
+
   return (
     <div className={styles.profileSwitcherWrapper}>
       <div 
@@ -44,8 +77,8 @@ export default function ProfileMenu({
               {user ? user.name.charAt(0).toUpperCase() : 'U'}
             </div>
             <div className={styles.profileMeta}>
-              <div className={styles.profileName}>{user ? (user.role === 'admin' ? user.name : t('profile.hello', { name: user.name })) : t('sidebar.loading')}</div>
-              <div className={styles.profileRole}>{user ? (user.role === 'admin' ? t('profile.admin') : t('profile.member')) : ''}</div>
+              <div className={styles.profileName}>{getDisplayName()}</div>
+              <div className={styles.profileRole}>{getDisplayRole()}</div>
             </div>
             <div className={styles.profileSettingsIcon}>
               <Icons.Settings size={14} />
@@ -63,9 +96,9 @@ export default function ProfileMenu({
                     user.name.charAt(0).toUpperCase()
                   )}
                 </div>
-                <div className={styles.popoverUserName}>{user.role === 'admin' ? user.name : t('profile.hello', { name: user.name })}</div>
+                <div className={styles.popoverUserName}>{getDisplayName()}</div>
                 <div className={styles.popoverUserBadge}>
-                  {user.role === 'admin' ? t('profile.admin') : t('profile.member')}
+                  {getDisplayRole()}
                 </div>
               </div>
               
