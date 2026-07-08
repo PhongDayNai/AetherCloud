@@ -358,6 +358,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
         setGroups(groupsList);
       }
 
+      // Sync active workspace role dynamically
+      if (activeWorkspace.type === 'group') {
+        const currentGroup = groupsList.find((g: any) => g.id === activeWorkspace.id);
+        if (currentGroup) {
+          if (currentGroup.role !== activeWorkspace.role) {
+            setActiveWorkspace({
+              type: 'group',
+              id: currentGroup.id,
+              name: currentGroup.name,
+              role: currentGroup.role
+            });
+          }
+        }
+      }
+
       let gId: string | null = null;
       if (activeWorkspace.type === 'group') {
         gId = activeWorkspace.id;
@@ -456,6 +471,38 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
   useEffect(() => {
     loadData();
   }, [activeWorkspace.type, activeWorkspace.type === 'group' ? (activeWorkspace as any).id : '', activeWorkspace.type === 'space' ? (activeWorkspace as any).id : '']);
+
+  // Listen to group updates from socket server
+  useEffect(() => {
+    const handleGroupUpdate = async (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { type, metadata } = customEvent.detail || {};
+      
+      // Reload groups and workspace details
+      await loadData(true);
+
+      if (metadata && metadata.groupId) {
+        const { groupId } = metadata;
+        const isActiveGroup = 
+          (activeWorkspace.type === 'group' && activeWorkspace.id === groupId) ||
+          (activeWorkspace.type === 'space' && activeWorkspace.groupId === groupId);
+
+        if (isActiveGroup) {
+          // 1. Kick out of group: redirect immediately and show error toast
+          if (type === 'group_kick') {
+            addToast(t('groups.error.noPermission') || 'Bạn không còn quyền truy cập nhóm này.', 'error');
+            setActiveWorkspace({ type: 'personal' });
+            router.push('/cloud/dashboard');
+          }
+        }
+      }
+    };
+
+    window.addEventListener('group-update', handleGroupUpdate);
+    return () => {
+      window.removeEventListener('group-update', handleGroupUpdate);
+    };
+  }, [activeWorkspace, loadData, addToast, t, router]);
 
   return (
     <WorkspaceContext.Provider value={{
