@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import styles from './auth.module.css';
 
 const Icons = {
   Mail: (): React.JSX.Element => (
@@ -90,55 +91,55 @@ export default function LoginForm({
 
   return (
     <>
-      <form onSubmit={onSubmit} className="form" noValidate>
-        <div className="input-group">
-          <label className="label">{t('fields.email')}</label>
-          <div className="input-wrapper">
-            <span className="input-icon"><Icons.Mail /></span>
+      <form onSubmit={onSubmit} className={styles.form} noValidate>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>{t('fields.email')}</label>
+          <div className={styles.inputWrapper}>
+            <span className={styles.inputIcon}><Icons.Mail /></span>
             <input 
               value={email} 
               onChange={(e) => setEmail(e.target.value)} 
               placeholder={t('placeholders.email')} 
               type="text"
               required
-              className="input"
+              className={styles.input}
             />
           </div>
         </div>
         
-        <div className="input-group">
-          <label className="label">{t('fields.password')}</label>
-          <div className="input-wrapper">
-            <span className="input-icon"><Icons.Lock /></span>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>{t('fields.password')}</label>
+          <div className={styles.inputWrapper}>
+            <span className={styles.inputIcon}><Icons.Lock /></span>
             <input 
               value={password} 
               onChange={(e) => setPassword(e.target.value)} 
               placeholder={t('placeholders.password')} 
               type="password" 
               required
-              className="input"
+              className={styles.input}
             />
           </div>
         </div>
 
         <button 
           disabled={isLoading}
-          className="submit-btn"
+          className={styles.submitBtn}
         >
           {isLoading ? (
-            <span className="spinner-container">
-              <span className="spinner" /> {t('buttons.processing')}
+            <span className={styles.spinnerContainer}>
+              <span className={styles.spinner} /> {t('buttons.processing')}
             </span>
           ) : t('buttons.login')}
         </button>
       </form>
 
-      <div className="toggle-container">
+      <div className={styles.toggleContainer}>
         <p>
           {t('toggle.noAccount')}{' '}
           <span 
             onClick={onToggleToRegister} 
-            className="toggle-link"
+            className={styles.toggleLink}
           >
             {t('toggle.registerNow')}
           </span>
@@ -146,7 +147,7 @@ export default function LoginForm({
       </div>
 
       {msg && (
-        <div className={`message ${msg.type === 'error' ? 'error-msg' : 'success-msg'}`}>
+        <div className={`${styles.message} ${msg.type === 'error' ? styles.errorMsg : styles.successMsg}`}>
           {msg.key ? t(msg.key) : msg.text}
         </div>
       )}

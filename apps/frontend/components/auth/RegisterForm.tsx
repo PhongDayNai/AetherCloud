@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import styles from './auth.module.css';
 
 const Icons = {
   User: (): React.JSX.Element => (
@@ -118,40 +119,40 @@ export default function RegisterForm({
 
   return (
     <>
-      <form onSubmit={onSubmit} className="form" noValidate>
-        <div className="input-group">
-          <label className="label">{t('fields.name')}</label>
-          <div className="input-wrapper">
-            <span className="input-icon"><Icons.User /></span>
+      <form onSubmit={onSubmit} className={styles.form} noValidate>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>{t('fields.name')}</label>
+          <div className={styles.inputWrapper}>
+            <span className={styles.inputIcon}><Icons.User /></span>
             <input 
               value={name} 
               onChange={(e) => setName(e.target.value)} 
               placeholder={t('placeholders.name')} 
               required
-              className="input"
+              className={styles.input}
             />
           </div>
         </div>
         
-        <div className="input-group">
-          <label className="label">{t('fields.email')}</label>
-          <div className="input-wrapper">
-            <span className="input-icon"><Icons.Mail /></span>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>{t('fields.email')}</label>
+          <div className={styles.inputWrapper}>
+            <span className={styles.inputIcon}><Icons.Mail /></span>
             <input 
               value={email} 
               onChange={(e) => setEmail(e.target.value)} 
               placeholder={t('placeholders.email')} 
               type="email"
               required
-              className="input"
+              className={styles.input}
             />
           </div>
         </div>
         
-        <div className="input-group">
-          <label className="label">{t('fields.password')}</label>
-          <div className="input-wrapper">
-            <span className="input-icon"><Icons.Lock /></span>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>{t('fields.password')}</label>
+          <div className={styles.inputWrapper}>
+            <span className={styles.inputIcon}><Icons.Lock /></span>
             <input 
               value={password} 
               onChange={(e) => setPassword(e.target.value)} 
@@ -159,44 +160,44 @@ export default function RegisterForm({
               type="password" 
               minLength={8}
               required
-              className="input"
+              className={styles.input}
             />
           </div>
         </div>
         
-        <div className="input-group">
-          <label className="label">{t('fields.inviteCode')}</label>
-          <div className="input-wrapper">
-            <span className="input-icon"><Icons.Key /></span>
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>{t('fields.inviteCode')}</label>
+          <div className={styles.inputWrapper}>
+            <span className={styles.inputIcon}><Icons.Key /></span>
             <input 
               value={inviteCode} 
               onChange={(e) => setInviteCode(e.target.value)} 
               placeholder={t('placeholders.inviteCode')} 
               maxLength={6}
               required
-              className="input invite-input"
+              className={`${styles.input} ${styles.inviteInput}`}
             />
           </div>
         </div>
 
         <button 
           disabled={isLoading}
-          className="submit-btn"
+          className={styles.submitBtn}
         >
           {isLoading ? (
-            <span className="spinner-container">
-              <span className="spinner" /> {t('buttons.processing')}
+            <span className={styles.spinnerContainer}>
+              <span className={styles.spinner} /> {t('buttons.processing')}
             </span>
           ) : t('buttons.register')}
         </button>
       </form>
 
-      <div className="toggle-container">
+      <div className={styles.toggleContainer}>
         <p>
           {t('toggle.hasAccount')}{' '}
           <span 
             onClick={onToggleToLogin} 
-            className="toggle-link"
+            className={styles.toggleLink}
           >
             {t('toggle.loginNow')}
           </span>
@@ -204,7 +205,7 @@ export default function RegisterForm({
       </div>
 
       {msg && (
-        <div className={`message ${msg.type === 'error' ? 'error-msg' : 'success-msg'}`}>
+        <div className={`${styles.message} ${msg.type === 'error' ? styles.errorMsg : styles.successMsg}`}>
           {msg.key ? t(msg.key) : msg.text}
         </div>
       )}
