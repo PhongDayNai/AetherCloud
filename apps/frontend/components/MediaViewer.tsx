@@ -7,6 +7,7 @@ import SmartVideo from './SmartVideo';
 import * as Icons from './Icons';
 import { useCloud } from '../context/CloudContext';
 import QuantumLoader from './QuantumLoader';
+import styles from './MediaViewer.module.css';
 
 interface MediaViewerProps {
   active: Asset | null;
@@ -209,20 +210,20 @@ export default function MediaViewer({
   };
 
   return (
-    <div className="viewer" onClick={handleClose}>
-      <button className="nav left" onClick={handlePrev}><Icons.ChevronLeft size={24} /></button>
-      <div className={`stage ${activeMediaFit === 'contain-tall' ? 'stageTall' : ''}`}>
-        <div className="stageTitle">{active.originalName}</div>
+    <div className={styles.viewer} onClick={handleClose}>
+      <button className={`${styles.nav} ${styles.left}`} onClick={handlePrev}><Icons.ChevronLeft size={24} /></button>
+      <div className={`${styles.stage} ${activeMediaFit === 'contain-tall' ? styles.stageTall : ''}`}>
+        <div className={styles.stageTitle}>{active.originalName}</div>
         {active.type === 'image' && (
-          <img key={active.id} src={`${api}/api/assets/_media/original/${active.id}`} alt={active.originalName} className={`full mediaEnter ${activeMediaFit}`} onClick={(e) => e.stopPropagation()} />
+          <img key={active.id} src={`${api}/api/assets/_media/original/${active.id}`} alt={active.originalName} className={`${styles.full} ${styles.mediaEnter} ${activeMediaFit === 'contain-tall' ? styles.containTall : styles.containWide}`} onClick={(e) => e.stopPropagation()} />
         )}
         {active.type === 'video' && (
           active.processingStatus === 'processing' ? (
-            <div className="videoProcessingOverlay mediaEnter" onClick={(e) => e.stopPropagation()}>
+            <div className={`${styles.videoProcessingOverlay} ${styles.mediaEnter}`} onClick={(e) => e.stopPropagation()}>
               <QuantumLoader size="medium" />
-              <div className="overlayTitle">{t('viewer.videoOptimizing')}</div>
-              <div className="overlayDesc">{t('viewer.videoOptimizingDesc')}</div>
-              <a href={`${api}/api/assets/_media/original/${active.id}`} download={active.originalName} className="downloadOriginalBtn" onClick={(e) => e.stopPropagation()}>
+              <div className={styles.overlayTitle}>{t('viewer.videoOptimizing')}</div>
+              <div className={styles.overlayDesc}>{t('viewer.videoOptimizingDesc')}</div>
+              <a href={`${api}/api/assets/_media/original/${active.id}`} download={active.originalName} className={styles.downloadOriginalBtn} onClick={(e) => e.stopPropagation()}>
                 <span>{t('viewer.downloadOriginal')}</span>
                 <span>↓</span>
               </a>
@@ -235,7 +236,7 @@ export default function MediaViewer({
                 mp4Src={`${api}/api/assets/_media/play/${active.id}?v=${encodeURIComponent(active.processingFinishedAt || active.uploadedAt || active.id)}`}
                 controls
                 autoPlay
-                className={`full mediaEnter ${activeMediaFit}`}
+                className={`${styles.full} ${styles.mediaEnter} ${activeMediaFit === 'contain-tall' ? styles.containTall : styles.containWide}`}
                 preload="auto"
                 active
                 onMeta={({ w, h }) => setActiveMediaFit(h > w ? 'contain-tall' : 'contain-wide')}
@@ -244,38 +245,38 @@ export default function MediaViewer({
           )
         )}
         {active.type !== 'image' && active.type !== 'video' && (
-          <div className="docPreviewBlock mediaEnter" onClick={(e) => e.stopPropagation()}>
-            <div className="docIcon"><Icons.DocIcon item={active} size={64} /></div>
-            <div className="docTypeMeta" style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '10px', fontWeight: 500 }}>
+          <div className={`${styles.docPreviewBlock} ${styles.mediaEnter}`} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.docIcon}><Icons.DocIcon item={active} size={64} /></div>
+            <div className={styles.docTypeMeta} style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '10px', fontWeight: 500 }}>
               {t('categories.' + docCategoryOf(active)) || docCategoryOf(active).toUpperCase()} · {fmtBytes(active.size)}
             </div>
-            <a href={getDocViewerUrl()} target="_blank" rel="noreferrer" className="openDocBtn">
+            <a href={getDocViewerUrl()} target="_blank" rel="noreferrer" className={styles.openDocBtn}>
               <span>{t('viewer.openDoc')}</span>
               <span>↗</span>
             </a>
-            <a href={`${api}/api/assets/_media/original/${active.id}`} download={active.originalName} className="downloadDocBtn">
+            <a href={`${api}/api/assets/_media/original/${active.id}`} download={active.originalName} className={styles.downloadDocBtn}>
               <span>{t('details.download') || 'Tải xuống'}</span>
               <span>↓</span>
             </a>
           </div>
         )}
       </div>
-      <button className="nav right" onClick={handleNext}><Icons.ChevronRight size={24} /></button>
-      <button className="topBtn infoBtn" onClick={(e) => { e.stopPropagation(); setShowInfo((v) => !v); }} title={t('details.title')}><Icons.Info size={18} /></button>
+      <button className={`${styles.nav} ${styles.right}`} onClick={handleNext}><Icons.ChevronRight size={24} /></button>
+      <button className={`${styles.topBtn} ${styles.infoBtn}`} onClick={(e) => { e.stopPropagation(); setShowInfo((v) => !v); }} title={t('details.title')}><Icons.Info size={18} /></button>
       {!isReadOnly && (
         active.type !== 'file' ? (
-          <button className="topBtn albumBtn" onClick={onAlbumBtnClick} title={t('viewer.createNewAlbum')}><Icons.Plus size={18} /></button>
+          <button className={`${styles.topBtn} ${styles.albumBtn}`} onClick={onAlbumBtnClick} title={t('viewer.createNewAlbum')}><Icons.Plus size={18} /></button>
         ) : (
-          <button className="topBtn albumBtn" onClick={onDocProjectBtnClick} title={t('viewer.createNewProject') || 'Tạo tập tài liệu mới'}><Icons.Plus size={18} /></button>
+          <button className={`${styles.topBtn} ${styles.albumBtn}`} onClick={onDocProjectBtnClick} title={t('viewer.createNewProject') || 'Tạo tập tài liệu mới'}><Icons.Plus size={18} /></button>
         )
       )}
       {!isReadOnly && (
-        <button className="topBtn tagBtn" onClick={onTagBtnClick} title={t('sidebar.tagsTitle')}><Icons.Tag size={18} /></button>
+        <button className={`${styles.topBtn} ${styles.tagBtn}`} onClick={onTagBtnClick} title={t('sidebar.tagsTitle')}><Icons.Tag size={18} /></button>
       )}
-      <button className="close" onClick={handleClose} title={t('actions.cancel')}><Icons.Close size={18} /></button>
+      <button className={styles.close} onClick={handleClose} title={t('actions.cancel')}><Icons.Close size={18} /></button>
 
       {showInfo && (
-        <div className="infoPanel" onClick={(e) => e.stopPropagation()}>
+        <div className={styles.infoPanel} onClick={(e) => e.stopPropagation()}>
           <div><b>{active.originalName}</b></div>
           <div>{t('details.format')}: {active.mime ? (active.originalName.includes('.') ? active.originalName.split('.').pop()?.toUpperCase() : active.mime.split('/').pop()?.toUpperCase()) : '-'}</div>
           <div>{t('details.size')}: {fmtBytes(active.size)}</div>
@@ -291,722 +292,73 @@ export default function MediaViewer({
       )}
 
       {showAlbumPicker && (
-        <div className="albumPanel" onClick={(e) => e.stopPropagation()}>
-          <input className="albumSearch" placeholder={t('viewer.searchAlbumPlaceholder')} value={albumQuery} onChange={(e) => setAlbumQuery(e.target.value)} />
-          <button className="albumCreate" onClick={() => createNewAlbumInSelection(albumQuery || window.prompt(t('viewer.newAlbumPrompt')) || '')}>+ {t('viewer.createNewAlbum')}</button>
-          <div className="albumList">
+        <div className={styles.albumPanel} onClick={(e) => e.stopPropagation()}>
+          <input className={styles.albumSearch} placeholder={t('viewer.searchAlbumPlaceholder')} value={albumQuery} onChange={(e) => setAlbumQuery(e.target.value)} />
+          <button className={styles.albumCreate} onClick={() => createNewAlbumInSelection(albumQuery || window.prompt(t('viewer.newAlbumPrompt')) || '')}>+ {t('viewer.createNewAlbum')}</button>
+          <div className={styles.albumList}>
             {albums.filter((a) => a.name.toLowerCase().includes(albumQuery.toLowerCase())).map((a) => {
               const isSelected = selectedAlbumsForActive.includes(a.name);
               return (
-                <button key={a.name} className={`albumItem ${isSelected ? 'selected' : ''}`} onClick={() => toggleAlbumSelection(a.name)}>
-                  <span className="chk">{isSelected ? '✓' : ''}</span>
+                <button key={a.name} className={`${styles.albumItem} ${isSelected ? styles.selected : ''}`} onClick={() => toggleAlbumSelection(a.name)}>
+                  <span className={styles.chk}>{isSelected ? '✓' : ''}</span>
                   <span>{a.name}</span>
-                  <span className="cnt">({a.count})</span>
+                  <span className={styles.cnt}>({a.count})</span>
                 </button>
               );
             })}
           </div>
-          <div className="albumActions">
-            <button className="albumBtnSave" onClick={saveActiveAlbums}>{t('actions.save')}</button>
-            <button className="albumBtnCancel" onClick={() => setShowAlbumPicker(false)}>{t('actions.cancel')}</button>
+          <div className={styles.albumActions}>
+            <button className={styles.albumBtnSave} onClick={saveActiveAlbums}>{t('actions.save')}</button>
+            <button className={styles.albumBtnCancel} onClick={() => setShowAlbumPicker(false)}>{t('actions.cancel')}</button>
           </div>
         </div>
       )}
 
       {showTagPicker && (
-        <div className="tagPanel" onClick={(e) => e.stopPropagation()}>
-          <input className="tagSearch" placeholder={t('viewer.searchOrCreateTagPlaceholder')} value={tagQuery} onChange={(e) => setTagQuery(e.target.value)} />
-          <button className="tagCreate" onClick={() => createNewTagInSelection(tagQuery || window.prompt(t('viewer.newTagPrompt')) || '')}>+ {t('viewer.createNewTag')}</button>
-          <div className="tagList">
+        <div className={styles.tagPanel} onClick={(e) => e.stopPropagation()}>
+          <input className={styles.tagSearch} placeholder={t('viewer.searchOrCreateTagPlaceholder')} value={tagQuery} onChange={(e) => setTagQuery(e.target.value)} />
+          <button className={styles.tagCreate} onClick={() => createNewTagInSelection(tagQuery || window.prompt(t('viewer.newTagPrompt')) || '')}>+ {t('viewer.createNewTag')}</button>
+          <div className={styles.tagList}>
             {tags.filter((tVal) => tVal.name.toLowerCase().includes(tagQuery.toLowerCase())).map((tVal) => {
               const isSelected = selectedTagsForActive.includes(tVal.name);
               return (
-                <button key={tVal.name} className={`tagItem ${isSelected ? 'selected' : ''}`} onClick={() => toggleTagSelection(tVal.name)}>
-                  <span className="chk">{isSelected ? '✓' : ''}</span>
+                <button key={tVal.name} className={`${styles.tagItem} ${isSelected ? styles.selected : ''}`} onClick={() => toggleTagSelection(tVal.name)}>
+                  <span className={styles.chk}>{isSelected ? '✓' : ''}</span>
                   <span>#{tVal.name}</span>
-                  <span className="cnt">({tVal.count})</span>
+                  <span className={styles.cnt}>({tVal.count})</span>
                 </button>
               );
             })}
           </div>
-          <div className="tagActions">
-            <button className="tagBtnSave" onClick={saveActiveTags}>{t('actions.save')}</button>
-            <button className="tagBtnCancel" onClick={() => setShowTagPicker(false)}>{t('actions.cancel')}</button>
+          <div className={styles.tagActions}>
+            <button className={styles.tagBtnSave} onClick={saveActiveTags}>{t('actions.save')}</button>
+            <button className={styles.tagBtnCancel} onClick={() => setShowTagPicker(false)}>{t('actions.cancel')}</button>
           </div>
         </div>
       )}
 
       {showDocProjectPicker && (
-        <div className="albumPanel" onClick={(e) => e.stopPropagation()}>
-          <input className="albumSearch" placeholder={t('viewer.searchProjectPlaceholder') || 'Tìm tập tài liệu...'} value={docProjectQuery} onChange={(e) => setDocProjectQuery(e.target.value)} />
-          <button className="albumCreate" onClick={() => createNewDocProjectInSelection(docProjectQuery || window.prompt(t('messages.projectPrompt')) || '')}>+ {t('viewer.createNewProject') || 'Tạo tập tài liệu mới'}</button>
-          <div className="albumList">
+        <div className={styles.albumPanel} onClick={(e) => e.stopPropagation()}>
+          <input className={styles.albumSearch} placeholder={t('viewer.searchProjectPlaceholder') || 'Tìm tập tài liệu...'} value={docProjectQuery} onChange={(e) => setDocProjectQuery(e.target.value)} />
+          <button className={styles.albumCreate} onClick={() => createNewDocProjectInSelection(docProjectQuery || window.prompt(t('messages.projectPrompt')) || '')}>+ {t('viewer.createNewProject') || 'Tạo tập tài liệu mới'}</button>
+          <div className={styles.albumList}>
             {docProjects.filter((p) => p.name.toLowerCase().includes(docProjectQuery.toLowerCase())).map((p) => {
               const isSelected = selectedDocProjectsForActive.includes(p.name);
               return (
-                <button key={p.name} className={`albumItem ${isSelected ? 'selected' : ''}`} onClick={() => toggleDocProjectSelection(p.name)}>
-                  <span className="chk">{isSelected ? '✓' : ''}</span>
+                <button key={p.name} className={`${styles.albumItem} ${isSelected ? styles.selected : ''}`} onClick={() => toggleDocProjectSelection(p.name)}>
+                  <span className={styles.chk}>{isSelected ? '✓' : ''}</span>
                   <span>{p.name}</span>
-                  <span className="cnt">({p.count})</span>
+                  <span className={styles.cnt}>({p.count})</span>
                 </button>
               );
             })}
           </div>
-          <div className="albumActions">
-            <button className="albumBtnSave" onClick={saveActiveDocProjects}>{t('actions.save')}</button>
-            <button className="albumBtnCancel" onClick={() => setShowDocProjectPicker(false)}>{t('actions.cancel')}</button>
+          <div className={styles.albumActions}>
+            <button className={styles.albumBtnSave} onClick={saveActiveDocProjects}>{t('actions.save')}</button>
+            <button className={styles.albumBtnCancel} onClick={() => setShowDocProjectPicker(false)}>{t('actions.cancel')}</button>
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        .viewer {
-          position: fixed;
-          inset: 0;
-          background: rgba(10, 10, 12, 0.98);
-          z-index: 9999;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          animation: viewerFadeIn 0.2s ease-out forwards;
-        }
-        .stage {
-          width: calc(100vw - 160px);
-          height: calc(100vh - 120px);
-          text-align: center;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          gap: 10px;
-          position: relative;
-          overflow: hidden;
-        }
-        .stageTall::before,
-        .stageTall::after {
-          content: '';
-          position: absolute;
-          top: 40px;
-          bottom: 12px;
-          width: clamp(40px, 10vw, 160px);
-          pointer-events: none;
-          z-index: 1;
-          filter: blur(16px);
-          opacity: 0.35;
-          border-radius: 18px;
-        }
-        .stageTall::before {
-          left: 0;
-          background: linear-gradient(90deg, rgba(255,255,255,.10), rgba(255,255,255,0));
-        }
-        .stageTall::after {
-          right: 0;
-          background: linear-gradient(270deg, rgba(255,255,255,.10), rgba(255,255,255,0));
-        }
-        .stageTitle, .full {
-          position: relative;
-          z-index: 2;
-        }
-        .mediaEnter {
-          animation: mediaFadeIn .3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .stageTitle {
-          margin-bottom: 6px;
-          font-weight: 600;
-          color: #ffffff;
-          font-size: 15px;
-        }
-        .full {
-          display: block;
-          max-width: 100%;
-          max-height: calc(100% - 36px);
-          width: auto;
-          height: auto;
-          object-fit: contain;
-          background: transparent;
-          border-radius: 12px;
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-        }
-        .full.contain-tall { height: calc(100% - 36px); width: auto; max-width: 100%; max-height: calc(100% - 36px); }
-        .full.contain-wide { width: 100%; height: auto; max-width: 100%; max-height: calc(100% - 36px); }
-        video.full,
-        video.full.contain-tall,
-        video.full.contain-wide {
-          width: auto !important;
-          height: calc(100% - 36px) !important;
-          min-width: 0 !important;
-          max-width: 100% !important;
-          max-height: calc(100% - 36px) !important;
-          object-fit: contain !important;
-          aspect-ratio: auto !important;
-          margin: 0 auto;
-          display: block;
-        }
-        img.full { max-width: 100%; max-height: calc(100% - 36px); }
-        .nav {
-          position: absolute;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 48px;
-          height: 48px;
-          border-radius: 99px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          font-size: 24px;
-          color: white;
-          background: rgba(255, 255, 255, 0.05);
-          cursor: pointer;
-          display: grid;
-          place-items: center;
-          transition: all 0.2s ease;
-          backdrop-filter: blur(8px);
-        }
-        .nav:hover {
-          background: rgba(255, 255, 255, 0.15);
-          border-color: rgba(255, 255, 255, 0.2);
-          transform: translateY(-50%) scale(1.05);
-        }
-        .left { left: 24px; }
-        .right { right: 24px; }
-        .topBtn {
-          position: absolute;
-          top: 24px;
-          width: 40px;
-          height: 40px;
-          border-radius: 99px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          background: rgba(255, 255, 255, 0.05);
-          color: white;
-          font-size: 16px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          backdrop-filter: blur(8px);
-          display: grid;
-          place-items: center;
-        }
-        .topBtn:hover {
-          background: rgba(255, 255, 255, 0.15);
-          border-color: rgba(255, 255, 255, 0.2);
-          transform: scale(1.05);
-        }
-        .infoBtn { right: 120px; }
-        .albumBtn { right: 72px; }
-        .tagBtn { right: 168px; }
-        .close {
-          position: absolute;
-          right: 24px;
-          top: 24px;
-          width: 40px;
-          height: 40px;
-          border-radius: 99px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          background: rgba(255, 255, 255, 0.05);
-          color: white;
-          font-size: 16px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          backdrop-filter: blur(8px);
-          display: grid;
-          place-items: center;
-        }
-        .close:hover {
-          background: rgba(255, 255, 255, 0.15);
-          border-color: rgba(255, 255, 255, 0.2);
-          transform: scale(1.05);
-        }
-        .infoPanel {
-          position: absolute;
-          right: 24px;
-          top: 76px;
-          width: 300px;
-          background: rgba(15, 15, 18, 0.85);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 16px;
-          padding: 16px;
-          display: grid;
-          gap: 8px;
-          font-size: 12px;
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(12px);
-          color: #a1a1aa;
-          animation: panelEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          transform-origin: top right;
-          z-index: 10;
-        }
-        .infoPanel b {
-          color: #ffffff;
-          font-size: 13px;
-          word-break: break-all;
-        }
-        .albumPanel {
-          position: absolute;
-          right: 24px;
-          top: 76px;
-          width: min(300px, calc(100vw - 48px));
-          box-sizing: border-box;
-          max-height: 60vh;
-          overflow-y: auto;
-          background: rgba(15, 15, 18, 0.85);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 16px;
-          padding: 12px;
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(12px);
-          animation: panelEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          transform-origin: top right;
-          z-index: 10;
-        }
-        .albumPanel * {
-          box-sizing: border-box;
-        }
-        .albumSearch {
-          width: 100%;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          color: #fff;
-          border-radius: 8px;
-          padding: 8px 10px;
-          margin-bottom: 8px;
-          font-family: inherit;
-          font-size: 13px;
-          outline: none;
-          box-sizing: border-box;
-        }
-        .albumSearch:focus {
-          border-color: rgba(255, 255, 255, 0.2);
-        }
-        .albumCreate {
-          width: 100%;
-          background: #ffffff;
-          border: 0;
-          color: #09090b;
-          border-radius: 8px;
-          padding: 8px;
-          margin-bottom: 8px;
-          font-weight: 600;
-          font-size: 12px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          font-family: inherit;
-        }
-        .albumCreate:hover {
-          background: #f4f4f5;
-        }
-        .albumList {
-          display: grid;
-          gap: 4px;
-        }
-        .albumItem {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          text-align: left;
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          color: #e4e4e7;
-          border-radius: 8px;
-          padding: 8px 10px;
-          font-size: 12px;
-          font-family: inherit;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          width: 100%;
-          box-sizing: border-box;
-        }
-        .albumItem span:nth-child(2) {
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .albumItem:hover {
-          background: rgba(255, 255, 255, 0.06);
-          color: #ffffff;
-        }
-        .albumItem.selected {
-          background: rgba(255, 255, 255, 0.08);
-          border-color: rgba(255, 255, 255, 0.2);
-          color: #ffffff;
-        }
-        .albumItem .chk {
-          width: 14px;
-          height: 14px;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          border-radius: 4px;
-          display: grid;
-          place-items: center;
-          font-size: 10px;
-          color: #09090b;
-          background: transparent;
-          transition: all 0.2s ease;
-        }
-        .albumItem.selected .chk {
-          background: #ffffff;
-          border-color: #ffffff;
-          color: #09090b;
-        }
-        .albumItem .cnt {
-          margin-left: auto;
-          font-size: 11px;
-          color: #71717a;
-        }
-        .albumActions {
-          display: flex;
-          gap: 8px;
-          margin-top: 12px;
-          border-top: 1px solid rgba(255, 255, 255, 0.06);
-          padding-top: 10px;
-        }
-        .albumBtnSave {
-          flex: 1;
-          background: #ffffff;
-          color: #09090b;
-          border: 0;
-          border-radius: 8px;
-          padding: 8px;
-          font-weight: 600;
-          font-size: 12px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          font-family: inherit;
-        }
-        .albumBtnSave:hover {
-          background: #f4f4f5;
-        }
-        .albumBtnCancel {
-          background: rgba(255, 255, 255, 0.05);
-          color: #e4e4e7;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 8px;
-          padding: 8px 12px;
-          font-weight: 600;
-          font-size: 12px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          font-family: inherit;
-        }
-        .albumBtnCancel:hover {
-          background: rgba(255, 255, 255, 0.1);
-        }
-        .tagPanel {
-          position: absolute;
-          right: 24px;
-          top: 76px;
-          width: 300px;
-          max-height: 60vh;
-          overflow-y: auto;
-          background: rgba(15, 15, 18, 0.85);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 16px;
-          padding: 12px;
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(12px);
-          animation: panelEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          transform-origin: top right;
-          z-index: 10;
-        }
-        .tagSearch {
-          width: 100%;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          color: #fff;
-          border-radius: 8px;
-          padding: 8px 10px;
-          margin-bottom: 8px;
-          font-family: inherit;
-          font-size: 13px;
-          outline: none;
-          box-sizing: border-box;
-        }
-        .tagSearch:focus {
-          border-color: rgba(255, 255, 255, 0.2);
-        }
-        .tagCreate {
-          width: 100%;
-          background: #ffffff;
-          border: 0;
-          color: #09090b;
-          border-radius: 8px;
-          padding: 8px;
-          margin-bottom: 8px;
-          font-weight: 600;
-          font-size: 12px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          font-family: inherit;
-        }
-        .tagCreate:hover {
-          background: #f4f4f5;
-        }
-        .tagList {
-          display: grid;
-          gap: 4px;
-        }
-        .tagItem {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          text-align: left;
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          color: #e4e4e7;
-          border-radius: 8px;
-          padding: 8px 10px;
-          font-size: 12px;
-          font-family: inherit;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        .tagItem:hover {
-          background: rgba(255, 255, 255, 0.06);
-          color: #ffffff;
-        }
-        .tagItem.selected {
-          background: rgba(255, 255, 255, 0.08);
-          border-color: rgba(255, 255, 255, 0.2);
-          color: #ffffff;
-        }
-        .tagItem .chk {
-          width: 14px;
-          height: 14px;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          border-radius: 4px;
-          display: grid;
-          place-items: center;
-          font-size: 10px;
-          color: #09090b;
-          background: transparent;
-          transition: all 0.2s ease;
-        }
-        .tagItem.selected .chk {
-          background: #ffffff;
-          border-color: #ffffff;
-          color: #09090b;
-        }
-        .tagItem .cnt {
-          margin-left: auto;
-          font-size: 11px;
-          color: #71717a;
-        }
-        .tagActions {
-          display: flex;
-          gap: 8px;
-          margin-top: 12px;
-          border-top: 1px solid rgba(255, 255, 255, 0.06);
-          padding-top: 10px;
-        }
-        .tagBtnSave {
-          flex: 1;
-          background: #ffffff;
-          color: #09090b;
-          border: 0;
-          border-radius: 8px;
-          padding: 8px;
-          font-weight: 600;
-          font-size: 12px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          font-family: inherit;
-        }
-        .tagBtnSave:hover {
-          background: #f4f4f5;
-        }
-        .tagBtnCancel {
-          background: rgba(255, 255, 255, 0.05);
-          color: #e4e4e7;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 8px;
-          padding: 8px 12px;
-          font-weight: 600;
-          font-size: 12px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          font-family: inherit;
-        }
-        .tagBtnCancel:hover {
-          background: rgba(255, 255, 255, 0.1);
-        }
-        .docPreviewBlock {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 20px;
-          padding: 40px;
-          width: 320px;
-          max-width: 90%;
-          text-align: center;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        }
-        .docPreviewBlock .docIcon {
-          font-size: 64px;
-          margin-bottom: 16px;
-          filter: drop-shadow(0 4px 10px rgba(0,0,0,0.3));
-        }
-        .docPreviewBlock .docName {
-          font-size: 14px;
-          font-weight: 600;
-          color: #ffffff;
-          line-height: 1.4;
-          word-break: break-all;
-        }
-        .docPreviewBlock .openDocBtn {
-          margin-top: 24px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          background: var(--accent-color, #6366f1);
-          color: #ffffff;
-          padding: 10px 24px;
-          border-radius: 12px;
-          font-weight: 600;
-          font-size: 13.5px;
-          text-decoration: none;
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          cursor: pointer;
-          width: 100%;
-          box-sizing: border-box;
-        }
-        .docPreviewBlock .openDocBtn:hover {
-          background: var(--accent-color-hover, #4f46e5);
-          transform: translateY(-1.5px);
-          box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
-        }
-        .docPreviewBlock .openDocBtn:active {
-          transform: translateY(0.5px);
-        }
-        .docPreviewBlock .downloadDocBtn {
-          margin-top: 14px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          background: transparent;
-          color: var(--text-muted, #a1a1aa);
-          padding: 6px 16px;
-          font-weight: 500;
-          font-size: 12.5px;
-          text-decoration: none;
-          transition: all 0.2s ease;
-          cursor: pointer;
-        }
-        .docPreviewBlock .downloadDocBtn:hover {
-          color: #ffffff;
-          text-decoration: underline;
-        }
-        :global([data-theme='light']) .docPreviewBlock {
-          background: rgba(255, 255, 255, 0.95);
-          border-color: rgba(0, 0, 0, 0.08);
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-        }
-        :global([data-theme='light']) .docPreviewBlock .docName {
-          color: #18181b;
-        }
-        :global([data-theme='light']) .docPreviewBlock .openDocBtn {
-          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
-          border: none;
-        }
-        :global([data-theme='light']) .docPreviewBlock .downloadDocBtn:hover {
-          color: #18181b;
-        }
-        .videoProcessingOverlay {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 16px;
-          background: rgba(15, 15, 18, 0.95);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 16px;
-          padding: 40px 24px;
-          width: 320px;
-          max-width: 90%;
-          text-align: center;
-          box-shadow: 0 10px 35px rgba(0,0,0,0.5);
-        }
-        .doubleRingLoader {
-          position: relative;
-          width: 36px;
-          height: 36px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 8px;
-        }
-        .doubleRingLoader .ring1 {
-          position: absolute;
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-          background: #eab308;
-          animation: ring1Pulse 1.6s ease-in-out infinite;
-        }
-        .doubleRingLoader .ring2 {
-          position: absolute;
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: 2px solid rgba(234, 179, 8, 0.4);
-          animation: ring2Pulse 1.6s ease-in-out infinite;
-        }
-        @keyframes ring1Pulse {
-          0% { transform: scale(0.8); opacity: 0.5; }
-          50% { transform: scale(1.2); opacity: 1; }
-          100% { transform: scale(0.8); opacity: 0.5; }
-        }
-        @keyframes ring2Pulse {
-          0% { transform: scale(1.2); opacity: 1; border-color: rgba(234, 179, 8, 0.4); }
-          50% { transform: scale(0.8); opacity: 0.2; border-color: rgba(234, 179, 8, 0.1); }
-          100% { transform: scale(1.2); opacity: 1; border-color: rgba(234, 179, 8, 0.4); }
-        }
-        .overlayTitle {
-          font-size: 15px;
-          font-weight: 700;
-          color: #ffffff;
-          margin-top: 8px;
-        }
-        .overlayDesc {
-          font-size: 12px;
-          color: #71717a;
-          line-height: 1.5;
-        }
-        .downloadOriginalBtn {
-          margin-top: 12px;
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          background: #ffffff;
-          color: #09090b;
-          text-decoration: none;
-          font-size: 12.5px;
-          font-weight: 600;
-          padding: 8px 16px;
-          border-radius: 8px;
-          transition: background 0.15s ease;
-        }
-        .downloadOriginalBtn:hover {
-          background: #f4f4f5;
-        }
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        @keyframes mediaFadeIn {
-          from { opacity: 0; transform: scale(.97) translateY(8px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        @keyframes viewerFadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes panelEnter {
-          from { opacity: 0; transform: scale(0.95) translateY(-8px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }
