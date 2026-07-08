@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { getApiOrigin } from '../lib/utils';
+import { useLanguage } from './LanguageContext';
 
 export interface NotificationItem {
   id: string;
@@ -33,6 +34,7 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useLanguage();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -44,6 +46,71 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const isMountedRef = useRef<boolean>(true);
   const toastListenerRef = useRef<((message: string, type: 'info' | 'error' | 'backend', options?: { title?: string; duration?: number; onClick?: () => void }) => void) | null>(null);
   const isConnectingRef = useRef<boolean>(false);
+
+  const getFormattedNotificationText = useCallback((item: NotificationItem) => {
+    const meta = item.metadata || {};
+    const getRoleLabel = (r: string) => {
+      if (r === 'admin') return t('profile.admin') || 'Quản trị viên';
+      if (r === 'member') return t('profile.member') || 'Thành viên';
+      return r;
+    };
+
+    switch (item.type) {
+      case 'group_invite':
+        return {
+          title: t('notifications.type.group_invite') || 'Lời mời tham gia nhóm',
+          content: t('notifications.type.group_invite.desc', {
+            senderName: meta.senderName || 'Ai đó',
+            groupName: meta.groupName || 'Nhóm',
+            role: getRoleLabel(meta.role || 'member')
+          })
+        };
+      case 'group_join':
+        return {
+          title: t('notifications.type.group_join') || 'Thành viên mới gia nhập',
+          content: t('notifications.type.group_join.desc', {
+            joinerName: meta.joinerName || 'Thành viên',
+            groupName: meta.groupName || 'Nhóm'
+          })
+        };
+      case 'group_leave':
+        return {
+          title: t('notifications.type.group_leave') || 'Thành viên rời nhóm',
+          content: t('notifications.type.group_leave.desc', {
+            userName: meta.userName || 'Thành viên',
+            groupName: meta.groupName || 'Nhóm'
+          })
+        };
+      case 'group_kick':
+        return {
+          title: t('notifications.type.group_kick') || 'Thông báo từ nhóm',
+          content: t('notifications.type.group_kick.desc', {
+            groupName: meta.groupName || 'Nhóm'
+          })
+        };
+      case 'group_role_update':
+        return {
+          title: t('notifications.type.group_role_update') || 'Cập nhật chức vụ',
+          content: t('notifications.type.group_role_update.desc', {
+            groupName: meta.groupName || 'Nhóm',
+            role: getRoleLabel(meta.role || 'member')
+          })
+        };
+      case 'group_owner_transfer':
+        return {
+          title: t('notifications.type.group_owner_transfer') || 'Nhượng chức Chủ nhóm',
+          content: t('notifications.type.group_owner_transfer.desc', {
+            groupName: meta.groupName || 'Nhóm',
+            newOwnerName: meta.newOwnerName || 'Chủ sở hữu mới'
+          })
+        };
+      default:
+        return {
+          title: item.title,
+          content: item.content
+        };
+    }
+  }, [t]);
 
   const registerToastListener = useCallback((listener: (message: string, type: 'info' | 'error' | 'backend', options?: { title?: string; duration?: number; onClick?: () => void }) => void) => {
     toastListenerRef.current = listener;
@@ -316,10 +383,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               setUnreadCount((prev) => prev + 1);
             }
 
+            const formatted = getFormattedNotificationText(newNotification);
+
             // Hiển thị Toast thông báo realtime
             if (toastListenerRef.current) {
-              toastListenerRef.current(newNotification.content, 'backend', {
-                title: newNotification.title,
+              toastListenerRef.current(formatted.content, 'backend', {
+                title: formatted.title,
                 duration: 10000,
                 onClick: () => {
                   if (newNotification.type === 'group_invite' && newNotification.metadata?.token) {
@@ -329,7 +398,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 }
               });
             } else {
-              addNotificationToast(newNotification.title, newNotification.content);
+              addNotificationToast(formatted.title, formatted.content);
             }
           }
         } catch (err) {
