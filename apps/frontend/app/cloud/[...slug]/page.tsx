@@ -456,6 +456,14 @@ export default function DashboardPage(): React.JSX.Element {
               {t('sidebar.recentlyAdded') || 'Mới thêm'}
             </button>
             <button
+              className={`tabBtn ${collectionView === 'albums' ? 'active' : ''}`}
+              onClick={() => setCollectionView('albums')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Icons.Folder size={14} />
+              {t('sidebar.albums') || (language === 'en' ? 'Albums' : 'Album')}
+            </button>
+            <button
               className={`tabBtn ${collectionView === 'images' ? 'active' : ''}`}
               onClick={() => setCollectionView('images')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -481,21 +489,69 @@ export default function DashboardPage(): React.JSX.Element {
             </button>
           </div>
 
-          <AssetGrid
-            groupByTimeEnabled={groupByTimeEnabled}
-            setGroupByTimeEnabled={setGroupByTimeEnabled}
-            groupMode={groupMode}
-            setGroupMode={setGroupMode}
-            collectionView={collectionView}
-            photoGroups={photoGroups}
-            expandedGroups={expandedGroups}
-            toggleGroup={toggleGroup}
-            selectedIds={selectedIds}
-            api={api}
-            cardHandlers={cardHandlers}
-            openPhoto={openPhoto}
-            t={t}
-          />
+          {collectionView === 'albums' && selectedAlbum !== 'all' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', marginTop: '8px' }}>
+              <button 
+                onClick={() => setSelectedAlbum('all')} 
+                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '13px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: '600' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
+                {t('spaces.backToSpace') || (language === 'en' ? 'Back' : 'Quay lại')}
+              </button>
+              <span style={{ color: 'var(--text-muted)' }}>/</span>
+              <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{selectedAlbum}</span>
+            </div>
+          )}
+
+          {collectionView === 'albums' && selectedAlbum === 'all' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', marginTop: '20px' }}>
+              {availableAlbums.length === 0 ? (
+                <div style={{ gridColumn: '1/-1', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '80px 0' }}>
+                  {t('invite.emptyList') || (language === 'en' ? 'No albums created yet' : 'Chưa có album nào được tạo')}
+                </div>
+              ) : (
+                availableAlbums.map(([name, count]) => (
+                  <div 
+                    key={name}
+                    style={{ background: 'var(--bg-tile)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '16px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all 0.2s' }}
+                    onClick={() => setSelectedAlbum(name)}
+                    onMouseEnter={(e: any) => {
+                      e.currentTarget.style.borderColor = 'var(--border-strong)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e: any) => {
+                      e.currentTarget.style.borderColor = 'var(--border-color)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--bg-item-active)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icons.Folder size={24} style={{ color: 'var(--text-primary)' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary)' }}>{name}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{count} {t('photos.countItems') || (language === 'en' ? 'files' : 'tập tin')}</div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <AssetGrid
+              groupByTimeEnabled={groupByTimeEnabled}
+              setGroupByTimeEnabled={setGroupByTimeEnabled}
+              groupMode={groupMode}
+              setGroupMode={setGroupMode}
+              collectionView={collectionView}
+              photoGroups={photoGroups}
+              expandedGroups={expandedGroups}
+              toggleGroup={toggleGroup}
+              selectedIds={selectedIds}
+              api={api}
+              cardHandlers={cardHandlers}
+              openPhoto={openPhoto}
+              t={t}
+            />
+          )}
         </>
       )}
 

@@ -60,14 +60,14 @@ interface AssetContextType {
   setDocTypeFilter: React.Dispatch<React.SetStateAction<string>>;
   docCategoryFilter: string[];
   setDocCategoryFilter: (val: string[] | string | ((prev: string[]) => string[])) => void;
-  docCollectionView: 'all' | 'recent' | 'trash';
-  setDocCollectionView: React.Dispatch<React.SetStateAction<'all' | 'recent' | 'trash'>>;
+  docCollectionView: 'all' | 'recent' | 'binders' | 'trash';
+  setDocCollectionView: (view: 'all' | 'recent' | 'binders' | 'trash') => void;
   allFilesCollectionView: 'all' | 'recent' | 'trash';
-  setAllFilesCollectionView: React.Dispatch<React.SetStateAction<'all' | 'recent' | 'trash'>>;
+  setAllFilesCollectionView: (view: 'all' | 'recent' | 'trash') => void;
   docKindsExpanded: boolean;
-  setDocKindsExpanded: React.Dispatch<React.SetStateAction<boolean>>;
-  collectionView: 'all' | 'recent' | 'images' | 'videos' | 'trash';
-  setCollectionView: React.Dispatch<React.SetStateAction<'all' | 'recent' | 'images' | 'videos' | 'trash'>>;
+  setDocKindsExpanded: (expanded: boolean) => void;
+  collectionView: 'all' | 'recent' | 'albums' | 'images' | 'videos' | 'trash';
+  setCollectionView: React.Dispatch<React.SetStateAction<'all' | 'recent' | 'albums' | 'images' | 'videos' | 'trash'>>;
   spacesSubTab: 'active' | 'trash';
   setSpacesSubTab: React.Dispatch<React.SetStateAction<'active' | 'trash'>>;
   albumsExpanded: boolean;
@@ -196,10 +196,10 @@ export function AssetProvider({ children }: { children: React.ReactNode }): Reac
     });
   };
 
-  const [docCollectionView, setDocCollectionView] = useState<'all' | 'recent' | 'trash'>('all');
+  const [docCollectionView, setDocCollectionView] = useState<'all' | 'recent' | 'binders' | 'trash'>('all');
   const [allFilesCollectionView, setAllFilesCollectionView] = useState<'all' | 'recent' | 'trash'>('all');
-  const [docKindsExpanded, setDocKindsExpanded] = useState<boolean>(false);
-  const [collectionView, setCollectionView] = useState<'all' | 'recent' | 'images' | 'videos' | 'trash'>('all');
+  const [docKindsExpanded, setDocKindsExpanded] = useState(false);
+  const [collectionView, setCollectionView] = useState<'all' | 'recent' | 'albums' | 'images' | 'videos' | 'trash'>('all');
   const [spacesSubTab, setSpacesSubTab] = useState<'active' | 'trash'>('active');
   const [albumsExpanded, setAlbumsExpanded] = useState<boolean>(false);
   const [docProjectsExpanded, setDocProjectsExpanded] = useState<boolean>(false);
@@ -1148,6 +1148,20 @@ export function AssetProvider({ children }: { children: React.ReactNode }): Reac
   useEffect(() => {
     setActiveIndex(-1);
   }, [tab, collectionView, selectedAlbum, docCollectionView, docCategoryFilter, selectedDocProject, selectedFilterTags]);
+
+  // Tự động reset selectedAlbum về 'all' khi chuyển sang tab collectionView khác 'albums'
+  useEffect(() => {
+    if (collectionView !== 'albums') {
+      setSelectedAlbum('all');
+    }
+  }, [collectionView, setSelectedAlbum]);
+
+  // Tự động reset selectedDocProject về 'all' khi chuyển sang tab docCollectionView khác 'binders'
+  useEffect(() => {
+    if (docCollectionView !== 'binders') {
+      setSelectedDocProject('all');
+    }
+  }, [docCollectionView, setSelectedDocProject]);
 
   // Load data when activeWorkspace or tab changes
   useEffect(() => {
