@@ -68,11 +68,14 @@ export default function GroupInviteManager({
   };
 
   useEffect(() => {
-    fetchInvites();
-  }, [groupId]);
+    if (localRole !== 'member') {
+      fetchInvites();
+    }
+  }, [groupId, localRole]);
 
   // Listen to realtime updates
   useEffect(() => {
+    if (localRole === 'member') return;
     const handleGroupUpdate = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { metadata } = customEvent.detail || {};
@@ -82,7 +85,7 @@ export default function GroupInviteManager({
     };
     window.addEventListener('group-update', handleGroupUpdate);
     return () => window.removeEventListener('group-update', handleGroupUpdate);
-  }, [groupId]);
+  }, [groupId, localRole]);
 
   const todayStr = useMemo(() => {
     const d = new Date();

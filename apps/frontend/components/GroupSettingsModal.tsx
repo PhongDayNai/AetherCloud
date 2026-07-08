@@ -152,13 +152,15 @@ export default function GroupSettingsModal({
                 <span>{t('groups.pendingTab') || 'Lời mời đang chờ'}</span>
               </button>
             )}
-            <button
-              className={`${styles.verticalTabButton} ${activeTab === 'invites' ? styles.active : ''}`}
-              onClick={() => setActiveTab('invites')}
-            >
-              <Icons.Documents size={16} />
-              <span>{t('groups.invitesTab') || 'Mã mời nhóm'}</span>
-            </button>
+            {localRole !== 'member' && (
+              <button
+                className={`${styles.verticalTabButton} ${activeTab === 'invites' ? styles.active : ''}`}
+                onClick={() => setActiveTab('invites')}
+              >
+                <Icons.Documents size={16} />
+                <span>{t('groups.invitesTab') || 'Mã mời nhóm'}</span>
+              </button>
+            )}
           </div>
 
           <div className={styles.sidebarFooter}>
